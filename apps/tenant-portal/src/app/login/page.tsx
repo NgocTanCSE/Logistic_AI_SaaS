@@ -141,9 +141,11 @@ if (!response.data?.access_token && !response.data?.accessToken) {
             <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 mb-2">Quick Login Demo</p>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => { setTenantSlug('demo-tenant'); setEmail('tenant.admin@smartlogi.vn'); }} className="text-[10px] py-1 h-auto">Admin</Button>
-              <Button variant="outline" size="sm" onClick={() => { setTenantSlug('warehouse-tenant'); setEmail('manager@warehouse.vn'); }} className="text-[10px] py-1 h-auto">Warehouse</Button>
+              <Button variant="outline" size="sm" onClick={() => { setTenantSlug('warehouse-tenant'); setEmail('manager@warehouse.vn'); }} className="text-[10px] py-1 h-auto">WH Mgr</Button>
+              <Button variant="outline" size="sm" onClick={() => { setTenantSlug('pack-station'); setEmail('staff@warehouse.vn'); }} className="text-[10px] py-1 h-auto">WH Staff</Button>
               <Button variant="outline" size="sm" onClick={() => { setTenantSlug('logistics-tenant'); setEmail('dispatch@logistics.vn'); }} className="text-[10px] py-1 h-auto">Dispatch</Button>
               <Button variant="outline" size="sm" onClick={() => { setTenantSlug('smartlogi'); setEmail('driver@smartlogi.vn'); }} className="text-[10px] py-1 h-auto">Driver</Button>
+              <Button variant="outline" size="sm" onClick={() => { setTenantSlug('customer-tenant'); setEmail('client@customer.vn'); }} className="text-[10px] py-1 h-auto">Customer</Button>
             </div>
           </div>
 

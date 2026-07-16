@@ -82,7 +82,7 @@ export class AuthService {
         data: {
           name: tenantSlug,
           slug: tenantSlug,
-          dbSchemaName: 'public',
+          dbSchemaName: tenantSlug.replace(/-/g, '_'),
           status: 'ACTIVE',
         },
       });
