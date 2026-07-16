@@ -25,6 +25,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git checkout --orphan hf-deploy
           git rm -rf --cached . 2>/dev/null || true
+          rm -rf apps/driver-app
           rm -rf packages/prisma-schemas/prisma/migrations
           rm -f .env.docker
           cp Dockerfile.hf Dockerfile
