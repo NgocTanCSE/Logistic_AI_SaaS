@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "echo 'prisma-schemas ready'",
     "seed": "ts-node prisma/seed.ts",
-    "seed:lite": "ts-node prisma/seed-lite.ts",
+    "seed:lite": "ts-node prisma/seeds/index.ts",
     "build": "tsc",
     "migrate:deploy": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
