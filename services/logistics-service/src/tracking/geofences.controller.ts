@@ -18,8 +18,6 @@ export class GeofencesController {
   @RequirePermissions(Permissions.TripsDispatch)
   async createGeofence(@Body() body: { name: string, polygonWkt: string, zoneType: string }, @Request() req: any) {
     const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
-    if (isSqlite) return { ok: true, message: "Mock Geofence created (SQLite mode)" };
-
     const schemaName = req.schemaName || 'tenant';
     
     if (!this.validateSchemaName(schemaName)) {
@@ -28,6 +26,18 @@ export class GeofencesController {
 
     if (!body.name || !body.polygonWkt || !body.zoneType) {
       throw new BadRequestException("name, polygonWkt, and zoneType are required");
+    }
+
+    if (isSqlite) {
+      await this.prisma.geofence.create({
+        data: {
+          name: body.name,
+          polygon: body.polygonWkt, // Store raw WKT string
+          zoneType: body.zoneType,
+          isActive: true
+        }
+      });
+      return { ok: true, message: "Geofence created (SQLite mode)" };
     }
 
     await this.prisma.$executeRawUnsafe(
@@ -43,17 +53,21 @@ export class GeofencesController {
   @RequirePermissions(Permissions.TripsRead)
   async listGeofences(@Request() req: any) {
     const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
-    if (isSqlite) {
-      return [
-        { id: "mock-1", name: "Mock Zone 1", polygon: { type: "Polygon", coordinates: [[[0,0],[0,1],[1,1],[1,0],[0,0]]] }, zoneType: "RESTRICTED", isActive: true },
-        { id: "mock-2", name: "Mock Zone 2", polygon: { type: "Polygon", coordinates: [[[2,2],[2,3],[3,3],[3,2],[2,2]]] }, zoneType: "SAFE", isActive: true }
-      ];
-    }
-
     const schemaName = req.schemaName || 'tenant';
     
     if (!this.validateSchemaName(schemaName)) {
       throw new BadRequestException("Invalid schema name");
+    }
+
+    if (isSqlite) {
+      const fences = await this.prisma.geofence.findMany();
+      return fences.map(f => ({
+        id: f.id,
+        name: f.name,
+        polygon: { type: "Polygon", coordinates: [[[0,0],[0,1],[1,1],[1,0],[0,0]]] }, // Dummy GeoJSON for frontend render if needed, or parse WKT here
+        zoneType: f.zoneType,
+        isActive: f.isActive
+      }));
     }
 
     const result: any[] = await this.prisma.$queryRawUnsafe(
@@ -68,12 +82,22 @@ export class GeofencesController {
   @RequirePermissions(Permissions.TripsDispatch)
   async updateGeofence(@Param("id") id: string, @Body() body: { name?: string, zoneType?: string, isActive?: boolean }, @Request() req: any) {
     const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
-    if (isSqlite) return { ok: true, message: "Mock Geofence updated (SQLite mode)" };
-
     const schemaName = req.schemaName || 'tenant';
     
     if (!this.validateSchemaName(schemaName)) {
       throw new BadRequestException("Invalid schema name");
+    }
+
+    if (isSqlite) {
+      await this.prisma.geofence.update({
+        where: { id },
+        data: {
+          ...(body.name && { name: body.name }),
+          ...(body.zoneType && { zoneType: body.zoneType }),
+          ...(body.isActive !== undefined && { isActive: body.isActive })
+        }
+      });
+      return { ok: true };
     }
 
     const result: any[] = await this.prisma.$queryRawUnsafe(
@@ -92,12 +116,15 @@ export class GeofencesController {
   @RequirePermissions(Permissions.TripsDispatch)
   async deleteGeofence(@Param("id") id: string, @Request() req: any) {
     const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
-    if (isSqlite) return { ok: true, message: "Mock Geofence deleted (SQLite mode)" };
-
     const schemaName = req.schemaName || 'tenant';
     
     if (!this.validateSchemaName(schemaName)) {
       throw new BadRequestException("Invalid schema name");
+    }
+
+    if (isSqlite) {
+      await this.prisma.geofence.delete({ where: { id } });
+      return { ok: true };
     }
 
     const result: any[] = await this.prisma.$queryRawUnsafe(

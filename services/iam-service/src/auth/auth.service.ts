@@ -98,70 +98,33 @@ export class AuthService {
     const expectedRole = this.getRoleFromSlug(tenantSlug);
 
     if (isSqlite) {
-      // SQLite/Fallback mode - try to find user, create if not exists (demo mode)
-      let user = await this.prisma.tenantUser.findFirst({
+      const user = await this.prisma.tenantUser.findFirst({
         where: { email },
       });
 
       if (!user) {
-        // Auto-create demo user for testing (SQLite mode)
-        user = await this.prisma.tenantUser.create({
-          data: {
-            email,
-            passwordHash: await bcrypt.hash(pass || 'Tenant@123', 10),
-            fullName: 'Demo User',
-            status: 'ACTIVE',
-          },
-        });
+        throw new UnauthorizedException('Invalid credentials');
       }
 
-      // Always ensure the user has the expected role for the tenant they are logging into
-      const existingRoleCheck = await this.prisma.customRole.findFirst({
-        where: { name: expectedRole },
-      });
-      let assignedRoleId = existingRoleCheck?.id;
-      if (!assignedRoleId) {
-        const newRole = await this.prisma.customRole.create({
-          data: { name: expectedRole, isSystemDefault: true },
-        });
-        assignedRoleId = newRole.id;
-      }
-      
-      // Upsert the userRole linking
-      await this.prisma.userRole.upsert({
-        where: { userId_roleId: { userId: user.id, roleId: assignedRoleId } },
-        update: {},
-        create: { userId: user.id, roleId: assignedRoleId }
-      });
-
-      // Create default permissions if missing
-      const adminPerms = [
-        'inventory:read', 'inventory:adjust', 'warehouses:manage', 'tasks:read', 'tasks:create', 'tasks:update',
-        'orders:read', 'orders:create', 'trips:read', 'trips:dispatch', 'vehicles:read', 'vehicles:manage',
-        'drivers:manage', 'users:read', 'users:invite', 'roles:manage', 'settings:manage', 'audit-logs:read',
-        'billing:read', 'api-keys:manage', 'notifications:read', 'mobile:sync:pull', 'mobile:sync:push',
-        'mobile:uploads', 'mobile:gps:batch', 'mobile:sos', 'pack-station:scan', 'clients:manage', 'clients:read',
-        'returns:read', 'returns:create', 'returns:approve', 'returns:inspect', 'returns:refund', 'tenant-dashboard:read'
-      ];
-      for (const p of adminPerms) {
-        const [resource, action] = p.split(':');
-        await this.prisma.rolePermission.upsert({
-          where: { roleId_resource_action: { roleId: assignedRoleId, resource, action } },
-          update: {},
-          create: { roleId: assignedRoleId, resource, action },
-        });
+      const isPasswordValid = await bcrypt.compare(pass, user.passwordHash || '');
+      if (!isPasswordValid) {
+        throw new UnauthorizedException('Invalid credentials');
       }
 
-      // Skip password validation in SQLite mode for demo
-      const permissions: string[] = [];
-
-      // Fetch permissions for the assigned role
-      const perms = await this.prisma.rolePermission.findMany({
-        where: { roleId: assignedRoleId },
+      const roles = await this.prisma.userRole.findMany({
+        where: { userId: user.id },
+        include: { role: true },
       });
-      permissions.push(...perms.map(p => `${p.resource}:${p.action}`));
+      const userRoleId = roles[0]?.roleId;
+      let permissions: string[] = [];
+      if (userRoleId) {
+        const perms = await this.prisma.rolePermission.findMany({
+          where: { roleId: userRoleId },
+        });
+        permissions = perms.map(p => `${p.resource}:${p.action}`);
+      }
 
-      const dbRole = expectedRole;
+      const dbRole = roles[0]?.role?.name || expectedRole;
 
       const payload: any = {
         sub: user.id,

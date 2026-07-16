@@ -28,32 +28,22 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const redirectByRole = (role: string) => {
-    switch (role) {
-      case 'TENANT_ADMIN':
-        router.replace('/dashboard');
-        break;
-      case 'WAREHOUSE_MANAGER':
-        router.replace('/wms/tasks');
-        break;
-      case 'LOGISTICS_MANAGER':
-        router.replace('/logistics/dispatch');
-        break;
-      case 'WAREHOUSE_STAFF':
-        router.replace('/wms/tasks');
-        break;
-      case 'DRIVER':
-        router.replace('/drivers/my-trips');
-        break;
-      case 'CUSTOMER_CLIENT':
-        router.replace('/orders');
-        break;
-      case 'TENANT_USER':
-        router.replace('/dashboard');
-        break;
-      default:
-        router.replace('/inventory');
-        break;
+  const redirectByRole = (roleStr: string) => {
+    const roles = roleStr.split(',').map(r => r.trim());
+    if (roles.includes('TENANT_ADMIN')) {
+      router.replace('/dashboard');
+    } else if (roles.includes('WAREHOUSE_MANAGER') || roles.includes('WAREHOUSE_STAFF')) {
+      router.replace('/wms/tasks');
+    } else if (roles.includes('LOGISTICS_MANAGER')) {
+      router.replace('/logistics/dispatch');
+    } else if (roles.includes('DRIVER')) {
+      router.replace('/drivers/my-trips');
+    } else if (roles.includes('CUSTOMER_CLIENT')) {
+      router.replace('/orders');
+    } else if (roles.includes('TENANT_USER')) {
+      router.replace('/dashboard');
+    } else {
+      router.replace('/inventory');
     }
   };
 
