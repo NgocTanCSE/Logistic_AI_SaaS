@@ -16,6 +16,7 @@ export default function Sidebar() {
   const canAccessAdmin = isSuperAdmin || ['TENANT_ADMIN'].includes(role);
   const isTenantUser = role === 'TENANT_USER';
   const isDriver = role === 'DRIVER';
+  const isClient = role === 'CLIENT_USER' || role === 'CUSTOMER';
 
   const NavLink = ({ href, children, exact }: { href: string, children: React.ReactNode, exact?: boolean }) => {
     const isActive = exact ? pathname === href : (pathname === href || (href !== '/dashboard' && pathname.startsWith(href + '/')));
@@ -74,6 +75,7 @@ export default function Sidebar() {
               )}
               {role === 'WAREHOUSE_STAFF' && (
                 <>
+                  <NavLink href="/wms/waves">Wave Picking</NavLink>
                   <NavLink href="/wms/packing">Pack Station</NavLink>
                   <NavLink href="/wms/tasks">My Tasks</NavLink>
                 </>
@@ -105,7 +107,7 @@ export default function Sidebar() {
           <div className="pt-4 border-t border-slate-100">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 px-4">Administration</div>
             <div className="space-y-1">
-              <NavLink href="/branches">Branch Registry</NavLink>
+              {isSuperAdmin && <NavLink href="/branches">Branch Registry</NavLink>}
               <NavLink href="/admin/clients">Client Accounts</NavLink>
               <NavLink href="/admin/billing">Billing</NavLink>
               <NavLink href="/admin/api-keys">API Keys</NavLink>
@@ -118,13 +120,23 @@ export default function Sidebar() {
           </div>
         )}
 
+        {/* Client Portal */}
+        {isClient && (
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 px-4">Client Portal</div>
+            <div className="space-y-1">
+              <NavLink href="/orders">My Orders</NavLink>
+              <NavLink href="/inventory">My Inventory</NavLink>
+              <NavLink href="/logistics/reports">Tracking</NavLink>
+            </div>
+          </div>
+        )}
 
         {/* Tenant User Basic Access */}
         {isTenantUser && (
           <div>
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 px-4">Workspace</div>
             <div className="space-y-1">
-              <NavLink href="/dashboard">Dashboard</NavLink>
               <NavLink href="/orders">Orders</NavLink>
               <NavLink href="/inventory">Inventory View</NavLink>
             </div>
@@ -133,11 +145,10 @@ export default function Sidebar() {
 
         {isDriver && (
           <div>
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 px-4">Driver</div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 px-4">Driver Portal</div>
             <div className="space-y-1">
-              <NavLink href="/dashboard">Dashboard</NavLink>
               <NavLink href="/drivers/my-trips">My Trips</NavLink>
-              <NavLink href="/orders">Orders</NavLink>
+              <NavLink href="/orders">Deliveries</NavLink>
             </div>
           </div>
         )}

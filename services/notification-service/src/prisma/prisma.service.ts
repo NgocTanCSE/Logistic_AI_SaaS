@@ -61,7 +61,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
   public switchSchema(schemaName?: string): any {
     if (PrismaService.isSqlite) {
-      return this;
+      return (this as any).$extends({});
     }
     const schema = schemaName || 'public';
     if (!schema || schema === 'public') {
@@ -83,3 +83,4 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     return extended || this;
   }
 }
+

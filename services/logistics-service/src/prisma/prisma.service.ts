@@ -61,7 +61,7 @@ public get tenantClient(): any {
 
   public switchSchema(schemaName?: string): any {
     if (PrismaService.isSqlite) {
-      return this;
+      return (this as any).$extends({});
     }
     const schema = schemaName || 'public';
     if (!schema || schema === 'public') {
@@ -83,3 +83,4 @@ public get tenantClient(): any {
     return extended || this;
   }
 }
+
