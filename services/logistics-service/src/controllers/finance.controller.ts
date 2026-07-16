@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, UseGuards, Query, Param, UseInterceptors, UploadedFile, BadRequestException } from "@nestjs/common"
+﻿import { Controller, Get, Post, Patch, Body, UseGuards, Query, Param, UseInterceptors, UploadedFile, BadRequestException } from "@nestjs/common"
 import { FileInterceptor } from "@nestjs/platform-express"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types"
@@ -48,19 +48,19 @@ export class FinanceController {
       throw new BadRequestException("No file uploaded");
     }
 
-    // 1. Đọc file Excel từ ngân hàng
+    // 1. Äá»c file Excel tá»« ngĂ¢n hĂ ng
     const workbook = XLSX.read(file.buffer, { type: 'buffer' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data: any[] = XLSX.utils.sheet_to_json(sheet);
 
-    // 2. Map data sang format chuẩn (Reference, Amount, Date)
+    // 2. Map data sang format chuáº©n (Reference, Amount, Date)
     const entries = data.map(row => ({
-      reference: String(row['Reference'] || row['Nội dung'] || ''),
-      amount: Number(row['Amount'] || row['Số tiền'] || 0),
-      transactionDate: String(row['Date'] || row['Ngày'] || ''),
+      reference: String(row['Reference'] || row['Ná»™i dung'] || ''),
+      amount: Number(row['Amount'] || row['Sá»‘ tiá»n'] || 0),
+      transactionDate: String(row['Date'] || row['NgĂ y'] || ''),
     }));
 
-    // 3. Thực hiện đối soát
+    // 3. Thá»±c hiá»‡n Ä‘á»‘i soĂ¡t
     return this.logisticsService.reconcileBankStatement(entries);
   }
 

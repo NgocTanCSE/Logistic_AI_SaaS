@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Delete,
@@ -52,7 +52,7 @@ export class ApiKeysController {
     @Body() body: { name?: string; scopes?: string[] },
   ) {
     const tenantId = req.tenantId ?? req.user?.tenant_id;
-    // Generate a 256‑bit secret and store only its hash.
+    // Generate a 256â€‘bit secret and store only its hash.
     const rawKey = crypto.randomBytes(32).toString('hex');
     const keyHash = await bcrypt.hash(rawKey, 10);
 

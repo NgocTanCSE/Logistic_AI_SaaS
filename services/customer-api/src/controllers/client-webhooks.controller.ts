@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Request, UseGuards, NotFoundException, BadRequestException, Delete, Param } from "@nestjs/common"
+﻿import { Body, Controller, Get, Post, Request, UseGuards, NotFoundException, BadRequestException, Delete, Param } from "@nestjs/common"
 import { Permissions, PermissionsGuard, RequirePermissions } from "shared-types"
 import { WebhookCreateDto } from "../dtos/webhook-create.dto"
 import { PrismaService } from "../prisma/prisma.service"
@@ -49,7 +49,7 @@ export class ClientWebhooksController {
       throw new BadRequestException("At least one event must be subscribed to");
     }
 
-    // Kiểm tra giới hạn số lượng webhook (VD: max 10 webhooks per client)
+    // Kiá»ƒm tra giá»›i háº¡n sá»‘ lÆ°á»£ng webhook (VD: max 10 webhooks per client)
     const count = await this.prisma.tenantClient.clientWebhook.count({ where: { clientId } });
     if (count >= 10) {
       throw new BadRequestException("Maximum webhook limit reached (10)");

@@ -134,7 +134,7 @@ export class AuthService {
           'orders:read', 'orders:create', 'trips:read', 'trips:dispatch', 'vehicles:read', 'vehicles:manage',
           'drivers:manage', 'users:read', 'users:invite', 'roles:manage', 'settings:manage', 'audit-logs:read',
           'billing:read', 'api-keys:manage', 'notifications:read', 'mobile:sync:pull', 'mobile:sync:push',
-          'mobile:uploads', 'mobile:gps:batch', 'mobile:sos', 'pack-station:scan'
+          'mobile:uploads', 'mobile:gps:batch', 'mobile:sos', 'pack-station:scan', 'clients:manage', 'clients:read'
         ];
         for (const p of adminPerms) {
           const [resource, action] = p.split(':');

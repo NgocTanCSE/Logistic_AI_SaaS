@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common"
+﻿import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common"
 import { ClientsModule, Transport } from "@nestjs/microservices"
 import { HttpModule } from "@nestjs/axios"
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler"

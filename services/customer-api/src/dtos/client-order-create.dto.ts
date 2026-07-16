@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MinLength, IsNumber } from "class-validator"
+﻿import { IsOptional, IsString, MinLength, IsNumber } from "class-validator"
 
 export class ClientOrderCreateDto {
   @IsOptional()

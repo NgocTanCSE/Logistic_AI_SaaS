@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, UseGuards, Query, NotFoundException, InternalServerErrorException, BadRequestException } from "@nestjs/common";
+﻿import { Controller, Get, Post, Patch, Param, Body, UseGuards, Query, NotFoundException, InternalServerErrorException, BadRequestException } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types";
 import { PrismaService } from "../prisma/prisma.service";
@@ -19,8 +19,8 @@ export class CodRemittancesController {
     @Query('limit') limit: number = 20
   ) {
     try {
-      const skip = (Number(page) - 1) * Number(limit);
-      const take = Number(limit);
+      const skip = (Number(page || 1) - 1) * Number(limit || 20);
+      const take = Number(limit || 20);
       
       const where: any = {};
       if (driverId) where.driverId = driverId;
@@ -49,7 +49,7 @@ export class CodRemittancesController {
         data,
         meta: {
           total,
-          page: Number(page),
+          page: Number(page || 1),
           limit: take,
           totalPages: Math.ceil(total / take)
         }

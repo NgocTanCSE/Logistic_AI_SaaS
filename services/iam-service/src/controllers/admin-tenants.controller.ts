@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, InternalServerErrorException, NotFoundException, BadRequestException, Logger } from "@nestjs/common"
+﻿import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, InternalServerErrorException, NotFoundException, BadRequestException, Logger } from "@nestjs/common"
 import { TenantCreateDto } from "../dtos/tenant-create.dto"
 import { UpdateTenantDto } from "../dtos/tenant-update.dto"
 import { Permissions, PermissionsGuard, RequirePermissions } from "../shared-types"
@@ -24,8 +24,8 @@ export class AdminTenantsController {
     @Query('order') order: 'asc' | 'desc' = 'desc',
   ) {
     try {
-      const skip = (Number(page) - 1) * Number(limit);
-      const take = Number(limit);
+      const skip = (Number(page || 1) - 1) * Number(limit || 20);
+      const take = Number(limit || 20);
 
       // Validate sort field to prevent injection
       const allowedSortFields = ['createdAt', 'name', 'status', 'slug'];
@@ -46,7 +46,7 @@ export class AdminTenantsController {
         data,
         meta: {
           total,
-          page: Number(page),
+          page: Number(page || 1),
           limit: take,
           totalPages: Math.ceil(total / take),
         },
@@ -80,7 +80,7 @@ export class AdminTenantsController {
     }
 
     return await this.prisma.$transaction(async (tx) => {
-      // 1. Tạo Tenant record trong public
+      // 1. Táº¡o Tenant record trong public
       const tenant = await tx.tenant.create({
         data: {
           name: body.name,
@@ -92,15 +92,15 @@ export class AdminTenantsController {
       });
 
       try {
-        // 2. Tạo PostgreSQL Schema
+        // 2. Táº¡o PostgreSQL Schema
         await tx.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS "${dbSchemaName}"`);
 
-        // 3. Chạy toàn bộ DDL (tự động extract từ schema.prisma)
+        // 3. Cháº¡y toĂ n bá»™ DDL (tá»± Ä‘á»™ng extract tá»« schema.prisma)
         for (const statement of ddlStatements) {
           await tx.$executeRawUnsafe(statement);
         }
 
-        // 4. Seed Admin đầu tiên cho Tenant
+        // 4. Seed Admin Ä‘áº§u tiĂªn cho Tenant
         if (body.adminEmail && body.adminPassword) {
           // Validate password length
           if (body.adminPassword.length < 8) {
@@ -108,7 +108,7 @@ export class AdminTenantsController {
           }
           const passwordHash = await bcrypt.hash(body.adminPassword, 10);
           
-          // Tạo role ADMIN mặc định và lưu ID để dùng gán cho user
+          // Táº¡o role ADMIN máº·c Ä‘á»‹nh vĂ  lÆ°u ID Ä‘á»ƒ dĂ¹ng gĂ¡n cho user
           const roleResult = await tx.customRole.create({
             data: {
               name: 'TENANT_ADMIN',
@@ -117,7 +117,7 @@ export class AdminTenantsController {
           });
           const roleId = roleResult.id;
 
-          // Tạo user và lưu ID
+          // Táº¡o user vĂ  lÆ°u ID
           const userResult = await tx.tenantUser.create({
             data: {
               email: body.adminEmail,
@@ -128,7 +128,7 @@ export class AdminTenantsController {
           });
           const userId = userResult.id;
 
-          // Gán role
+          // GĂ¡n role
           await tx.userRole.create({
             data: {
               userId,

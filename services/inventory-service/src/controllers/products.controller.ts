@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, NotFoundException, BadRequestException, InternalServerErrorException } from "@nestjs/common";
+﻿import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards, NotFoundException, BadRequestException, InternalServerErrorException } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { IsString, IsNumber, IsOptional, Min } from "class-validator";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -45,8 +45,8 @@ export class ProductsController {
     @Query('search') search?: string,
   ) {
     try {
-      const skip = (Number(page) - 1) * Number(limit);
-      const take = Number(limit);
+      const skip = (Number(page || 1) - 1) * Number(limit || 20);
+      const take = Number(limit || 20);
 
       const where = search ? {
         OR: [
@@ -69,7 +69,7 @@ export class ProductsController {
         data,
         meta: {
           total,
-          page: Number(page),
+          page: Number(page || 1),
           limit: take,
           totalPages: Math.ceil(total / take),
         },

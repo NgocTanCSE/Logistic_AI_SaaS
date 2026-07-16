@@ -11,7 +11,7 @@ export class ClientsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Post()
-  @RequirePermissions(Permissions.TenantsManage)
+  @RequirePermissions(Permissions.ClientsManage)
   async createClient(@Body() body: { name: string }) {
     try {
       return await this.prisma.tenantClient.client.create({ data: { name: body.name } });
@@ -21,7 +21,7 @@ export class ClientsController {
   }
 
   @Post(":id/users")
-  @RequirePermissions(Permissions.TenantsManage)
+  @RequirePermissions(Permissions.ClientsManage)
   async createClientUser(@Param("id") id: string, @Body() body: { email: string, fullName: string }) {
     try {
       return await this.prisma.tenantClient.clientUser.create({ data: { clientId: id, ...body } });
@@ -31,7 +31,7 @@ export class ClientsController {
   }
 
   @Get()
-  @RequirePermissions(Permissions.TenantsManage)
+  @RequirePermissions(Permissions.ClientsManage)
   async listClients() {
     try {
       return await this.prisma.tenantClient.client.findMany({ include: { users: true } });

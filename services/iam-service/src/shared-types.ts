@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Local re-exports from the shared-types package.
  * The iam-service uses a local copy because it also needs auth-specific types.
  * All permissions, guards, and decorators come from the shared package.

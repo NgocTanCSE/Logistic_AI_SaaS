@@ -18,6 +18,8 @@ export const Permissions = {
   MobileSos: "mobile:sos",
   BillingRead: "billing:read",
   TenantsManage: "tenants:manage",
+  ClientsManage: "clients:manage",
+  ClientsRead: "clients:read",
   PlansManage: "plans:manage",
   FeatureFlagsManage: "feature-flags:manage",
   AuditLogsRead: "audit-logs:read",

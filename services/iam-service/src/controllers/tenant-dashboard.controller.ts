@@ -1,4 +1,4 @@
-import { Controller, Get, Req, UseGuards, InternalServerErrorException } from "@nestjs/common"
+﻿import { Controller, Get, Req, UseGuards, InternalServerErrorException } from "@nestjs/common"
 import { PrismaService } from "../prisma/prisma.service"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 import { Permissions, PermissionsGuard, RequirePermissions } from "../shared-types"
@@ -32,7 +32,7 @@ export class TenantDashboardController {
 
       const avgOptimization = totalTrips > 0
         ? Math.round((deliveredOrders / Math.max(totalOrders, 1)) * 100) + "%"
-        : "—"
+        : "â€”"
 
       return {
         totalDeliveries: totalOrders,

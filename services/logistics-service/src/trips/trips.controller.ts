@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Query, Body, Param, UseGuards, InternalServerErrorException, NotFoundException } from "@nestjs/common";
+﻿import { Controller, Get, Post, Patch, Query, Body, Param, UseGuards, InternalServerErrorException, NotFoundException } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types";
 import { PrismaService } from "../prisma/prisma.service";
@@ -39,8 +39,8 @@ export class TripsController {
     @Query("status") status?: string,
   ) {
     try {
-      const skip = (Number(page) - 1) * Number(limit);
-      const take = Number(limit);
+      const skip = (Number(page || 1) - 1) * Number(limit || 20);
+      const take = Number(limit || 20);
       const where: any = {};
       if (status) where.status = status;
 
@@ -57,7 +57,7 @@ export class TripsController {
 
       return {
         data,
-        meta: { total, page: Number(page), limit: take, totalPages: Math.ceil(total / take) },
+        meta: { total, page: Number(page || 1), limit: take, totalPages: Math.ceil(total / take) },
       };
     } catch (error) {
       throw new InternalServerErrorException("Failed to fetch trips");

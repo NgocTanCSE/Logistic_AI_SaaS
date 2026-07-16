@@ -1,4 +1,4 @@
-const Stripe = require('stripe');
+﻿const Stripe = require('stripe');
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 

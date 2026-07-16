@@ -1,4 +1,4 @@
-import { Controller, Get, Param, NotFoundException, UseInterceptors } from "@nestjs/common";
+﻿import { Controller, Get, Param, NotFoundException, UseInterceptors } from "@nestjs/common";
 import { CacheInterceptor } from "@nestjs/cache-manager";
 import { Throttle } from "@nestjs/throttler";
 import { PrismaService } from "../prisma/prisma.service";

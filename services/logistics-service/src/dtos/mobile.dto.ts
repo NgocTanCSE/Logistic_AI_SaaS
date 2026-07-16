@@ -1,4 +1,4 @@
-import { IsNumber, IsString, IsNotEmpty, MaxLength, Min, Max } from 'class-validator';
+﻿import { IsNumber, IsString, IsNotEmpty, MaxLength, Min, Max } from 'class-validator';
 
 export class SosAlertDto {
   @IsNumber()

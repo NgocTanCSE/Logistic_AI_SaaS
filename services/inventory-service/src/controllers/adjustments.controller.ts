@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Query } from "@nestjs/common"
+﻿import { Controller, Get, UseGuards, Query } from "@nestjs/common"
 import { ApiTags } from "@nestjs/swagger"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types"
@@ -13,6 +13,6 @@ export class AdjustmentsController {
   @Get()
   @RequirePermissions(Permissions.InventoryRead)
   async getAdjustments(@Query("page") page: number, @Query("limit") limit: number) {
-    return this.inventoryService.getAdjustments({ page: Number(page), limit: Number(limit) })
+    return this.inventoryService.getAdjustments({ page: Number(page || 1), limit: Number(limit || 20) })
   }
 }

@@ -1,11 +1,11 @@
-import { Controller, Get, Param, UseGuards, Request, Query } from "@nestjs/common";
+﻿import { Controller, Get, Param, UseGuards, Request, Query } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types";
 import { PrismaService } from "../prisma/prisma.service";
 import { ApiTags } from "@nestjs/swagger";
 
 /**
- * Mobile‑specific read‑only endpoints used by the driver app.
+ * Mobileâ€‘specific readâ€‘only endpoints used by the driver app.
  * Returns trips assigned to the authenticated driver and the stops for a given trip.
  */
 @ApiTags('Mobile Trips')

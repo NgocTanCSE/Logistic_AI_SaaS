@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Patch, Query, UseGuards } from "@nestjs/common"
+﻿import { Body, Controller, Get, Param, Post, Patch, Query, UseGuards } from "@nestjs/common"
 import { CreateGeofenceDto } from "../dtos/create-geofence.dto"
 import { DispatchTripDto } from "../dtos/dispatch-trip.dto"
 import { OptimizeRoutingDto } from "../dtos/optimize-routing.dto"
@@ -16,7 +16,7 @@ export class LogisticsController {
   @Get("trips")
   @RequirePermissions(Permissions.TripsRead)
   async list(@Query("page") page: number, @Query("limit") limit: number) {
-    return this.logisticsService.listTrips({ page: Number(page), limit: Number(limit) });
+    return this.logisticsService.listTrips({ page: Number(page || 1), limit: Number(limit || 20) });
   }
 
   @Post("trips/:id/dispatch")

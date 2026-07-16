@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional, MaxLength, Matches, Min } from 'class-validator';
+﻿import { IsString, IsNotEmpty, IsNumber, IsOptional, MaxLength, Matches, Min } from 'class-validator';
 
 export class CreateOrderDto {
   @IsString()

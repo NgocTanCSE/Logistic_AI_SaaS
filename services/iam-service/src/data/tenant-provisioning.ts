@@ -1,4 +1,4 @@
-export const TENANT_BASELINE_DDL = `
+﻿export const TENANT_BASELINE_DDL = `
 -- Create IAM tables for tenant schema
 CREATE TABLE IF NOT EXISTS "tenant_users" (
     "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),

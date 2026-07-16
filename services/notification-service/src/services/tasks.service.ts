@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventPrismaService } from '../prisma/event-prisma.service';
 
@@ -11,11 +11,11 @@ export class TasksService {
   ) {}
 
 /**
-    * 🧹 Clean up old notifications every night at midnight.
+    * đŸ§¹ Clean up old notifications every night at midnight.
     */
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async cleanupOldNotifications() {
-    this.logger.log('🧹 Starting cleanup of old notifications...');
+    this.logger.log('đŸ§¹ Starting cleanup of old notifications...');
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -29,7 +29,7 @@ export class TasksService {
       });
       this.logger.log(` Cleaned up ${result.count} notifications older than 30 days.`);
     } catch (error: any) {
-      this.logger.error(`❌ Cleanup failed: ${error.message}`);
+      this.logger.error(`âŒ Cleanup failed: ${error.message}`);
     }
   }
 

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, MaxLength } from "class-validator";
+﻿import { IsString, IsOptional, IsEnum, MaxLength } from "class-validator";
 
 export enum TenantStatus {
   PENDING = 'PENDING',

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+﻿import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WmsAllocationEngine, AllocationStrategy, InventoryItem } from 'wms-engine';
 
@@ -53,7 +53,7 @@ export class WavesService {
           binId: s.binId,
           productId: s.productId,
           quantityAvailable: s.quantityOnHand - s.quantityAllocated,
-          createdAt: s.createdAt, // Dùng ngày thực tế để FIFO/LIFO hoạt động
+          createdAt: s.createdAt, // DĂ¹ng ngĂ y thá»±c táº¿ Ä‘á»ƒ FIFO/LIFO hoáº¡t Ä‘á»™ng
           expiryDate: s.expiryDate,
         }));
 
@@ -61,7 +61,7 @@ export class WavesService {
           const allocations = WmsAllocationEngine.allocate(engineStocks, requiredQty as number, strategy);
 
           for (const alloc of allocations) {
-            // 1. Tạo Task lấy hàng
+            // 1. Táº¡o Task láº¥y hĂ ng
             await tx.task.create({
               data: {
                 warehouseId,
@@ -74,7 +74,7 @@ export class WavesService {
               },
             });
 
-            // 2. Cập nhật số lượng đã cấp phát (Allocated) dùng Optimistic Locking
+            // 2. Cáº­p nháº­t sá»‘ lÆ°á»£ng Ä‘Ă£ cáº¥p phĂ¡t (Allocated) dĂ¹ng Optimistic Locking
             const inv = stocks.find((s: any) => s.id === alloc.inventoryId);
             const updateResult = await tx.$executeRawUnsafe(
               `UPDATE inventory 
@@ -89,7 +89,7 @@ export class WavesService {
             }
           }
         } catch (error: any) {
-          throw new BadRequestException(`Cấp phát thất bại cho SP ${productId}: ${error?.message || 'Unknown error'}`);
+          throw new BadRequestException(`Cáº¥p phĂ¡t tháº¥t báº¡i cho SP ${productId}: ${error?.message || 'Unknown error'}`);
         }
       }
 

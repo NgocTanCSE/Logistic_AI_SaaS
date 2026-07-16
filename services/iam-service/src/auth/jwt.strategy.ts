@@ -1,4 +1,4 @@
-import { ExtractJwt, Strategy as JwtStrategyClass } from 'passport-jwt';
+﻿import { ExtractJwt, Strategy as JwtStrategyClass } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, UnauthorizedException, Logger } from '@nestjs/common';
 import { JwtPayload } from '../shared-types';

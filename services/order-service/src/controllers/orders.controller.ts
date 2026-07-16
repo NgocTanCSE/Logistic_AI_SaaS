@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, InternalServerErrorException, NotFoundException, BadRequestException, Logger } from "@nestjs/common";
+﻿import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards, InternalServerErrorException, NotFoundException, BadRequestException, Logger } from "@nestjs/common";
 import { IsString, IsNumber, IsOptional, IsArray, ValidateNested, Min } from "class-validator";
 import { Type } from "class-transformer";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -119,8 +119,8 @@ export class OrdersController {
     @Query("search") search?: string,
   ) {
     try {
-      const skip = (Number(page) - 1) * Number(limit);
-      const take = Number(limit);
+      const skip = (Number(page || 1) - 1) * Number(limit || 20);
+      const take = Number(limit || 20);
 
       const where: any = {};
       if (status) where.status = status;
@@ -147,7 +147,7 @@ export class OrdersController {
         data,
         meta: {
           total,
-          page: Number(page),
+          page: Number(page || 1),
           limit: take,
           totalPages: Math.ceil(total / take),
         },

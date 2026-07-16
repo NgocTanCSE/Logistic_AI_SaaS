@@ -1,4 +1,4 @@
-import { IsArray, IsString, MinLength } from "class-validator"
+﻿import { IsArray, IsString, MinLength } from "class-validator"
 
 export class WebhookCreateDto {
   @IsString()

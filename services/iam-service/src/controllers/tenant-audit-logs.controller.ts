@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, InternalServerErrorException } from "@nestjs/common"
+﻿import { Controller, Get, Query, UseGuards, InternalServerErrorException } from "@nestjs/common"
 import { PrismaService } from "../prisma/prisma.service"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 import { Permissions, PermissionsGuard, RequirePermissions } from "../shared-types"
@@ -19,8 +19,8 @@ export class TenantAuditLogsController {
     @Query("actorEmail") actorEmail?: string,
   ) {
     try {
-      const skip = (Number(page) - 1) * Number(limit)
-      const take = Number(limit)
+      const skip = (Number(page || 1) - 1) * Number(limit || 20)
+      const take = Number(limit || 20)
 
       const where: any = {}
       if (action) where.action = action
@@ -40,7 +40,7 @@ export class TenantAuditLogsController {
         data,
         meta: {
           total,
-          page: Number(page),
+          page: Number(page || 1),
           limit: take,
           totalPages: Math.ceil(total / take),
         },

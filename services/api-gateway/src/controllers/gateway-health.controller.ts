@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+﻿import { Controller, Get } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { SERVICES } from '../config/services.config';
 import { lastValueFrom } from 'rxjs';

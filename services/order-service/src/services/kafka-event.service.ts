@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger, OnModuleInit, Optional } from "@nestjs/common"
+﻿import { Injectable, Inject, Logger, OnModuleInit, Optional } from "@nestjs/common"
 import { ClientKafka } from "@nestjs/microservices"
 
 @Injectable()
@@ -39,7 +39,7 @@ export class KafkaEventService implements OnModuleInit {
     const payload = JSON.stringify(message)
     if (!this.kafkaClient || !this.connected) {
       this.eventBuffer.push({ topic, message: payload })
-      this.logger.warn(`Kafka not connected — buffered event: ${topic}`)
+      this.logger.warn(`Kafka not connected â€” buffered event: ${topic}`)
       return
     }
     try {

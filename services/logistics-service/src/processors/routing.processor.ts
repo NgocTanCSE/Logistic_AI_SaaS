@@ -1,4 +1,4 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
+﻿import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,16 +19,16 @@ export class RoutingProcessor extends WorkerHost {
 
   async process(job: Job<any, any, string>): Promise<any> {
     const { jobId, payload } = job.data;
-    this.logger.log(`👷 Processing routing job: ${jobId}`);
+    this.logger.log(`đŸ‘· Processing routing job: ${jobId}`);
 
     try {
-      // Gọi sang AI Service
+      // Gá»i sang AI Service
       const response: any = await firstValueFrom(
         this.httpService.post(`${this.aiServiceUrl}/routing/solve`, payload)
       );
 
       if (response.data.ok) {
-        // Cập nhật Database thành công
+        // Cáº­p nháº­t Database thĂ nh cĂ´ng
         await this.prisma.tenantClient.routeOptimizationJob.update({
           where: { id: jobId },
           data: {
@@ -39,7 +39,7 @@ export class RoutingProcessor extends WorkerHost {
         });
         this.logger.log(` Routing job ${jobId} COMPLETED`);
       } else {
-        // Cập nhật Database thất bại
+        // Cáº­p nháº­t Database tháº¥t báº¡i
         await this.prisma.tenantClient.routeOptimizationJob.update({
           where: { id: jobId },
           data: {
@@ -47,10 +47,10 @@ export class RoutingProcessor extends WorkerHost {
             completedAt: new Date(),
           },
         });
-        this.logger.error(`❌ Routing job ${jobId} FAILED inside AI Service`);
+        this.logger.error(`âŒ Routing job ${jobId} FAILED inside AI Service`);
       }
     } catch (error: any) {
-      this.logger.error(`🔥 Lỗi khi gọi AI Service cho job ${jobId}: ${error.message}`);
+      this.logger.error(`đŸ”¥ Lá»—i khi gá»i AI Service cho job ${jobId}: ${error.message}`);
       await this.prisma.tenantClient.routeOptimizationJob.update({
         where: { id: jobId },
         data: {

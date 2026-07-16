@@ -1,4 +1,4 @@
-export interface ServiceConfig {
+﻿export interface ServiceConfig {
   name: string;
   url: string;
   prefix: string;

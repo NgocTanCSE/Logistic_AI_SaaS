@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, ForbiddenException, Request, NotFoundException, InternalServerErrorException } from "@nestjs/common";
+﻿import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards, ForbiddenException, Request, NotFoundException, InternalServerErrorException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { PermissionsGuard, RequirePermissions, Permissions } from "../shared-types";
@@ -54,7 +54,7 @@ export class TenantUsersController {
   @Post()
   @RequirePermissions(Permissions.UsersInvite)
   async create(@Request() req: any, @Body() body: { email: string, fullName: string, roleId: string, password: string }) {
-    // 1. Kiểm tra giới hạn subscription
+    // 1. Kiá»ƒm tra giá»›i háº¡n subscription
     const tenantId = req.user.tenant_id;
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },

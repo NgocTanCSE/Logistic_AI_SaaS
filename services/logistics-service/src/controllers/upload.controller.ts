@@ -1,4 +1,4 @@
-import { Controller, Post, UseInterceptors, UploadedFile, UseGuards, Param, Body, BadRequestException } from '@nestjs/common';
+﻿import { Controller, Post, UseInterceptors, UploadedFile, UseGuards, Param, Body, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { S3Service } from '../services/s3.service';
@@ -37,7 +37,7 @@ export class UploadController {
     const folder = type === 'SIGNATURE' ? 'signatures' : 'pod';
     const result = await this.s3Service.uploadFile(file, folder);
 
-    // 2. Cập nhật thông tin Delivery
+    // 2. Cáº­p nháº­t thĂ´ng tin Delivery
     const updateData: any = {};
     if (type === 'SIGNATURE') {
       updateData.podSignatureUrl = result.url;
@@ -49,8 +49,8 @@ export class UploadController {
       updateData.codAmountCollected = parseFloat(codCollected);
     }
 
-    // Nếu đã có cả ảnh và chữ ký (hoặc chỉ cần 1 tùy nghiệp vụ), đánh dấu thành công
-    // Ở đây ta giả định nhận được ảnh là coi như thành công bước đầu
+    // Náº¿u Ä‘Ă£ cĂ³ cáº£ áº£nh vĂ  chá»¯ kĂ½ (hoáº·c chá»‰ cáº§n 1 tĂ¹y nghiá»‡p vá»¥), Ä‘Ă¡nh dáº¥u thĂ nh cĂ´ng
+    // á» Ä‘Ă¢y ta giáº£ Ä‘á»‹nh nháº­n Ä‘Æ°á»£c áº£nh lĂ  coi nhÆ° thĂ nh cĂ´ng bÆ°á»›c Ä‘áº§u
     updateData.status = 'DELIVERED';
 
     await this.prisma.tenantClient.delivery.update({

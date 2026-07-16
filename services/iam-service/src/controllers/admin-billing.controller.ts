@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Param, Query, Body, UseGuards, NotFoundException, BadRequestException } from "@nestjs/common";
+﻿import { Controller, Get, Post, Put, Delete, Param, Query, Body, UseGuards, NotFoundException, BadRequestException } from "@nestjs/common";
 import { IsString, IsNumber, IsOptional, IsArray, ValidateNested, Min } from "class-validator";
 import { Type } from "class-transformer";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
@@ -97,8 +97,8 @@ export class AdminBillingController {
     @Query("limit") limit: number = 15,
   ) {
     try {
-      const skip = (Number(page) - 1) * Number(limit)
-      const take = Number(limit)
+      const skip = (Number(page || 1) - 1) * Number(limit || 20)
+      const take = Number(limit || 20)
 
       const [data, total] = await Promise.all([
         this.prisma.invoice.findMany({
@@ -116,14 +116,14 @@ export class AdminBillingController {
         data: data.map(inv => ({
           id: inv.id,
           tenant: inv.tenant?.name || "N/A",
-          plan: "—",
+          plan: "â€”",
           amount: `$${Number(inv.totalAmount).toFixed(2)}`,
-          issuedAt: inv.issuedAt?.toISOString().split("T")[0] || "—",
+          issuedAt: inv.issuedAt?.toISOString().split("T")[0] || "â€”",
           status: inv.status,
         })),
         meta: {
           total,
-          page: Number(page),
+          page: Number(page || 1),
           limit: take,
           totalPages: Math.ceil(total / take),
           mrr: totalAmount,

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+﻿import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -53,40 +53,40 @@ export class LogisticsService {
 
   async optimizeRouting(dto: any) {
     const orderIds = dto.orderIds || [];
-    this.logger.log(` Bắt đầu tạo Job tối ưu lộ trình cho ${orderIds.length} đơn hàng...`);
+    this.logger.log(` Báº¯t Ä‘áº§u táº¡o Job tá»‘i Æ°u lá»™ trĂ¬nh cho ${orderIds.length} Ä‘Æ¡n hĂ ng...`);
 
-    // 1. Lấy thông tin đơn hàng
+    // 1. Láº¥y thĂ´ng tin Ä‘Æ¡n hĂ ng
     const orders = await this.prisma.tenantClient.order.findMany({
       where: { id: { in: orderIds } },
     });
 
-    // 2. Lấy thông tin đội xe
+    // 2. Láº¥y thĂ´ng tin Ä‘á»™i xe
     const vehicles = await this.prisma.tenantClient.vehicle.findMany({
       where: { status: 'ACTIVE' },
       take: 10,
     });
 
-    // 3. Chuẩn bị payload với tọa độ thực (Geocoding thực tế từ địa chỉ)
+    // 3. Chuáº©n bá»‹ payload vá»›i tá»a Ä‘á»™ thá»±c (Geocoding thá»±c táº¿ tá»« Ä‘á»‹a chá»‰)
     const locations = await Promise.all(orders.map(async (o: any) => {
       let lat = o.lat ? Number(o.lat) : null;
       let lng = o.lng ? Number(o.lng) : null;
 
-      // Nếu thiếu tọa độ, thực hiện Geocoding thực tế
+      // Náº¿u thiáº¿u tá»a Ä‘á»™, thá»±c hiá»‡n Geocoding thá»±c táº¿
       if (!lat || !lng) {
-        this.logger.log(`🌍 Đang Geocoding địa chỉ: ${o.recipientAddress} cho đơn hàng ${o.trackingCode}`);
+        this.logger.log(`đŸŒ Äang Geocoding Ä‘á»‹a chá»‰: ${o.recipientAddress} cho Ä‘Æ¡n hĂ ng ${o.trackingCode}`);
         const coords = await this.geocodingService.geocode(o.recipientAddress);
         
         if (coords) {
           lat = coords.lat;
           lng = coords.lng;
-          // Lưu lại tọa độ vào DB để dùng cho lần sau (Cache)
+          // LÆ°u láº¡i tá»a Ä‘á»™ vĂ o DB Ä‘á»ƒ dĂ¹ng cho láº§n sau (Cache)
           await this.prisma.tenantClient.order.update({
             where: { id: o.id },
             data: { lat, lng }
           });
         } else {
-          // Fallback cuối cùng nếu Geocode thất bại: Ghim về trung tâm khu vực (tránh drift ngẫu nhiên quá xa)
-          this.logger.warn(` Không thể geocode địa chỉ: ${o.recipientAddress}. Sử dụng tọa độ mặc định.`);
+          // Fallback cuá»‘i cĂ¹ng náº¿u Geocode tháº¥t báº¡i: Ghim vá» trung tĂ¢m khu vá»±c (trĂ¡nh drift ngáº«u nhiĂªn quĂ¡ xa)
+          this.logger.warn(` KhĂ´ng thá»ƒ geocode Ä‘á»‹a chá»‰: ${o.recipientAddress}. Sá»­ dá»¥ng tá»a Ä‘á»™ máº·c Ä‘á»‹nh.`);
           lat = 10.762622 + (Math.random() - 0.5) * 0.01; 
           lng = 106.660172 + (Math.random() - 0.5) * 0.01;
         }
@@ -116,7 +116,7 @@ export class LogisticsService {
       demand: 0,
     });
 
-    // 4. Tạo Job trong DB với trạng thái PENDING
+    // 4. Táº¡o Job trong DB vá»›i tráº¡ng thĂ¡i PENDING
     const job = await this.prisma.tenantClient.routeOptimizationJob.create({
         data: {
           status: 'PENDING',
@@ -125,15 +125,15 @@ export class LogisticsService {
         },
     });
 
-    // 5. Đẩy vào BullMQ
+    // 5. Äáº©y vĂ o BullMQ
     await this.routingQueue.add('optimize', {
       jobId: job.id,
       payload,
     });
 
-    this.logger.log(` Job ${job.id} đã được đưa vào Queue!`);
+    this.logger.log(` Job ${job.id} Ä‘Ă£ Ä‘Æ°á»£c Ä‘Æ°a vĂ o Queue!`);
 
-    // Trả về ngay lập tức cho Frontend
+    // Tráº£ vá» ngay láº­p tá»©c cho Frontend
     return {
       ok: true,
       message: 'Routing optimization job queued successfully',
@@ -286,9 +286,9 @@ export class LogisticsService {
       throw new BadRequestException(`Job ${jobId} has no valid routes to apply`);
     }
 
-    this.logger.log(`🛠️ Applying routing job ${jobId} with ${routes.length} routes...`);
+    this.logger.log(`đŸ› ï¸ Applying routing job ${jobId} with ${routes.length} routes...`);
 
-    // Dùng transaction để đảm bảo tạo Trips và Deliveries đồng bộ, không tạo ra data rác nếu lỗi giữa chừng
+    // DĂ¹ng transaction Ä‘á»ƒ Ä‘áº£m báº£o táº¡o Trips vĂ  Deliveries Ä‘á»“ng bá»™, khĂ´ng táº¡o ra data rĂ¡c náº¿u lá»—i giá»¯a chá»«ng
     return this.prisma.tenantClient.$transaction(async (tx: any) => {
       let createdTripsCount = 0;
 
@@ -297,14 +297,14 @@ export class LogisticsService {
         const vehicleId = route.vehicle_id;
         const locations = route.route || [];
 
-        // Lọc ra các location là đơn hàng (bỏ qua DEPOT)
+        // Lá»c ra cĂ¡c location lĂ  Ä‘Æ¡n hĂ ng (bá» qua DEPOT)
         const orderIds = locations
           .filter((loc: any) => loc.id && loc.id !== 'DEPOT')
           .map((loc: any) => loc.id);
 
         if (orderIds.length === 0) continue;
 
-        // Tạo Trip mới
+        // Táº¡o Trip má»›i
         const trip = await tx.trip.create({
           data: {
             tripCode: `TRIP-AI-${Date.now().toString().slice(-6)}-${i + 1}`,
@@ -314,22 +314,22 @@ export class LogisticsService {
         });
         createdTripsCount++;
 
-        // Tạo Deliveries (stops) và Cập nhật trạng thái Orders
+        // Táº¡o Deliveries (stops) vĂ  Cáº­p nháº­t tráº¡ng thĂ¡i Orders
         let sequence = 1;
         for (const orderId of orderIds) {
-          // Kiểm tra xem Order có tồn tại không
+          // Kiá»ƒm tra xem Order cĂ³ tá»“n táº¡i khĂ´ng
           const order = await tx.order.findUnique({ where: { id: orderId } });
           if (!order) {
             throw new NotFoundException(`Order ${orderId} in route not found. Aborting transaction.`);
           }
 
-          // Cập nhật Order status
+          // Cáº­p nháº­t Order status
           await tx.order.update({
             where: { id: orderId },
             data: { status: 'DISPATCHED' },
           });
 
-          // Tạo Delivery stop
+          // Táº¡o Delivery stop
 await tx.delivery.create({
                 data: {
                   tripId: trip.id,
@@ -342,7 +342,7 @@ await tx.delivery.create({
         }
       }
 
-      // Đánh dấu job đã apply
+      // ÄĂ¡nh dáº¥u job Ä‘Ă£ apply
       await tx.routeOptimizationJob.update({
         where: { id: jobId },
         data: { status: 'APPLIED' },
@@ -425,8 +425,8 @@ await tx.delivery.create({
   }
 
   /**
-   * 🏦 Logic Đối soát Ngân hàng (Bank Reconciliation)
-   * Giúp tự động hóa việc kiểm tra tiền đã về tài khoản hay chưa.
+   * đŸ¦ Logic Äá»‘i soĂ¡t NgĂ¢n hĂ ng (Bank Reconciliation)
+   * GiĂºp tá»± Ä‘á»™ng hĂ³a viá»‡c kiá»ƒm tra tiá»n Ä‘Ă£ vá» tĂ i khoáº£n hay chÆ°a.
    */
   async reconcileBankStatement(entries: { reference: string, amount: number, transactionDate: string }[]) {
     const results = {
@@ -438,7 +438,7 @@ await tx.delivery.create({
     };
 
     for (const entry of entries) {
-      // 1. Tìm phiếu quyết toán dựa trên mã QR/Reference (Ghi trên nội dung chuyển khoản)
+      // 1. TĂ¬m phiáº¿u quyáº¿t toĂ¡n dá»±a trĂªn mĂ£ QR/Reference (Ghi trĂªn ná»™i dung chuyá»ƒn khoáº£n)
       const remittance = await this.prisma.tenantClient.codRemittance.findFirst({
         where: { qrCodeToken: entry.reference }
       });
@@ -453,20 +453,20 @@ await tx.delivery.create({
         continue;
       }
 
-      // 2. Kiểm tra số tiền (Cho phép sai số nhỏ do phí chuyển khoản nếu cần)
+      // 2. Kiá»ƒm tra sá»‘ tiá»n (Cho phĂ©p sai sá»‘ nhá» do phĂ­ chuyá»ƒn khoáº£n náº¿u cáº§n)
       const expectedAmount = Number(remittance.amountRemitted);
       if (Math.abs(expectedAmount - entry.amount) < 0.01) {
-        // Khớp hoàn toàn
+        // Khá»›p hoĂ n toĂ n
         await this.prisma.tenantClient.codRemittance.update({
           where: { id: remittance.id },
           data: { 
             status: 'RECONCILED',
-            // Có thể lưu thêm thông tin ngày giao dịch ngân hàng vào metadata nếu schema hỗ trợ
+            // CĂ³ thá»ƒ lÆ°u thĂªm thĂ´ng tin ngĂ y giao dá»‹ch ngĂ¢n hĂ ng vĂ o metadata náº¿u schema há»— trá»£
           }
         });
         results.matched++;
       } else {
-        // Sai lệch số tiền
+        // Sai lá»‡ch sá»‘ tiá»n
         results.mismatchAmount++;
       }
     }
@@ -600,7 +600,7 @@ await tx.delivery.create({
   }
 
   /**
-   * 🧠 SAI: Bridge human feedback to the AI Service for self-learning.
+   * đŸ§  SAI: Bridge human feedback to the AI Service for self-learning.
    */
   async submitAiFeedback(body: any) {
     const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://ai-service:8000';
@@ -624,7 +624,7 @@ await tx.delivery.create({
       );
       return { ok: true, localId: localFeedback.id, aiResponse: response.data };
     } catch (error: any) {
-      this.logger.error(`❌ Failed to forward feedback to AI Service: ${error.message}`);
+      this.logger.error(`âŒ Failed to forward feedback to AI Service: ${error.message}`);
       // We still return ok because we saved it locally and the AI Service will pick it up eventually
       return { ok: true, localId: localFeedback.id, warning: 'AI Service unreachable, feedback saved locally' };
     }

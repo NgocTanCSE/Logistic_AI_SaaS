@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Request, Query, NotFoundException } from "@nestjs/common"
+﻿import { Controller, Get, Post, Body, UseGuards, Request, Query, NotFoundException } from "@nestjs/common"
 import { ApiTags } from "@nestjs/swagger"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types"
@@ -17,7 +17,7 @@ export class InventoryController {
   @Get("ledger")
   @RequirePermissions(Permissions.InventoryRead)
   async getLedger(@Query("page") page: number, @Query("limit") limit: number) {
-    return this.inventoryService.getLedger({ page: Number(page), limit: Number(limit) })
+    return this.inventoryService.getLedger({ page: Number(page || 1), limit: Number(limit || 20) })
   }
 
   @Post("adjust")

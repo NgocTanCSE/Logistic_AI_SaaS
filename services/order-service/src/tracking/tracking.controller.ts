@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Logger } from "@nestjs/common";
+﻿import { Controller, Post, Body, UseGuards, Logger } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types";
 import { PrismaService } from "../prisma/prisma.service";
@@ -21,10 +21,10 @@ export class TrackingController {
   @RequirePermissions(Permissions.OrdersCreate)
   async addEvent(@Body() body: { orderId: string, status: string, location: string, description: string }) {
     return await this.prisma.tenantClient.$transaction(async (tx: any) => {
-      // 1. Tạo sự kiện tracking
+      // 1. Táº¡o sá»± kiá»‡n tracking
       const event = await tx.orderTrackingEvent.create({ data: body });
       
-      // 2. Cập nhật trạng thái đơn hàng
+      // 2. Cáº­p nháº­t tráº¡ng thĂ¡i Ä‘Æ¡n hĂ ng
       const order = await tx.order.update({ 
         where: { id: body.orderId }, 
         data: { status: body.status } 
@@ -40,18 +40,18 @@ export class TrackingController {
   private async dispatchWebhooks(clientId: string, event: any) {
     if (!clientId) return;
 
-    // Tìm các webhook đăng ký cho client này
+    // TĂ¬m cĂ¡c webhook Ä‘Äƒng kĂ½ cho client nĂ y
     const webhooks = await this.prisma.tenantClient.clientWebhook.findMany({
       where: { clientId, isActive: true }
     });
 
     for (const webhook of webhooks) {
-      // Kiểm tra xem sự kiện có nằm trong danh sách đăng ký không
+      // Kiá»ƒm tra xem sá»± kiá»‡n cĂ³ náº±m trong danh sĂ¡ch Ä‘Äƒng kĂ½ khĂ´ng
       if (webhook.events.includes(event.status) || webhook.events.includes('*')) {
         try {
-          this.logger.log(`📡 Dispatching webhook to ${webhook.url} for Order ${event.orderId}`);
+          this.logger.log(`đŸ“¡ Dispatching webhook to ${webhook.url} for Order ${event.orderId}`);
           
-          // Gửi request HTTP thực tế
+          // Gá»­i request HTTP thá»±c táº¿
           await firstValueFrom(
             this.httpService.post(webhook.url, {
               trackingCode: event.orderId, // Should ideally be trackingCode from order
@@ -64,8 +64,8 @@ export class TrackingController {
             })
           );
         } catch (error: any) {
-          this.logger.error(`❌ Webhook dispatch failed for ${webhook.url}: ${error.message}`);
-          // Trong thực tế, ta nên lưu vào bảng WebhookLogs để retry
+          this.logger.error(`âŒ Webhook dispatch failed for ${webhook.url}: ${error.message}`);
+          // Trong thá»±c táº¿, ta nĂªn lÆ°u vĂ o báº£ng WebhookLogs Ä‘á»ƒ retry
         }
       }
     }

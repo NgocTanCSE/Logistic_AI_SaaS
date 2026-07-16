@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Param, Post, Request, UseGuards, NotFoundException, BadRequestException } from "@nestjs/common"
+﻿import { Body, Controller, Get, Patch, Param, Post, Request, UseGuards, NotFoundException, BadRequestException } from "@nestjs/common"
 import { Permissions, PermissionsGuard, RequirePermissions } from "shared-types"
 import { ClientOrderCreateDto } from "../dtos/client-order-create.dto"
 import { ClientBulkUploadDto } from "../dtos/client-bulk-upload.dto"
@@ -118,7 +118,7 @@ export class ClientOrdersController {
       throw new BadRequestException("Orders array is empty or invalid");
     }
 
-    // Dùng transaction để bulk create, đảm bảo không lưu 1 nửa dữ liệu nếu có lỗi
+    // DĂ¹ng transaction Ä‘á»ƒ bulk create, Ä‘áº£m báº£o khĂ´ng lÆ°u 1 ná»­a dá»¯ liá»‡u náº¿u cĂ³ lá»—i
     return this.prisma.tenantClient.$transaction(async (tx: any) => {
       const createdOrders = [];
       let successCount = 0;

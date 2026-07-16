@@ -1,4 +1,4 @@
-import { IsArray, ValidateNested } from "class-validator"
+﻿import { IsArray, ValidateNested } from "class-validator"
 import { Type } from "class-transformer"
 import { ClientOrderCreateDto } from "./client-order-create.dto"
 

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Patch, Query, UseGuards, Logger, InternalServerErrorException, NotFoundException, BadRequestException } from "@nestjs/common"
+﻿import { Body, Controller, Get, Param, Post, Patch, Query, UseGuards, Logger, InternalServerErrorException, NotFoundException, BadRequestException } from "@nestjs/common"
 import { Permissions, PermissionsGuard, RequirePermissions } from "shared-types"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 import { LogisticsService } from "../services/logistics.service"
@@ -24,8 +24,8 @@ export class ReturnsController {
     @Query("status") status?: string
   ) {
     try {
-      const skip = (Number(page) - 1) * Number(limit)
-      const take = Number(limit)
+      const skip = (Number(page || 1) - 1) * Number(limit || 20)
+      const take = Number(limit || 20)
       const where: any = {}
       if (status) where.status = status
 
@@ -47,7 +47,7 @@ export class ReturnsController {
 
       return {
         data,
-        meta: { total, page: Number(page), limit: take, totalPages: Math.ceil(total / take) }
+        meta: { total, page: Number(page || 1), limit: take, totalPages: Math.ceil(total / take) }
       }
     } catch (error) {
       this.logger.error(`Failed to list return requests: ${error instanceof Error ? error.message : "Unknown"}`)

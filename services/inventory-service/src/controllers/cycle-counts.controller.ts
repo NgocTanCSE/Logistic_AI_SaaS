@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, UseGuards, Request, Query, Param, NotFoundException } from "@nestjs/common"
+﻿import { Controller, Get, Post, Patch, Body, UseGuards, Request, Query, Param, NotFoundException } from "@nestjs/common"
 import { ApiTags } from "@nestjs/swagger"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types"
@@ -40,7 +40,7 @@ export class CycleCountsController {
   @Get()
   @RequirePermissions(Permissions.InventoryRead)
   async list(@Query("warehouseId") warehouseId: string, @Query("page") page: number, @Query("limit") limit: number) {
-    return this.inventoryService.getCycleCounts(warehouseId, { page: Number(page), limit: Number(limit) })
+    return this.inventoryService.getCycleCounts(warehouseId, { page: Number(page || 1), limit: Number(limit || 20) })
   }
 
   @Patch(":id/status")

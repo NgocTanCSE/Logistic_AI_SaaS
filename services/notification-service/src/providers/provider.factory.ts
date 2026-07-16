@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+﻿import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConsoleEmailProvider, EmailProvider } from './email.provider';
 import { SendGridEmailProvider } from './sendgrid-email.provider';
@@ -28,13 +28,13 @@ export class ProviderFactory {
     this.logger.log(`Push provider: ${pushType}`);
 
     if (emailType === 'console') {
-      this.logger.warn('EMAIL_PROVIDER not set to "sendgrid" — emails will only be logged to console, not sent');
+      this.logger.warn('EMAIL_PROVIDER not set to "sendgrid" â€” emails will only be logged to console, not sent');
     }
     if (smsType === 'console') {
-      this.logger.warn('SMS_PROVIDER not set to "twilio" — SMS will only be logged to console, not sent');
+      this.logger.warn('SMS_PROVIDER not set to "twilio" â€” SMS will only be logged to console, not sent');
     }
     if (pushType === 'console') {
-      this.logger.warn('PUSH_PROVIDER not set to "fcm" — push notifications will only be logged to console, not sent');
+      this.logger.warn('PUSH_PROVIDER not set to "fcm" â€” push notifications will only be logged to console, not sent');
     }
   }
 

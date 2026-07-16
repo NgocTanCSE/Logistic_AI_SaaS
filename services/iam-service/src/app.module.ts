@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common"
+﻿import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common"
 import { CacheModule } from "@nestjs/cache-manager"
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler"
 import { APP_INTERCEPTOR, APP_GUARD, Reflector } from "@nestjs/core"

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request, NotFoundException, BadRequestException, ConflictException } from "@nestjs/common"
+﻿import { Controller, Get, Post, Body, Param, UseGuards, Request, NotFoundException, BadRequestException, ConflictException } from "@nestjs/common"
 import { ApiTags } from "@nestjs/swagger"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types"
@@ -39,7 +39,7 @@ export class TasksController {
     const actorId = req.user?.sub || "00000000-0000-0000-0000-000000000000";
 
     return this.prisma.tenantClient.$transaction(async (tx: any) => {
-      // 1. Lấy thông tin Task và Inventory liên quan
+      // 1. Láº¥y thĂ´ng tin Task vĂ  Inventory liĂªn quan
       const task = await tx.task.findUnique({
         where: { id },
         include: { wave: true }
@@ -48,7 +48,7 @@ export class TasksController {
       if (!task) throw new NotFoundException("Task not found");
       if (task.status === "COMPLETED") throw new BadRequestException("Task already completed");
 
-      // Tìm inventory dựa trên sourceBin và product
+      // TĂ¬m inventory dá»±a trĂªn sourceBin vĂ  product
       const invs = await tx.inventory.findMany({ 
         where: { 
           warehouseId: task.warehouseId, 
@@ -60,7 +60,7 @@ export class TasksController {
       if (invs.length === 0) throw new NotFoundException("Source inventory not found");
       const inv = invs[0];
 
-      // 2. Cập nhật Task status
+      // 2. Cáº­p nháº­t Task status
       await tx.task.update({
         where: { id },
         data: { 
@@ -70,7 +70,7 @@ export class TasksController {
         }
       });
 
-      // 3. Khấu trừ kho: Trừ cả số dư thực tế và số dư đã cấp phát (Allocated)
+      // 3. Kháº¥u trá»« kho: Trá»« cáº£ sá»‘ dÆ° thá»±c táº¿ vĂ  sá»‘ dÆ° Ä‘Ă£ cáº¥p phĂ¡t (Allocated)
       const updateResult = await tx.$executeRawUnsafe(
         `UPDATE inventory 
         SET quantity_on_hand = quantity_on_hand - $1,
@@ -82,7 +82,7 @@ export class TasksController {
 
       if (updateResult === 0) throw new ConflictException("Inventory concurrent update detected");
 
-      // 4. Ghi nhận biến động kho (Stock Movement)
+      // 4. Ghi nháº­n biáº¿n Ä‘á»™ng kho (Stock Movement)
       await tx.stockMovement.create({
         data: {
           inventoryId: inv.id,

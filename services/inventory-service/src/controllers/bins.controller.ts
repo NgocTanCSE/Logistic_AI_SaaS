@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, Patch, Body, Query, UseGuards, NotFoundException, BadRequestException } from "@nestjs/common"
+﻿import { Controller, Get, Param, Post, Patch, Body, Query, UseGuards, NotFoundException, BadRequestException } from "@nestjs/common"
 import { ApiTags } from "@nestjs/swagger"
 import { IsString, IsNumber, IsOptional, Min } from "class-validator"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
@@ -49,8 +49,8 @@ export class BinsController {
     @Query("rackId") rackId?: string,
     @Query("search") search?: string,
   ) {
-    const skip = (Number(page) - 1) * Number(limit)
-    const take = Number(limit)
+    const skip = (Number(page || 1) - 1) * Number(limit || 20)
+    const take = Number(limit || 20)
     const where: any = {}
     if (warehouseId) where.warehouseId = warehouseId
     if (rackId) where.rackId = rackId
@@ -73,7 +73,7 @@ export class BinsController {
 
     return {
       data,
-      meta: { total, page: Number(page), limit: take, totalPages: Math.ceil(total / take) },
+      meta: { total, page: Number(page || 1), limit: take, totalPages: Math.ceil(total / take) },
     }
   }
 
