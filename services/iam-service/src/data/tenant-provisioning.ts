@@ -1,4 +1,4 @@
-﻿export const TENANT_BASELINE_DDL = `
+export const TENANT_BASELINE_DDL = `
 -- Create IAM tables for tenant schema
 CREATE TABLE IF NOT EXISTS "tenant_users" (
     "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,7 +66,7 @@ export const SEED_TENANT_ADMIN_ROLE = async (tx: any) => {
      }
    });
 
-   const resources = ['inventory', 'warehouses', 'tasks', 'orders', 'trips', 'vehicles', 'drivers', 'users', 'roles', 'settings'];
+   const resources = ['inventory', 'warehouses', 'tasks', 'orders', 'trips', 'vehicles', 'drivers', 'users', 'roles', 'settings', 'clients', 'billing', 'api-keys', 'audit-logs', 'notifications', 'mobile', 'pack-station', 'returns'];
    const actions = ['read', 'create', 'update', 'delete', 'manage', 'invite'];
 
    const permissions = [];
