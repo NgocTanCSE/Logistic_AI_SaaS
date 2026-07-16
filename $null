@@ -1,0 +1,8 @@
+Exception calling "ReadAllBytes" with "1" argument(s): "Access to the path 'C:\Users\Ngoc 
+Tan\Downloads\Logistic_AI_SaaS\apps\driver-app' is denied."
+At line:1 char:27
++ ... ch-Object { $bytes = [System.IO.File]::ReadAllBytes($_)[0..1]; if ($b ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:) [], MethodInvocationException
+    + FullyQualifiedErrorId : UnauthorizedAccessException
+ 

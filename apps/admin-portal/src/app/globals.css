@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-ink font-sans antialiased min-h-[100dvh] overflow-x-hidden selection:bg-primary/30 selection:text-primary;
+    font-family: 'Geist', 'Outfit', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+@layer components {
+  /* Glassmorphism Panel */
+  .glass-panel {
+    @apply bg-surface/50 backdrop-blur-xl border border-border/50 rounded-2xl;
+    border-width: 1px;
+    border-color: rgba(255,255,255,0.1);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1), 0 8px 32px rgba(0,0,0,0.3);
+  }
+  
+  /* Cyber Input */
+  .cyber-input {
+    @apply w-full bg-surface/30 border border-border rounded-xl px-4 py-3 text-ink placeholder-inkSoft focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all duration-300;
+  }
+  
+  /* Neon Button */
+  .neon-button {
+    @apply relative overflow-hidden bg-primary hover:bg-primaryHover text-white font-medium py-3 px-6 rounded-xl transition-all duration-300 shadow-[0_0_15px_rgba(59,130,246,0.3)] hover:shadow-[0_0_25px_rgba(59,130,246,0.6)] transform hover:-translate-y-0.5;
+  }
+}
+
+.hover-glow {
+  transition: all 0.3s;
+}
+.hover-glow:hover {
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.text-gradient {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(to right, #3b82f6, #06b6d4);
+}
