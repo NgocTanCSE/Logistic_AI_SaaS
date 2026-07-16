@@ -51,8 +51,8 @@ function AiInsightsContent() {
         api.get('/logistics/ai/models'),
         api.get('/logistics/ai/feedbacks?isUsed=false')
       ]);
-      setModels(modelsRes.data || []);
-      setFeedbacks(feedbackRes.data || []);
+      setModels(modelsRes.data?.data || modelsRes.data || []);
+      setFeedbacks(feedbackRes.data?.data || feedbackRes.data || []);
     } catch (err) {
       console.error("Failed to fetch AI data", err);
     } finally {

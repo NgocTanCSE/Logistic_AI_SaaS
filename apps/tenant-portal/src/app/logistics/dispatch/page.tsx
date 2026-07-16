@@ -90,8 +90,8 @@ export default function DispatchTowerPage() {
         api.get('/drivers'),
         api.get('/trips')
       ]);
-      setDrivers(driversRes.data || []);
-      setTrips(tripsRes.data || []);
+      setDrivers(driversRes.data?.data || driversRes.data || []);
+      setTrips(tripsRes.data?.data || tripsRes.data || []);
     } catch (e) {
       console.error('Failed to fetch dispatch data', e);
       setDrivers([]);
@@ -103,7 +103,7 @@ export default function DispatchTowerPage() {
     setLoading(true);
     try {
       const response = await api.get('/logistics/dispatch/unassigned-orders');
-      setOrders(response.data || []);
+      setOrders(response.data?.data || response.data || []);
     } catch (err) {
       console.error('Failed to fetch unassigned orders', err);
       setOrders([]);

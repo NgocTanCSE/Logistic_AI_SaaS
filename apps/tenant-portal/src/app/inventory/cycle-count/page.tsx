@@ -43,7 +43,7 @@ export default function CycleCountPage() {
     setError('');
     try {
       const res = await api.get('/warehouses');
-      setWarehouses(res.data || []);
+      setWarehouses(res.data?.data || res.data || []);
     } catch (err) {
       console.error("Failed to fetch warehouses", err);
       setError('Failed to fetch warehouses');

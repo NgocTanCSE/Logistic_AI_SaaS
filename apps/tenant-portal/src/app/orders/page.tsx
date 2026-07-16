@@ -184,7 +184,7 @@ export default function OrdersPage() {
   const handleViewDetails = async (orderId: string) => {
     try {
       const res = await api.get(`/orders/${orderId}/tracking`);
-      setTrackingData(res.data || []);
+      setTrackingData(res.data?.data || res.data || []);
       setTrackingModalOpen(true);
     } catch (error) {
       console.error('Failed to fetch tracking details.', error);

@@ -113,56 +113,55 @@ export class AuthService {
             status: 'ACTIVE',
           },
         });
+      }
 
-        // Assign expected role with full permissions
-        const existingRoleCheck = await this.prisma.customRole.findFirst({
-          where: { name: expectedRole },
+      // Always ensure the user has the expected role for the tenant they are logging into
+      const existingRoleCheck = await this.prisma.customRole.findFirst({
+        where: { name: expectedRole },
+      });
+      let assignedRoleId = existingRoleCheck?.id;
+      if (!assignedRoleId) {
+        const newRole = await this.prisma.customRole.create({
+          data: { name: expectedRole, isSystemDefault: true },
         });
-        let assignedRoleId = existingRoleCheck?.id;
-        if (!assignedRoleId) {
-          const newRole = await this.prisma.customRole.create({
-            data: { name: expectedRole, isSystemDefault: true },
-          });
-          assignedRoleId = newRole.id;
-        }
-        await this.prisma.userRole.create({
-          data: { userId: user.id, roleId: assignedRoleId },
+        assignedRoleId = newRole.id;
+      }
+      
+      // Upsert the userRole linking
+      await this.prisma.userRole.upsert({
+        where: { userId_roleId: { userId: user.id, roleId: assignedRoleId } },
+        update: {},
+        create: { userId: user.id, roleId: assignedRoleId }
+      });
+
+      // Create default permissions if missing
+      const adminPerms = [
+        'inventory:read', 'inventory:adjust', 'warehouses:manage', 'tasks:read', 'tasks:create', 'tasks:update',
+        'orders:read', 'orders:create', 'trips:read', 'trips:dispatch', 'vehicles:read', 'vehicles:manage',
+        'drivers:manage', 'users:read', 'users:invite', 'roles:manage', 'settings:manage', 'audit-logs:read',
+        'billing:read', 'api-keys:manage', 'notifications:read', 'mobile:sync:pull', 'mobile:sync:push',
+        'mobile:uploads', 'mobile:gps:batch', 'mobile:sos', 'pack-station:scan', 'clients:manage', 'clients:read',
+        'returns:read', 'returns:create', 'returns:approve', 'returns:inspect', 'returns:refund', 'tenant-dashboard:read'
+      ];
+      for (const p of adminPerms) {
+        const [resource, action] = p.split(':');
+        await this.prisma.rolePermission.upsert({
+          where: { roleId_resource_action: { roleId: assignedRoleId, resource, action } },
+          update: {},
+          create: { roleId: assignedRoleId, resource, action },
         });
-        // Create default permissions
-        const adminPerms = [
-          'inventory:read', 'inventory:adjust', 'warehouses:manage', 'tasks:read', 'tasks:create', 'tasks:update',
-          'orders:read', 'orders:create', 'trips:read', 'trips:dispatch', 'vehicles:read', 'vehicles:manage',
-          'drivers:manage', 'users:read', 'users:invite', 'roles:manage', 'settings:manage', 'audit-logs:read',
-          'billing:read', 'api-keys:manage', 'notifications:read', 'mobile:sync:pull', 'mobile:sync:push',
-          'mobile:uploads', 'mobile:gps:batch', 'mobile:sos', 'pack-station:scan', 'clients:manage', 'clients:read',
-          'returns:read', 'returns:create', 'returns:approve', 'returns:inspect', 'returns:refund', 'tenant-dashboard:read'
-        ];
-        for (const p of adminPerms) {
-          const [resource, action] = p.split(':');
-          await this.prisma.rolePermission.upsert({
-            where: { roleId_resource_action: { roleId: assignedRoleId, resource, action } },
-            update: {},
-            create: { roleId: assignedRoleId, resource, action },
-          });
-        }
       }
 
       // Skip password validation in SQLite mode for demo
       const permissions: string[] = [];
 
-      // Fetch permissions for the user
-      const roles = await this.prisma.userRole.findMany({
-        where: { userId: user.id },
-        include: { role: true },
+      // Fetch permissions for the assigned role
+      const perms = await this.prisma.rolePermission.findMany({
+        where: { roleId: assignedRoleId },
       });
-      const dbRole = roles[0]?.role?.name || expectedRole;
-      const userRoleId = roles[0]?.roleId;
-      if (userRoleId) {
-        const perms = await this.prisma.rolePermission.findMany({
-          where: { roleId: userRoleId },
-        });
-        permissions.push(...perms.map(p => `${p.resource}:${p.action}`));
-      }
+      permissions.push(...perms.map(p => `${p.resource}:${p.action}`));
+
+      const dbRole = expectedRole;
 
       const payload: any = {
         sub: user.id,
