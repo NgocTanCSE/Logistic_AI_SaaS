@@ -26,7 +26,7 @@ const SLUG_ROLE_MAP: Record<string, string> = {
   'demo-tenant': 'TENANT_ADMIN',
   'warehouse-tenant': 'WAREHOUSE_MANAGER',
   'logistics-tenant': 'LOGISTICS_MANAGER',
-  'customer-tenant': 'CLIENT_USER',
+  'customer-tenant': 'CUSTOMER_CLIENT',
   'pack-station': 'WAREHOUSE_STAFF',
   'smartlogi': 'DRIVER',
 };

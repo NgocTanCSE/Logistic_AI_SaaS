@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, BadRequestException, NotFoundException } from "@nestjs/common";
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request, BadRequestException, NotFoundException } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types";
 import { PrismaService } from "../prisma/prisma.service";
@@ -17,6 +17,9 @@ export class GeofencesController {
   @Post()
   @RequirePermissions(Permissions.TripsDispatch)
   async createGeofence(@Body() body: { name: string, polygonWkt: string, zoneType: string }, @Request() req: any) {
+    const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
+    if (isSqlite) return { ok: true, message: "Mock Geofence created (SQLite mode)" };
+
     const schemaName = req.schemaName || 'tenant';
     
     if (!this.validateSchemaName(schemaName)) {
@@ -39,6 +42,14 @@ export class GeofencesController {
   @Get()
   @RequirePermissions(Permissions.TripsRead)
   async listGeofences(@Request() req: any) {
+    const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
+    if (isSqlite) {
+      return [
+        { id: "mock-1", name: "Mock Zone 1", polygon: { type: "Polygon", coordinates: [[[0,0],[0,1],[1,1],[1,0],[0,0]]] }, zoneType: "RESTRICTED", isActive: true },
+        { id: "mock-2", name: "Mock Zone 2", polygon: { type: "Polygon", coordinates: [[[2,2],[2,3],[3,3],[3,2],[2,2]]] }, zoneType: "SAFE", isActive: true }
+      ];
+    }
+
     const schemaName = req.schemaName || 'tenant';
     
     if (!this.validateSchemaName(schemaName)) {
@@ -56,6 +67,9 @@ export class GeofencesController {
   @Patch(":id")
   @RequirePermissions(Permissions.TripsDispatch)
   async updateGeofence(@Param("id") id: string, @Body() body: { name?: string, zoneType?: string, isActive?: boolean }, @Request() req: any) {
+    const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
+    if (isSqlite) return { ok: true, message: "Mock Geofence updated (SQLite mode)" };
+
     const schemaName = req.schemaName || 'tenant';
     
     if (!this.validateSchemaName(schemaName)) {
@@ -77,6 +91,9 @@ export class GeofencesController {
   @Delete(":id")
   @RequirePermissions(Permissions.TripsDispatch)
   async deleteGeofence(@Param("id") id: string, @Request() req: any) {
+    const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
+    if (isSqlite) return { ok: true, message: "Mock Geofence deleted (SQLite mode)" };
+
     const schemaName = req.schemaName || 'tenant';
     
     if (!this.validateSchemaName(schemaName)) {

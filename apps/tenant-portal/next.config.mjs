@@ -46,6 +46,10 @@ const nextConfig = {
         destination: 'http://127.0.0.1:3002/api/v1/products/:path*'
       },
       {
+        source: '/api/v1/tasks/:path*',
+        destination: 'http://127.0.0.1:3002/api/v1/tasks/:path*'
+      },
+      {
         source: '/api/v1/auth/refresh-token',
         destination: 'http://127.0.0.1:3003/api/v1/auth/refresh-token'
       },
