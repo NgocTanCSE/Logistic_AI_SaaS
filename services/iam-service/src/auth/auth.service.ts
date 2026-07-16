@@ -73,13 +73,24 @@ export class AuthService {
   async loginTenantUser(tenantSlug: string, email: string, pass: string) {
     // SQLite/Fallback mode - skip password validation for demo
     const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
-    const tenant = await this.prisma.tenant.findFirst({
+    let tenant = await this.prisma.tenant.findFirst({
       where: { slug: tenantSlug },
     });
 
+    if (isSqlite && !tenant) {
+      tenant = await this.prisma.tenant.create({
+        data: {
+          name: tenantSlug,
+          slug: tenantSlug,
+          dbSchemaName: 'public',
+          status: 'ACTIVE',
+        },
+      });
+    }
+
     if (!tenant) throw new UnauthorizedException('Tenant not found');
 
-    const role = this.getRoleFromSlug(tenantSlug);
+    const expectedRole = this.getRoleFromSlug(tenantSlug);
 
     if (isSqlite) {
       // SQLite/Fallback mode - try to find user, create if not exists (demo mode)
@@ -98,21 +109,21 @@ export class AuthService {
           },
         });
 
-        // Assign TENANT_ADMIN role with full permissions
+        // Assign expected role with full permissions
         const existingRoleCheck = await this.prisma.customRole.findFirst({
-          where: { name: 'TENANT_ADMIN' },
+          where: { name: expectedRole },
         });
-        let adminRoleId = existingRoleCheck?.id;
-        if (!adminRoleId) {
+        let assignedRoleId = existingRoleCheck?.id;
+        if (!assignedRoleId) {
           const newRole = await this.prisma.customRole.create({
-            data: { name: 'TENANT_ADMIN', isSystemDefault: true },
+            data: { name: expectedRole, isSystemDefault: true },
           });
-          adminRoleId = newRole.id;
+          assignedRoleId = newRole.id;
         }
         await this.prisma.userRole.create({
-          data: { userId: user.id, roleId: adminRoleId },
+          data: { userId: user.id, roleId: assignedRoleId },
         });
-        // Create default permissions for TENANT_ADMIN
+        // Create default permissions
         const adminPerms = [
           'inventory:read', 'inventory:adjust', 'warehouses:manage', 'tasks:read', 'tasks:create', 'tasks:update',
           'orders:read', 'orders:create', 'trips:read', 'trips:dispatch', 'vehicles:read', 'vehicles:manage',
@@ -123,9 +134,9 @@ export class AuthService {
         for (const p of adminPerms) {
           const [resource, action] = p.split(':');
           await this.prisma.rolePermission.upsert({
-            where: { roleId_resource_action: { roleId: adminRoleId, resource, action } },
+            where: { roleId_resource_action: { roleId: assignedRoleId, resource, action } },
             update: {},
-            create: { roleId: adminRoleId, resource, action },
+            create: { roleId: assignedRoleId, resource, action },
           });
         }
       }
@@ -138,6 +149,7 @@ export class AuthService {
         where: { userId: user.id },
         include: { role: true },
       });
+      const dbRole = roles[0]?.role?.name || expectedRole;
       const userRoleId = roles[0]?.roleId;
       if (userRoleId) {
         const perms = await this.prisma.rolePermission.findMany({
@@ -149,7 +161,7 @@ export class AuthService {
       const payload: any = {
         sub: user.id,
         email: user.email,
-        role,
+        role: dbRole,
         tenant_id: tenant.id,
         schema_name: 'public',
         permissions,
@@ -198,7 +210,7 @@ export class AuthService {
       const payload: any = {
         sub: user.id,
         email: user.email,
-        role,
+        role: roles[0]?.role?.name || expectedRole,
         tenant_id: tenant.id,
         schema_name: tenant.dbSchemaName,
         permissions,

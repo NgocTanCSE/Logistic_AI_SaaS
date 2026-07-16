@@ -137,6 +137,16 @@ if (!response.data?.access_token && !response.data?.accessToken) {
             <p className="text-sm text-inkSoft mt-1.5 font-medium">Enter your workspace slug to continue to the portal.</p>
           </div>
 
+          <div className="mb-6">
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400 mb-2">Quick Login Demo</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => { setTenantSlug('demo-tenant'); setEmail('tenant.admin@smartlogi.vn'); }} className="text-[10px] py-1 h-auto">Admin</Button>
+              <Button variant="outline" size="sm" onClick={() => { setTenantSlug('warehouse-tenant'); setEmail('manager@warehouse.vn'); }} className="text-[10px] py-1 h-auto">Warehouse</Button>
+              <Button variant="outline" size="sm" onClick={() => { setTenantSlug('logistics-tenant'); setEmail('dispatch@logistics.vn'); }} className="text-[10px] py-1 h-auto">Dispatch</Button>
+              <Button variant="outline" size="sm" onClick={() => { setTenantSlug('smartlogi'); setEmail('driver@smartlogi.vn'); }} className="text-[10px] py-1 h-auto">Driver</Button>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-5">
             <Input
               label="Workspace Slug"
