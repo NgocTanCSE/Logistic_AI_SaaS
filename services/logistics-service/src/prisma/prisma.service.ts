@@ -60,7 +60,7 @@ public get tenantClient(): any {
   }
 
   public switchSchema(schemaName?: string): any {
-    if (PrismaService._isSqlite) {
+    if (PrismaService.isSqlite) {
       return this;
     }
     const schema = schemaName || 'public';

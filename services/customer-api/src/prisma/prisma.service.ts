@@ -56,7 +56,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   public get tenantClient(): any {
-    if (PrismaService._isSqlite) {
+    if (PrismaService.isSqlite) {
       return this;
     }
     const schema = this.currentSchema;
