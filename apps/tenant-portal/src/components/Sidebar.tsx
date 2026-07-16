@@ -11,12 +11,17 @@ export default function Sidebar() {
   const role = user?.role || 'TENANT_USER';
 
   const isSuperAdmin = role === 'SUPER_ADMIN';
-  const canAccessWarehouse = isSuperAdmin || ['TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF'].includes(role);
-  const canAccessLogistics = isSuperAdmin || ['TENANT_ADMIN', 'LOGISTICS_MANAGER'].includes(role);
-  const canAccessAdmin = isSuperAdmin || ['TENANT_ADMIN'].includes(role);
-  const isTenantUser = role === 'TENANT_USER';
+  const isTenantAdmin = role === 'TENANT_ADMIN';
+  const isWarehouseManager = role === 'WAREHOUSE_MANAGER';
+  const isWarehouseStaff = role === 'WAREHOUSE_STAFF';
+  const isLogisticsManager = role === 'LOGISTICS_MANAGER';
   const isDriver = role === 'DRIVER';
   const isClient = role === 'CLIENT_USER' || role === 'CUSTOMER';
+  const isTenantUser = role === 'TENANT_USER';
+
+  const canAccessWarehouse = isSuperAdmin || isTenantAdmin || isWarehouseManager || isWarehouseStaff;
+  const canAccessLogistics = isSuperAdmin || isTenantAdmin || isLogisticsManager;
+  const canAccessTenantAdmin = isSuperAdmin || isTenantAdmin;
 
   const NavLink = ({ href, children, exact }: { href: string, children: React.ReactNode, exact?: boolean }) => {
     const isActive = exact ? pathname === href : (pathname === href || (href !== '/dashboard' && pathname.startsWith(href + '/')));
@@ -47,38 +52,36 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 px-6 space-y-8 mt-4 overflow-y-auto custom-scrollbar">
-        {/* Common Section */}
-        <div>
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 px-4">Overview</div>
-          <div className="space-y-1">
-            <NavLink href="/dashboard">Control Center</NavLink>
+        {/* Overview Section */}
+        {!isDriver && !isClient && (
+          <div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 px-4">Overview</div>
+            <div className="space-y-1">
+              <NavLink href="/dashboard">Control Center</NavLink>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Warehouse Section */}
         {canAccessWarehouse && (
           <div>
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 px-4">Warehouse Ops</div>
             <div className="space-y-1">
-              <NavLink href="/inventory" exact>Inventory Ledger</NavLink>
-              <NavLink href="/inventory/cycle-count">Cycle Counting</NavLink>
-              {role !== 'WAREHOUSE_STAFF' && (
+              {!isWarehouseStaff && (
                 <>
                   <NavLink href="/orders">Orders Management</NavLink>
+                  <NavLink href="/inventory" exact>Inventory Ledger</NavLink>
+                  <NavLink href="/inventory/cycle-count">Cycle Counting</NavLink>
                   <NavLink href="/inventory/adjustments">Stock Adjustments</NavLink>
-                  <NavLink href="/wms/waves">Wave Picking</NavLink>
-                  <NavLink href="/wms/packing">Pack Station</NavLink>
                   <NavLink href="/warehouses">Warehouse Setup</NavLink>
                   <NavLink href="/wms/equipment">Equipment Checkout</NavLink>
                   <NavLink href="/wms/products">Products</NavLink>
                 </>
               )}
-              {role === 'WAREHOUSE_STAFF' && (
-                <>
-                  <NavLink href="/wms/waves">Wave Picking</NavLink>
-                  <NavLink href="/wms/packing">Pack Station</NavLink>
-                  <NavLink href="/wms/tasks">My Tasks</NavLink>
-                </>
+              <NavLink href="/wms/waves">Wave Picking</NavLink>
+              <NavLink href="/wms/packing">Pack Station</NavLink>
+              {isWarehouseStaff && (
+                <NavLink href="/wms/tasks">My Tasks</NavLink>
               )}
             </div>
           </div>
@@ -103,17 +106,21 @@ export default function Sidebar() {
         )}
 
         {/* Admin Section */}
-        {canAccessAdmin && (
+        {canAccessTenantAdmin && (
           <div className="pt-4 border-t border-slate-100">
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 px-4">Administration</div>
             <div className="space-y-1">
-              {isSuperAdmin && <NavLink href="/branches">Branch Registry</NavLink>}
+              {isSuperAdmin && (
+                <>
+                  <NavLink href="/branches">Branch Registry</NavLink>
+                  <NavLink href="/admin/ai-insights">AI Insights & Training</NavLink>
+                </>
+              )}
               <NavLink href="/admin/clients">Client Accounts</NavLink>
               <NavLink href="/admin/billing">Billing</NavLink>
               <NavLink href="/admin/api-keys">API Keys</NavLink>
               <NavLink href="/admin/audit-logs">Audit Logs</NavLink>
               <NavLink href="/users">User Management</NavLink>
-              <NavLink href="/admin/ai-insights">AI Insights & Training</NavLink>
               <NavLink href="/roles">Permissions Matrix</NavLink>
               <NavLink href="/settings">System Settings</NavLink>
             </div>
@@ -143,6 +150,7 @@ export default function Sidebar() {
           </div>
         )}
 
+        {/* Driver Portal */}
         {isDriver && (
           <div>
             <div className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 px-4">Driver Portal</div>

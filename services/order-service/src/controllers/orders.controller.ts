@@ -153,6 +153,7 @@ export class OrdersController {
         },
       };
     } catch (error) {
+      this.logger.error(`Failed to fetch orders: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
       throw new InternalServerErrorException("Failed to fetch orders");
     }
   }

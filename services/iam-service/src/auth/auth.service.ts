@@ -74,7 +74,12 @@ export class AuthService {
     // SQLite/Fallback mode - skip password validation for demo
     const isSqlite = (process.env.DATABASE_URL || '').startsWith('file:');
     let tenant = await this.prisma.tenant.findFirst({
-      where: { slug: tenantSlug },
+      where: { 
+        OR: [
+          { slug: tenantSlug },
+          { dbSchemaName: tenantSlug.replace(/-/g, '_') }
+        ]
+      },
     });
 
     if (isSqlite && !tenant) {
