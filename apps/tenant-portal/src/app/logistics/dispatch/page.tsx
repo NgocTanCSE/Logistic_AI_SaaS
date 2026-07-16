@@ -90,8 +90,10 @@ export default function DispatchTowerPage() {
         api.get('/drivers'),
         api.get('/trips')
       ]);
-      setDrivers(driversRes.data?.data || driversRes.data || []);
-      setTrips(tripsRes.data?.data || tripsRes.data || []);
+      const dData = driversRes.data?.data || driversRes.data;
+      const tData = tripsRes.data?.data || tripsRes.data;
+      setDrivers(Array.isArray(dData) ? dData : []);
+      setTrips(Array.isArray(tData) ? tData : []);
     } catch (e) {
       console.error('Failed to fetch dispatch data', e);
       setDrivers([]);
@@ -103,7 +105,8 @@ export default function DispatchTowerPage() {
     setLoading(true);
     try {
       const response = await api.get('/logistics/dispatch/unassigned-orders');
-      setOrders(response.data?.data || response.data || []);
+      const data = response.data?.data || response.data;
+      setOrders(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch unassigned orders', err);
       setOrders([]);
@@ -216,12 +219,12 @@ const visualizeRoutes = (routes: any[]) => {
     }
   };
 
-  const mapMarkers = orders.map(o => ({
+  const mapMarkers = Array.isArray(orders) ? orders.map(o => ({
     id: o.id,
     lat: Number(o.lat) || 10.762622,
     lng: Number(o.lng) || 106.660172,
     label: `${o.trackingCode}: ${o.recipientAddress}`
-  }));
+  })) : [];
 
   // Drag & Drop
   const onDragEnd = async (result: any) => {
