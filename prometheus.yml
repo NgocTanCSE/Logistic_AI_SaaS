@@ -1,0 +1,47 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:3000']
+    metrics_path: '/metrics'
+
+  - job_name: 'iam-service'
+    static_configs:
+      - targets: ['iam-service:8081']
+    metrics_path: '/metrics'
+
+  - job_name: 'inventory-service'
+    static_configs:
+      - targets: ['inventory-service:8082']
+    metrics_path: '/metrics'
+
+  - job_name: 'order-service'
+    static_configs:
+      - targets: ['order-service:8083']
+    metrics_path: '/metrics'
+
+  - job_name: 'logistics-service'
+    static_configs:
+      - targets: ['logistics-service:8084']
+    metrics_path: '/metrics'
+
+  - job_name: 'customer-api'
+    static_configs:
+      - targets: ['customer-api:8085']
+    metrics_path: '/metrics'
+
+  - job_name: 'notification-service'
+    static_configs:
+      - targets: ['notification-service:8086']
+    metrics_path: '/metrics'

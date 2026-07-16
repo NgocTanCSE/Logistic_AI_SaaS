@@ -1,0 +1,47 @@
+{{- range $name, $config := .Values.components }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+spec:
+  replicas: {{ $config.replicas }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+    spec:
+      containers:
+        - name: {{ $name }}
+          image: "{{ $.Values.global.registry }}/{{ $name }}:{{ $.Values.global.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: {{ $config.port }}
+          resources:
+            requests:
+              cpu: {{ $config.cpu }}
+              memory: {{ $config.memory }}
+            limits:
+              cpu: {{ $config.cpu }}
+              memory: {{ $config.memory }}
+          envFrom:
+            - secretRef:
+                name: smartlogi-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ $config.port }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ $config.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+{{- end }}

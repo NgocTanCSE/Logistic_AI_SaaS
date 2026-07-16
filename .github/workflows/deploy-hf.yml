@@ -1,53 +1,33 @@
-name: Deploy to Hugging Face
+name: Deploy to Hugging Face Space
 
 on:
   push:
     branches:
       - main
-      - master
+  workflow_dispatch:
 
 jobs:
-  deploy:
+  deploy-to-hf:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
         with:
-          node-version: '20'
+          fetch-depth: 0
+          lfs: true
 
-      - name: Install pnpm
-        run: npm install -g pnpm@9.0.0
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build packages
+      - name: Push to Hugging Face Space (orphan branch)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_URL: https://user:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/tancse2005/Logistic_AI
         run: |
-          pnpm --filter shared-types build
-          pnpm --filter wms-engine build
-          pnpm --filter ui-components build
-
-      - name: Build services
-        run: |
-          pnpm --filter api-gateway run build
-          pnpm --filter iam-service run build
-          pnpm --filter inventory-service run build
-          pnpm --filter logistics-service run build
-          pnpm --filter order-service run build
-          pnpm --filter customer-api run build
-          pnpm --filter notification-service run build
-
-      - name: Build frontend
-        run: |
-          pnpm --filter admin-portal run build
-          pnpm --filter tenant-portal run build
-          pnpm --filter customer-portal run build
-
-      - name: Deploy to Hugging Face
-        uses: huggingface/huggingface-hub-action@v2
-        with:
-          repo_id: ${{ secrets.HF_REPO_ID }}
-          token: ${{ secrets.HF_TOKEN }}
-          path: .
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git checkout --orphan hf-deploy
+          git rm -rf --cached . 2>/dev/null || true
+          rm -rf packages/prisma-schemas/prisma/migrations
+          rm -f .env.docker
+          cp Dockerfile.hf Dockerfile
+          git add -A
+          git commit -m "Deploy to Hugging Face Space"
+          git push --force $HF_URL hf-deploy:main

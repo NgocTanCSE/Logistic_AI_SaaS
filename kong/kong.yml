@@ -1,0 +1,154 @@
+_format_version: "3.0"
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Authorization
+        - Content-Type
+        - X-Request-ID
+      exposed_headers:
+        - X-Request-ID
+      max_age: 3600
+      credentials: true
+
+  - name: rate-limiting
+    config:
+      minute: 100
+      hour: 1000
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+
+  - name: correlation-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid#counter
+
+  - name: request-transformer
+    config:
+      add:
+        headers:
+          - X-Gateway-Timestamp:$(date)
+      remove:
+        headers: []
+
+services:
+  - name: iam-service
+    url: http://iam-service:8081
+    routes:
+      - name: iam-route
+        paths:
+          - /api/v1/auth
+          - /api/v1/admin
+          - /api/v1/tenant
+          - /api/v1/mobile/auth
+          - /api/v1/client
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 20
+          hour: 200
+          policy: local
+
+  - name: ai-service
+    url: http://ai-service:8000
+    routes:
+      - name: ai-route
+        paths:
+          - /api/v1/ai
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 30
+          hour: 300
+          policy: local
+
+  - name: gps-service
+    url: http://gps-ingestion-service:8090
+    routes:
+      - name: gps-route
+        paths:
+          - /api/v1/gps
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 200
+          hour: 5000
+          policy: local
+
+  - name: inventory-service
+    url: http://inventory-service:8082
+    routes:
+      - name: inventory-route
+        paths:
+          - /api/v1/inventory
+          - /api/v1/products
+          - /api/v1/warehouses
+          - /api/v1/locations
+          - /api/v1/tasks
+          - /api/v1/waves
+          - /api/v1/mobile
+        strip_path: false
+
+  - name: order-service
+    url: http://order-service:8083
+    routes:
+      - name: order-route
+        paths:
+          - /api/v1/orders
+          - /api/v1/tracking
+          - /api/v1/webhooks
+          - /api/v1/clients
+        strip_path: false
+
+  - name: logistics-service
+    url: http://logistics-service:8084
+    routes:
+      - name: logistics-route
+        paths:
+          - /api/v1/logistics
+          - /api/v1/trips
+          - /api/v1/geofences
+          - /api/v1/vehicles
+          - /api/v1/drivers
+          - /api/v1/driver-app
+          - /api/v1/mobile/uploads
+          - /api/v1/mobile/trips
+        strip_path: false
+
+  - name: customer-api
+    url: http://customer-api:8085
+    routes:
+      - name: customer-api-route
+        paths:
+          - /api/v1/client
+          - /api/v1/public
+        strip_path: false
+    plugins:
+      - name: rate-limiting
+        config:
+          minute: 60
+          hour: 600
+          policy: local
+
+  - name: notification-service
+    url: http://notification-service:8086
+    routes:
+      - name: notification-route
+        paths:
+          - /api/v1/notifications
+        strip_path: false
+

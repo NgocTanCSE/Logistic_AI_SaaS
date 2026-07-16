@@ -1,0 +1,93 @@
+FROM node:22-bullseye
+
+# Build cache bust: 2026-07-15 fix-sqlite-tenant-client
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y postgresql-client supervisor dos2unix python3 python3-pip && rm -rf /var/lib/apt/lists/*
+
+# Enable pnpm
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+
+WORKDIR /app
+
+# Copy monorepo config
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
+
+# Copy necessary structures for dependency installation
+COPY apps/tenant-portal/package.json ./apps/tenant-portal/
+COPY apps/admin-portal/package.json ./apps/admin-portal/
+COPY apps/customer-portal/package.json ./apps/customer-portal/
+COPY apps/pack-station-web/package.json ./apps/pack-station-web/
+COPY services/iam-service/package.json ./services/iam-service/
+COPY services/customer-api/package.json ./services/customer-api/
+COPY services/notification-service/package.json ./services/notification-service/
+COPY services/api-gateway/package.json ./services/api-gateway/
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/prisma-schemas/package.json ./packages/prisma-schemas/
+COPY packages/map-components/package.json ./packages/map-components/
+COPY packages/hardware-bridge/package.json ./packages/hardware-bridge/
+COPY packages/ui-components/package.json ./packages/ui-components/
+COPY packages/wms-engine/package.json ./packages/wms-engine/
+COPY packages/offline-sync-engine/package.json ./packages/offline-sync-engine/
+COPY packages/mobile-ui-kit/package.json ./packages/mobile-ui-kit/
+COPY services/inventory-service/package.json ./services/inventory-service/
+COPY services/logistics-service/package.json ./services/logistics-service/
+COPY services/order-service/package.json ./services/order-service/
+# Install dependencies (development mode to build everything)
+RUN pnpm install --no-frozen-lockfile
+
+# Copy source code
+COPY apps ./apps
+COPY services ./services
+COPY packages ./packages
+COPY convert_schema.py ./convert_schema.py
+COPY hf-supervisord.conf /app/supervisord.conf
+COPY start.sh /app/start.sh
+
+# 1. Build Shared Types
+RUN pnpm --filter shared-types build
+
+# 2. Generate Prisma Client (convert schema first)
+ENV NEXT_PUBLIC_API_URL=/api/v1
+RUN python3 convert_schema.py
+ENV DATABASE_URL="file:/app/packages/prisma-schemas/prisma/dev.db"
+RUN cd packages/prisma-schemas && npx prisma db push --schema=prisma/schema.prisma --accept-data-loss --skip-generate
+# Copy schema and generate prisma client in each service
+RUN cp -r /app/packages/prisma-schemas/prisma /app/services/iam-service/prisma
+RUN cd /app/services/iam-service && DATABASE_URL="file:/app/packages/prisma-schemas/prisma/dev.db" npx prisma generate
+RUN cp -r /app/packages/prisma-schemas/prisma /app/services/inventory-service/prisma
+RUN cd /app/services/inventory-service && DATABASE_URL="file:/app/packages/prisma-schemas/prisma/dev.db" npx prisma generate
+RUN cp -r /app/packages/prisma-schemas/prisma /app/services/order-service/prisma
+RUN cd /app/services/order-service && DATABASE_URL="file:/app/packages/prisma-schemas/prisma/dev.db" npx prisma generate
+RUN cp -r /app/packages/prisma-schemas/prisma /app/services/logistics-service/prisma
+RUN cd /app/services/logistics-service && DATABASE_URL="file:/app/packages/prisma-schemas/prisma/dev.db" npx prisma generate
+RUN cp -r /app/packages/prisma-schemas/prisma /app/services/customer-api/prisma
+RUN cd /app/services/customer-api && DATABASE_URL="file:/app/packages/prisma-schemas/prisma/dev.db" npx prisma generate
+RUN cp -r /app/packages/prisma-schemas/prisma /app/services/notification-service/prisma
+RUN cd /app/services/notification-service && DATABASE_URL="file:/app/packages/prisma-schemas/prisma/dev.db" npx prisma generate
+
+# 3. Install Python AI Service dependencies
+RUN pip3 install -r services/ai-service/requirements.txt
+
+# 4. Build Backend Services
+ENV NEXT_PUBLIC_API_URL=/api/v1
+RUN pnpm --filter iam-service run build
+RUN pnpm --filter customer-api run build
+RUN pnpm --filter notification-service run build
+RUN pnpm --filter api-gateway run build
+RUN pnpm --filter wms-engine run build
+RUN pnpm --filter inventory-service run build
+RUN pnpm --filter logistics-service run build
+RUN pnpm --filter order-service run build
+
+# 5. Build Frontend Apps
+RUN pnpm --filter tenant-portal run build
+RUN pnpm --filter admin-portal run build
+RUN pnpm --filter customer-portal run build
+
+# Final adjustments
+RUN dos2unix /app/start.sh && chmod +x /app/start.sh
+RUN chmod -R 777 /app
+
+EXPOSE 7860
+CMD ["/app/start.sh"]

@@ -1,0 +1,13 @@
+import re
+with open('packages/prisma-schemas/prisma/schema.prisma', 'r', encoding='utf-8') as f:
+    content = f.read()
+
+# DO NOT normalize line endings to simulate the bug
+content = re.sub(r'provider\s*=\s*"postgresql"', 'provider = "sqlite"', content)
+content = re.sub(r'previewFeatures\s*=\s*\["multiSchema"\]', '', content)
+content = re.sub(r'schemas\s*=\s*\["public", "tenant"\]', '', content)
+# The broken regex that fails on \r\n
+content = re.sub(r'^[ \t]*@@schema\("[^"]+"\)[ \t]*\n?', '', content, flags=re.MULTILINE)
+
+with open('packages/prisma-schemas/prisma/schema.prisma', 'w', encoding='utf-8') as f:
+    f.write(content)

@@ -1,0 +1,40 @@
+# Default values for SmartLogi Helm Chart
+global:
+  environment: production
+  domain: api.smartlogi.vn
+  registry: smartlogi
+  tag: "latest"
+
+# Định nghĩa tài nguyên cho từng nhóm dự án
+components:
+  # --- BACKEND SERVICES (ports match docker-compose.yml) ---
+  iam-service: { port: 8081, replicas: 3, cpu: "100m", memory: "256Mi" }
+  ai-service: { port: 8000, replicas: 2, cpu: "500m", memory: "1Gi" }
+  logistics-service: { port: 8084, replicas: 3, cpu: "200m", memory: "512Mi" }
+  inventory-service: { port: 8082, replicas: 3, cpu: "200m", memory: "512Mi" }
+  order-service: { port: 8083, replicas: 3, cpu: "150m", memory: "256Mi" }
+  notification-service: { port: 8086, replicas: 2, cpu: "50m", memory: "128Mi" }
+  gps-ingestion-service: { port: 8090, replicas: 5, cpu: "100m", memory: "64Mi" }
+  customer-api: { port: 8085, replicas: 2, cpu: "100m", memory: "256Mi" }
+  webhook-service: { port: 8092, replicas: 2, cpu: "50m", memory: "64Mi" }
+  api-gateway: { port: 3000, replicas: 3, cpu: "200m", memory: "256Mi" }
+
+  # --- FRONTEND APPS (ports match docker-compose.yml) ---
+  admin-portal: { port: 4001, replicas: 2, cpu: "100m", memory: "256Mi" }
+  tenant-portal: { port: 4002, replicas: 4, cpu: "200m", memory: "512Mi" }
+  customer-portal: { port: 4003, replicas: 2, cpu: "100m", memory: "256Mi" }
+  pack-station-web: { port: 4004, replicas: 2, cpu: "100m", memory: "256Mi" }
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+
+storage:
+  minio:
+    enabled: true
+    bucket: smartlogi-pod
+  postgres:
+    host: smartlogi-db-primary
+    port: 5432
