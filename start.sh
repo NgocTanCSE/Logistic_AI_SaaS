@@ -17,7 +17,7 @@ if [ ! -f "/app/packages/prisma-schemas/prisma/dev.db" ]; then
 fi
 if [ -f "/app/packages/prisma-schemas/prisma/dev.db" ]; then
   echo "Database exists, running seed..."
-  DATABASE_URL="file:/app/packages/prisma-schemas/prisma/dev.db" npx ts-node packages/prisma-schemas/prisma/seed.ts
+  DATABASE_URL="file:/app/packages/prisma-schemas/prisma/dev.db" npx ts-node packages/prisma-schemas/prisma/seeds/index.ts
 fi
 
 sleep 2
