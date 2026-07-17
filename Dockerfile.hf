@@ -10,6 +10,11 @@ RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 WORKDIR /app
 
+# Disable telemetry and prompts that might hang the build
+ENV CI=true
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PRISMA_TELEMETRY_DISABLED=1
+
 # Copy monorepo config
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 
