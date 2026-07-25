@@ -9,10 +9,10 @@
     "build": "tsc"
   },
   "peerDependencies": {
-    "react": "^18.0.0"
+    "react": "^19.0.0"
   },
   "devDependencies": {
-    "@types/react": "^18.0.0",
-    "typescript": "^5.4.5"
+    "@types/react": "^19.0.0",
+    "typescript": "^5.5.3"
   }
 }

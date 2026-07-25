@@ -3,6 +3,7 @@ import { ClientsModule, Transport } from "@nestjs/microservices"
 import { HttpModule } from "@nestjs/axios"
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler"
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core"
+import { Reflector } from "@nestjs/core"
 import { HealthController } from "./controllers/health.controller"
 import { OrdersController } from "./controllers/orders.controller"
 import { BulkUploadController } from "./controllers/bulk-upload.controller"
@@ -16,6 +17,7 @@ import { PrismaModule } from "./prisma/prisma.module"
 import { AuthModule } from "./auth/auth.module"
 import { KafkaEventService } from "./services/kafka-event.service"
 import { AuditLogInterceptor, TenantSchemaInterceptor } from "./middleware/audit-log.interceptor"
+import { PermissionsGuard } from "shared-types"
 
 const kafkaBrokers = process.env.KAFKA_BROKERS?.trim()
 
@@ -58,10 +60,15 @@ const kafkaBrokers = process.env.KAFKA_BROKERS?.trim()
     AuthController
   ],
   providers: [
+    Reflector,
     KafkaEventService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
     },
     {
       provide: APP_INTERCEPTOR,

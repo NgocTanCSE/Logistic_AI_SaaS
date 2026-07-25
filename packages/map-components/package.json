@@ -9,16 +9,16 @@
     "build": "tsc"
   },
   "peerDependencies": {
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "dependencies": {
     "leaflet": "^1.9.4"
   },
   "devDependencies": {
     "@types/leaflet": "^1.9.12",
-    "@types/react": "^18.0.0",
-    "@types/react-dom": "^18.0.0",
-    "typescript": "^5.4.5"
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.5.3"
   }
 }

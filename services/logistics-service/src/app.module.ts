@@ -1,9 +1,9 @@
-﻿import { Reflector, APP_INTERCEPTOR } from '@nestjs/core';
+﻿import { Reflector, APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { Logger, MiddlewareConsumer, Module, NestModule } from "@nestjs/common"
 import { CacheModule } from "@nestjs/cache-manager"
 import { BullModule } from "@nestjs/bullmq"
 import { HttpModule } from "@nestjs/axios"
-import { ThrottlerModule } from "@nestjs/throttler"
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler"
 import { HealthController } from "./controllers/health.controller"
 import { TenantMiddleware } from "./middleware/tenant.middleware"
 import { PrismaModule } from "./prisma/prisma.module"
@@ -29,6 +29,7 @@ import { UploadController } from "./controllers/upload.controller"
 import { RoutingProcessor } from "./processors/routing.processor"
 import { getQueueToken } from "@nestjs/bullmq"
 import { AuditLogInterceptor, TenantSchemaInterceptor } from "./middleware/audit-log.interceptor"
+import { PermissionsGuard } from "shared-types"
 
 const isRedisEnabled = process.env.REDIS_HOST && process.env.REDIS_HOST !== 'localhost';
 
@@ -45,6 +46,7 @@ const importsArr: any[] = [
 
 const providersArr: any[] = [
    Reflector, 
+   PermissionsGuard,
    LogisticsService, 
    GeocodingService, 
    S3Service,
@@ -55,6 +57,10 @@ const providersArr: any[] = [
    {
      provide: APP_INTERCEPTOR,
      useClass: AuditLogInterceptor,
+   },
+   {
+     provide: APP_GUARD,
+     useClass: ThrottlerGuard,
    },
 ];
 

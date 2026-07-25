@@ -14,6 +14,7 @@ import { TenantMiddleware } from "./middleware/tenant.middleware"
 import { PrismaModule } from "./prisma/prisma.module"
 import { AuthModule } from "./auth/auth.module"
 import { TenantSchemaInterceptor } from "./interceptors/request-logging.interceptor"
+import { PermissionsGuard } from "shared-types"
 
 @Module({
   imports: [
@@ -35,7 +36,7 @@ import { TenantSchemaInterceptor } from "./interceptors/request-logging.intercep
     ClientInvoicesController,
     ClientReturnsController,
   ],
-  providers: [Reflector, 
+  providers: [Reflector, PermissionsGuard, 
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,

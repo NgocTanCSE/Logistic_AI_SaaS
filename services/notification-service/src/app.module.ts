@@ -1,10 +1,10 @@
-﻿import { Reflector, APP_INTERCEPTOR } from '@nestjs/core';
+﻿import { Reflector, APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ScheduleModule } from '@nestjs/schedule';
 import { HttpModule } from '@nestjs/axios';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { HealthController } from './controllers/health.controller';
 import { NotificationsController } from './controllers/notifications.controller';
 import { EventController } from './controllers/event.controller';
@@ -18,6 +18,7 @@ import { NotificationGateway } from './gateways/notification.gateway';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { JwtStrategy } from './auth/jwt.strategy';
 import { TenantSchemaInterceptor } from './interceptors/request-logging.interceptor';
+import { PermissionsGuard } from 'shared-types';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { TenantSchemaInterceptor } from './interceptors/request-logging.intercep
   controllers: [HealthController, NotificationsController, EventController],
   providers: [
     Reflector,
+    PermissionsGuard,
     NotificationService,
     TasksService,
     EventPrismaService,
@@ -50,6 +52,10 @@ import { TenantSchemaInterceptor } from './interceptors/request-logging.intercep
     {
       provide: APP_INTERCEPTOR,
       useClass: TenantSchemaInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
     },
   ],
 })

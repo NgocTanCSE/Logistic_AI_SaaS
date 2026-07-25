@@ -21,6 +21,7 @@ import { AuthModule } from "./auth/auth.module"
 import { InventoryService } from "./controllers/inventory.service"
 import { WavesService } from "./waves/waves.service"
 import { AuditLogInterceptor, TenantSchemaInterceptor } from "./middleware/audit-log.interceptor"
+import { PermissionsGuard } from "shared-types"
 
 @Module({
   imports: [
@@ -46,7 +47,7 @@ import { AuditLogInterceptor, TenantSchemaInterceptor } from "./middleware/audit
     WavesController,
     TasksController
   ],
-  providers: [Reflector, InventoryService, WavesService,
+  providers: [Reflector, PermissionsGuard, InventoryService, WavesService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
