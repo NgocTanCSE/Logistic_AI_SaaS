@@ -130,6 +130,22 @@ const nextConfig = {
         destination: 'http://127.0.0.1:3001/api/v1/health'
       },
       {
+        source: '/api/v1/keys',
+        destination: 'http://127.0.0.1:3001/api/v1/admin/keys'
+      },
+      {
+        source: '/api/v1/config',
+        destination: 'http://127.0.0.1:3001/api/v1/tenant/settings'
+      },
+      {
+        source: '/api/v1/env',
+        destination: 'http://127.0.0.1:3001/api/v1/admin/env'
+      },
+      {
+        source: '/api/v1/models',
+        destination: 'http://127.0.0.1:3001/api/v1/admin/models'
+      },
+      {
         source: '/api/v1/:path*',
         destination: 'http://127.0.0.1:3001/api/v1/:path*'
       }
