@@ -11,6 +11,7 @@ import { ClientAuthController } from "./controllers/client-auth.controller"
 import { AdminTenantsController } from "./controllers/admin-tenants.controller"
 import { AdminDashboardController } from "./controllers/admin-dashboard.controller"
 import { StripeWebhookController } from "./controllers/stripe-webhook.controller"
+import { ProbeController } from "./controllers/probe.controller"
 import { PrismaModule } from "./prisma/prisma.module"
 import { LoggerMiddleware } from "./middleware/logger.middleware"
 import { TenantMiddleware } from "./middleware/tenant.middleware"
@@ -73,6 +74,7 @@ import { MetricsController } from "./controllers/metrics.controller";
     ApiKeysController,
     FeatureFlagsController,
     MetricsController,
+    ProbeController,
   ],
   providers: [Reflector, StripeService, MfaService,
     {
