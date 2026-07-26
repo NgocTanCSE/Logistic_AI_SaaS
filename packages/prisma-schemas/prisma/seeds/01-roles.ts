@@ -24,6 +24,14 @@ export async function seedRoles(prisma: PrismaClient) {
 
   const roleIds: Record<string, string> = {};
 
+  // Permission map for all roles
+  const rolePermissionMap: Record<string, string[]> = {
+    'WAREHOUSE_STAFF': ['inventory:read', 'tasks:read', 'tasks:update', 'mobile:sync:pull', 'mobile:sync:push', 'pack-station:scan'],
+    'DRIVER': ['trips:read', 'mobile:sync:pull', 'mobile:sync:push', 'mobile:uploads', 'mobile:gps:batch', 'mobile:sos'],
+    'CUSTOMER_CLIENT': ['orders:read', 'orders:create', 'inventory:read', 'notifications:read', 'returns:read', 'returns:create'],
+    'TENANT_USER': ['inventory:read', 'orders:read', 'tasks:read', 'trips:read'],
+  };
+
   for (const roleName of roles) {
     let role = await prisma.customRole.findFirst({ where: { name: roleName } });
     if (!role) {
@@ -36,6 +44,24 @@ export async function seedRoles(prisma: PrismaClient) {
     // Full permissions for admin and log.manager as fallback
     if (roleName === 'TENANT_ADMIN' || roleName === 'LOGISTICS_MANAGER' || roleName === 'WAREHOUSE_MANAGER') {
       for (const p of adminPerms) {
+        const [resource, actionName] = p.split(':');
+        
+        const existingPerm = await prisma.rolePermission.findFirst({
+          where: { roleId: role.id, resource, action: actionName }
+        });
+        
+        if (!existingPerm) {
+           await prisma.rolePermission.create({
+             data: { roleId: role.id, resource, action: actionName }
+           });
+        }
+      }
+    }
+
+    // Individual permissions for other roles
+    const perms = rolePermissionMap[roleName];
+    if (perms) {
+      for (const p of perms) {
         const [resource, actionName] = p.split(':');
         
         const existingPerm = await prisma.rolePermission.findFirst({
