@@ -128,18 +128,18 @@ function main() {
                     // 4. Roles & Permissions
                     console.log('--- Seeding Roles & Permissions ---');
                     rolePermissionMap = {
-                        'TENANT_ADMIN': [
-                            "inventory:read", "inventory:adjust", "warehouses:manage", "tasks:read", "tasks:create", "tasks:update",
-                            "orders:read", "orders:create", "trips:read", "trips:dispatch", "vehicles:read", "vehicles:manage",
-                            "drivers:manage", "users:read", "users:invite", "roles:manage", "settings:manage", "audit-logs:read",
-                            "billing:read", "api-keys:manage", "notifications:read", "mobile:sync:pull", "mobile:sync:push",
-                            "mobile:uploads", "mobile:gps:batch", "mobile:sos", "pack-station:scan"
-                        ],
+'TENANT_ADMIN': [
+                             "inventory:read", "inventory:adjust", "warehouses:manage", "tasks:read", "tasks:create", "tasks:update",
+                             "orders:read", "orders:create", "trips:read", "trips:dispatch", "vehicles:read", "vehicles:manage",
+                             "drivers:manage", "users:read", "users:invite", "roles:manage", "settings:manage", "audit-logs:read",
+                             "billing:read", "api-keys:manage", "notifications:read", "mobile:sync:pull", "mobile:sync:push",
+                             "mobile:uploads", "mobile:gps:batch", "mobile:sos", "pack-station:scan", "returns:read", "returns:create", "returns:approve", "returns:inspect", "returns:refund"
+                         ],
                         'WAREHOUSE_MANAGER': ["inventory:read", "inventory:adjust", "warehouses:manage", "tasks:read", "tasks:create", "tasks:update", "orders:read", "vehicles:read", "users:read", "notifications:read", "pack-station:scan"],
                         'WAREHOUSE_STAFF': ["inventory:read", "tasks:read", "tasks:update", "mobile:sync:pull", "mobile:sync:push", "pack-station:scan"],
-                        'LOGISTICS_MANAGER': ["orders:read", "orders:create", "trips:read", "trips:dispatch", "vehicles:read", "vehicles:manage", "drivers:manage", "users:read", "notifications:read"],
+                        'LOGISTICS_MANAGER': ["orders:read", "orders:create", "trips:read", "trips:dispatch", "vehicles:read", "vehicles:manage", "drivers:manage", "users:read", "notifications:read", "returns:read", "returns:create", "returns:approve"],
                         'DRIVER': ["trips:read", "mobile:sync:pull", "mobile:sync:push", "mobile:uploads", "mobile:gps:batch", "mobile:sos"],
-                        'CUSTOMER_CLIENT': ["orders:read", "orders:create", "inventory:read", "notifications:read"],
+                        'CUSTOMER_CLIENT': ["orders:read", "orders:create", "inventory:read", "notifications:read", "returns:read", "returns:create"],
                         'TENANT_USER': ["inventory:read", "orders:read", "tasks:read", "trips:read"]
                     };
                     roleIds = {};
