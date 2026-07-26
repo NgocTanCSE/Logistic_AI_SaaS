@@ -97,8 +97,8 @@ async function main() {
   })();
 
   const clientRole = await (async () => {
-    let role = await prisma.customRole.findFirst({ where: { name: 'CLIENT_USER' } });
-    if (!role) role = await prisma.customRole.create({ data: { name: 'CLIENT_USER', isSystemDefault: true } });
+    let role = await prisma.customRole.findFirst({ where: { name: 'CUSTOMER_CLIENT' } });
+    if (!role) role = await prisma.customRole.create({ data: { name: 'CUSTOMER_CLIENT', isSystemDefault: true } });
     return role;
   })();
 

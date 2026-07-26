@@ -12,7 +12,7 @@ const SLUG_ROLE_MAP: Record<string, string> = {
   'demo-tenant': 'TENANT_ADMIN',
   'warehouse-tenant': 'WAREHOUSE_MANAGER',
   'logistics-tenant': 'LOGISTICS_MANAGER',
-  'customer-tenant': 'CLIENT_USER',
+  'customer-tenant': 'CUSTOMER_CLIENT',
   'pack-station': 'WAREHOUSE_STAFF',
   'smartlogi': 'DRIVER',
 };
@@ -23,7 +23,7 @@ const ROLE_REDIRECT_MAP: Record<string, string> = {
   'LOGISTICS_MANAGER': '/client/dashboard',
   'WAREHOUSE_STAFF': '/client/dashboard',
   'DRIVER': '/client/dashboard',
-  'CLIENT_USER': '/client/dashboard',
+  'CUSTOMER_CLIENT': '/client/dashboard',
   'TENANT_USER': '/client/dashboard',
 };
 
