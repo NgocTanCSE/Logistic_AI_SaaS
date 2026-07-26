@@ -2,6 +2,101 @@
 import { Request } from 'express';
 import * as jwt from 'jsonwebtoken';
 import { getJwtSecret, PUBLIC_PATHS } from '../config/services.config';
+import { Permissions } from 'shared-types';
+
+const MOCK_ROLE_PERMISSIONS: Record<string, string[]> = {
+  WAREHOUSE_MANAGER: [
+    Permissions.InventoryRead,
+    Permissions.InventoryAdjust,
+    Permissions.WarehousesManage,
+    Permissions.TasksRead,
+    Permissions.TasksCreate,
+    Permissions.TasksUpdate,
+    Permissions.OrdersRead,
+    Permissions.VehiclesRead,
+    Permissions.UsersRead,
+    Permissions.NotificationsRead,
+    Permissions.PackStationScan,
+  ],
+  WAREHOUSE_STAFF: [
+    Permissions.InventoryRead,
+    Permissions.TasksRead,
+    Permissions.TasksUpdate,
+    Permissions.MobileSyncPull,
+    Permissions.MobileSyncPush,
+    Permissions.PackStationScan,
+  ],
+  LOGISTICS_MANAGER: [
+    Permissions.OrdersRead,
+    Permissions.OrdersCreate,
+    Permissions.TripsRead,
+    Permissions.TripsDispatch,
+    Permissions.VehiclesRead,
+    Permissions.VehiclesManage,
+    Permissions.DriversManage,
+    Permissions.UsersRead,
+    Permissions.NotificationsRead,
+    Permissions.ReturnsRead,
+    Permissions.ReturnsCreate,
+    Permissions.ReturnsApprove,
+  ],
+  TENANT_ADMIN: [
+    Permissions.OrdersRead,
+    Permissions.OrdersCreate,
+    Permissions.InventoryRead,
+    Permissions.InventoryAdjust,
+    Permissions.WarehousesManage,
+    Permissions.TasksRead,
+    Permissions.TasksCreate,
+    Permissions.TasksUpdate,
+    Permissions.TripsRead,
+    Permissions.TripsDispatch,
+    Permissions.VehiclesRead,
+    Permissions.VehiclesManage,
+    Permissions.DriversManage,
+    Permissions.UsersRead,
+    Permissions.UsersInvite,
+    Permissions.RolesManage,
+    Permissions.SettingsManage,
+    Permissions.AuditLogsRead,
+    Permissions.BillingRead,
+    Permissions.ApiKeysManage,
+    Permissions.NotificationsRead,
+    Permissions.MobileSyncPull,
+    Permissions.MobileSyncPush,
+    Permissions.MobileUploads,
+    Permissions.MobileGpsBatch,
+    Permissions.MobileSos,
+    Permissions.PackStationScan,
+    Permissions.ReturnsRead,
+    Permissions.ReturnsCreate,
+    Permissions.ReturnsApprove,
+    Permissions.ReturnsInspect,
+    Permissions.ReturnsRefund,
+  ],
+  TENANT_USER: [
+    Permissions.InventoryRead,
+    Permissions.OrdersRead,
+    Permissions.TasksRead,
+    Permissions.TripsRead,
+  ],
+  DRIVER: [
+    Permissions.TripsRead,
+    Permissions.MobileSyncPull,
+    Permissions.MobileSyncPush,
+    Permissions.MobileUploads,
+    Permissions.MobileGpsBatch,
+    Permissions.MobileSos,
+  ],
+  CUSTOMER_CLIENT: [
+    Permissions.OrdersRead,
+    Permissions.OrdersCreate,
+    Permissions.InventoryRead,
+    Permissions.NotificationsRead,
+    Permissions.ReturnsRead,
+    Permissions.ReturnsCreate,
+  ],
+};
 
 @Injectable()
 export class JwtGatewayGuard implements CanActivate {
@@ -35,7 +130,7 @@ export class JwtGatewayGuard implements CanActivate {
         tenant_id: undefined,
         schema_name: 'public',
         schemaName: 'public',
-        permissions: [],
+        permissions: MOCK_ROLE_PERMISSIONS[mockRole] || [],
       };
       return true;
     }

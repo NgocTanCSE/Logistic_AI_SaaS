@@ -1,7 +1,7 @@
 ﻿import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
-import { Permissions } from '../shared-types';
+import { Permissions } from 'shared-types';
 
 const MOCK_ROLE_PERMISSIONS: Record<string, string[]> = {
   WAREHOUSE_MANAGER: [
