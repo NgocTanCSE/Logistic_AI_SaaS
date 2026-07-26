@@ -1,6 +1,86 @@
 ﻿import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
+import { Permissions } from '../shared-types';
+
+const MOCK_ROLE_PERMISSIONS: Record<string, string[]> = {
+  WAREHOUSE_MANAGER: [
+    Permissions.InventoryRead,
+    Permissions.InventoryAdjust,
+    Permissions.WarehousesManage,
+    Permissions.TasksRead,
+    Permissions.TasksCreate,
+    Permissions.TasksUpdate,
+    Permissions.OrdersRead,
+    Permissions.VehiclesRead,
+    Permissions.UsersRead,
+    Permissions.NotificationsRead,
+    Permissions.PackStationScan,
+  ],
+  WAREHOUSE_STAFF: [
+    Permissions.InventoryRead,
+    Permissions.TasksRead,
+    Permissions.TasksUpdate,
+    Permissions.MobileSyncPull,
+    Permissions.MobileSyncPush,
+    Permissions.PackStationScan,
+  ],
+  LOGISTICS_MANAGER: [
+    Permissions.OrdersRead,
+    Permissions.OrdersCreate,
+    Permissions.TripsRead,
+    Permissions.TripsDispatch,
+    Permissions.VehiclesRead,
+    Permissions.VehiclesManage,
+    Permissions.DriversManage,
+    Permissions.UsersRead,
+    Permissions.NotificationsRead,
+    Permissions.ReturnsRead,
+    Permissions.ReturnsCreate,
+    Permissions.ReturnsApprove,
+  ],
+  TENANT_ADMIN: [
+    Permissions.OrdersRead,
+    Permissions.OrdersCreate,
+    Permissions.InventoryRead,
+    Permissions.InventoryAdjust,
+    Permissions.WarehousesManage,
+    Permissions.TasksRead,
+    Permissions.TasksCreate,
+    Permissions.TasksUpdate,
+    Permissions.TripsRead,
+    Permissions.TripsDispatch,
+    Permissions.VehiclesRead,
+    Permissions.VehiclesManage,
+    Permissions.DriversManage,
+    Permissions.UsersRead,
+    Permissions.UsersInvite,
+    Permissions.RolesManage,
+    Permissions.SettingsManage,
+    Permissions.AuditLogsRead,
+    Permissions.BillingRead,
+    Permissions.ApiKeysManage,
+    Permissions.NotificationsRead,
+    Permissions.MobileSyncPull,
+    Permissions.MobileSyncPush,
+    Permissions.MobileUploads,
+    Permissions.MobileGpsBatch,
+    Permissions.MobileSos,
+    Permissions.PackStationScan,
+    Permissions.ReturnsRead,
+    Permissions.ReturnsCreate,
+    Permissions.ReturnsApprove,
+    Permissions.ReturnsInspect,
+    Permissions.ReturnsRefund,
+  ],
+  TENANT_USER: [
+    Permissions.InventoryRead,
+    Permissions.OrdersRead,
+    Permissions.TasksRead,
+    Permissions.TripsRead,
+  ],
+  SUPER_ADMIN: [],
+};
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -22,7 +102,7 @@ export class JwtAuthGuard implements CanActivate {
         tenant_id: undefined,
         schema_name: 'public',
         schemaName: 'public',
-        permissions: [],
+        permissions: MOCK_ROLE_PERMISSIONS[mockRole] || [],
       };
       return true;
     }
