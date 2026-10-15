@@ -1,5 +1,5 @@
 FROM node:20-alpine AS builder
-RUN apk add --no-cache libc6-compat openssl && npm install -g pnpm@9.0.0 typescript
+RUN apk add --no-cache libc6-compat openssl && corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 WORKDIR /app
 

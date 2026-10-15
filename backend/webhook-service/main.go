@@ -375,13 +375,7 @@ func processQueue() {
 	}
 }
 
-func main() {
-	initAuth()
-	initRedis()
-	initDB()
-
-	go processQueue()
-
+func setupRoutes() *http.ServeMux {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -636,6 +630,18 @@ func main() {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+
+	return mux
+}
+
+func main() {
+	initAuth()
+	initRedis()
+	initDB()
+
+	go processQueue()
+
+	mux := setupRoutes()
 
 	port := os.Getenv("PORT")
 	if port == "" {

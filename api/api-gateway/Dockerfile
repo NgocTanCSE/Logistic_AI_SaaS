@@ -8,7 +8,7 @@ COPY packages/shared-types/package.json ./packages/shared-types/
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
 COPY .npmrc ./
 
-RUN corepack enable && pnpm install --no-frozen-lockfile
+RUN corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --no-frozen-lockfile
 
 COPY packages/shared-types ./packages/shared-types
 COPY api/api-gateway ./api/api-gateway

@@ -1,5 +1,5 @@
 FROM node:20-alpine AS builder
-RUN apk add --no-cache libc6-compat openssl && npm install -g pnpm@9.0.0
+RUN apk add --no-cache libc6-compat openssl && corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN pnpm --filter prisma-schemas exec prisma generate
 # Runner stage
 FROM node:20-alpine AS runner
 ENV NODE_ENV=production
-RUN apk add --no-cache openssl && npm install -g pnpm@9.0.0
+RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules

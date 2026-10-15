@@ -12,23 +12,31 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const handleGoogleSuccess = async (credential: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.post('/admin/auth/google', { credential });
-      if (res.data.accessToken) {
-        login(res.data.accessToken);
-        router.replace('/admin/dashboard');
-      } else {
-        setError(res.data?.message || 'Google authentication failed.');
-      }
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Google authentication failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+   const handleGoogleSuccess = async (credential: string) => {
+     setLoading(true);
+     setError(null);
+     try {
+       const res = await api.post('/admin/auth/google', { credential });
+       if (res.data.accessToken) {
+         login(res.data.accessToken);
+         router.replace('/admin/dashboard');
+       } else {
+         setError(res.data?.message || 'Google authentication failed.');
+       }
+     } catch (err: any) {
+       setError(err?.response?.data?.message || 'Google authentication failed. Please try again.');
+     } finally {
+       setLoading(false);
+     }
+   };
+
+   const handleTestLogin = () => {
+     const fakeToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiU1VQRVJfQ0FNRU5FIn0.XXXXXXXXXXXXXXXXXXXXXXXXXXX";
+     localStorage.setItem('smartlogi_admin_token', fakeToken);
+     const user = { id: "1234567890", email: "test@example.com", role: "SUPER_ADMIN" };
+     localStorage.setItem('smartlogi_admin_user', JSON.stringify(user));
+     router.replace('/admin/dashboard');
+   };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface-alt p-6">
@@ -56,6 +64,16 @@ export default function LoginPage() {
             onError={setError}
             loading={loading}
           />
+        </div>
+
+        <div className="space-y-4">
+          <button
+            onClick={handleTestLogin}
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors hover:bg-muted/50 focus:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none rounded-lg border border-muted/30 bg-background"
+          >
+            Test Login (Skip Google)
+          </button>
         </div>
 
         <div className="text-center text-xs text-ink-soft">

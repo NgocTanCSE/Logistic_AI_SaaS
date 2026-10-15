@@ -17,6 +17,7 @@ func setupTest() {
 	processed = sync.Map{}
 	redisClient = nil
 	dbPool = nil
+	webhookAuthToken = "test-token"
 }
 
 func TestDeliverWebhook_Idempotency(t *testing.T) {
@@ -187,9 +188,12 @@ func TestDeliverWebhook_EventHeader(t *testing.T) {
 }
 
 func TestHealthEndpoint(t *testing.T) {
+	setupTest()
+	mux := setupRoutes()
+
 	req, _ := http.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
-	http.DefaultServeMux.ServeHTTP(w, req)
+	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -198,6 +202,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 func TestDeliverEndpoint(t *testing.T) {
 	setupTest()
+	mux := setupRoutes()
 
 	body := DeliveryRequest{
 		Id:    "test-id-7",
@@ -209,9 +214,10 @@ func TestDeliverEndpoint(t *testing.T) {
 
 	req, _ := http.NewRequest("POST", "/deliver", bytes.NewBuffer(bodyBytes))
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer test-token")
 	w := httptest.NewRecorder()
 
-	http.DefaultServeMux.ServeHTTP(w, req)
+	mux.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)

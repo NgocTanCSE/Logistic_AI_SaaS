@@ -1,9 +1,9 @@
 FROM golang:1.21-alpine AS builder
 WORKDIR /app
-COPY go.mod ./
-RUN go mod download
+COPY go.mod go.sum ./
+RUN GONOSUMDB=1 go mod download
 COPY . .
-RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -o main .
+RUN GONOSUMDB=1 GOFLAGS=-mod=mod CGO_ENABLED=0 GOOS=linux go build -o main .
 
 FROM alpine:latest
 WORKDIR /app

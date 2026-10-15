@@ -14,6 +14,8 @@ export function GoogleLoginButton({
   loading,
   fullWidth = true,
 }: GoogleLoginButtonProps) {
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+
   return (
     <GoogleLogin
       shape="rectangular"
@@ -21,6 +23,7 @@ export function GoogleLoginButton({
       size="large"
       loading={loading}
       fullWidth={fullWidth}
+      clientId={clientId}
       onSuccess={(credentialResponse) => {
         if (credentialResponse?.credential) {
           onSuccess(credentialResponse.credential);
