@@ -1,7 +1,7 @@
 "use client";
 
 import "./globals.css";
-import "./styles/layout-tokens.css"; // editorial layout tokens (typography/motion/shadow) — colors kept per portal
+import "../styles/layout-tokens.css"; // editorial layout tokens (typography/motion/shadow) — colors kept per portal
 import { AuthProvider } from "@/lib/auth-context";
 import AppShell from "@/components/AppShell";
 import { GoogleOAuthProvider } from "@react-oauth/google";

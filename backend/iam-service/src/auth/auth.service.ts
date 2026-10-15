@@ -219,7 +219,7 @@ export class AuthService {
           },
         });
 
-        const defaultRole = await this.prisma.role.findFirst({
+        const defaultRole = await this.prisma.customRole.findFirst({
           where: { name: 'TENANT_USER' },
         });
 

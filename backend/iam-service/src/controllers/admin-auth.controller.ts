@@ -51,7 +51,7 @@ export class AdminAuthController {
   @Post("reset-password")
   @Throttle({ auth: { limit: 5, ttl: 60000 } })
   async resetPassword(@Body() body: ResetPasswordDto): Promise<any> {
-    return this.authService.resetPasswordSuperAdmin(body.email, body.token, body.newPassword);
+    return this.authService.resetPasswordSuperAdmin(body.email, body.token, body.password);
   }
 
   @UseGuards(JwtAuthGuard)

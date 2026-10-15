@@ -5,6 +5,10 @@
      structure / typography / motion is adopted.
    ================================================================ */
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   /* Adapt to each portal's own `primary`/`background`/`border` tokens so
      the layout layer is portable across all 4 Next.js apps while keeping

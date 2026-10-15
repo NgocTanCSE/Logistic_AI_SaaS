@@ -62,3 +62,6 @@ export function Sidebar({ items, basePath }: SidebarProps) {
         </Link>
       </div>
     </aside>
+
+  );
+}

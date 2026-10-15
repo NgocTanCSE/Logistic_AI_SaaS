@@ -13,12 +13,12 @@ COPY packages/ ./packages/
 COPY backend/notification-service/ ./backend/notification-service/
 
 RUN pnpm install --no-frozen-lockfile
+RUN pnpm --filter shared-types build
 RUN pnpm --filter prisma-schemas exec prisma generate
 RUN pnpm --filter notification-service build
 RUN pnpm deploy --filter notification-service --prod /prod/app
 RUN cp -r /app/packages/prisma-schemas/prisma /prod/app/prisma && \
-    cd /prod/app && npx --yes prisma@5.18.0 generate && \
-    npx --yes prisma@5.18.0 db push --skip-generate --accept-data-loss
+    cd /prod/app && pnpm exec prisma generate
 
 FROM node:20-alpine AS runner
 WORKDIR /app

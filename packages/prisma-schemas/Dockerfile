@@ -15,11 +15,14 @@ RUN pnpm --filter prisma-schemas exec prisma generate
 
 # Runner stage
 FROM node:20-alpine AS runner
-WORKDIR /app/packages/prisma-schemas
 ENV NODE_ENV=production
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl && npm install -g pnpm@9.0.0
 
+WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/pnpm-workspace.yaml ./
+COPY --from=builder /app/package.json ./
 
-CMD sh -c "pnpm exec prisma db push && pnpm exec prisma db seed && echo 'Database ready'"
+WORKDIR /app/packages/prisma-schemas
+CMD sh -c "pnpm exec prisma db push --schema prisma/schema.prisma && pnpm exec prisma db seed --schema prisma/schema.prisma && echo 'Database ready'"

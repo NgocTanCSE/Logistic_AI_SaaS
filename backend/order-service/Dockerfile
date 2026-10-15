@@ -20,8 +20,7 @@ RUN pnpm --filter prisma-schemas exec prisma generate
 RUN pnpm --filter order-service build
 RUN pnpm deploy --filter order-service --prod /prod/app
 RUN cp -r /app/packages/prisma-schemas/prisma /prod/app/prisma && \
-    cd /prod/app && npx --yes prisma@5.18.0 generate && \
-    npx --yes prisma@5.18.0 db push --skip-generate --accept-data-loss
+    cd /prod/app && pnpm exec prisma generate
 
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -35,4 +34,4 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/.pnpm ./node_modules/.pnpm
 
 EXPOSE 3000
-CMD ["node", "dist/backend/order-service/src/main.js"]
+CMD ["node", "dist/main.js"]

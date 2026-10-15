@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import "./styles/layout-tokens.css"; /* editorial layout tokens — colors kept per portal */
+import "../styles/layout-tokens.css"; /* editorial layout tokens — colors kept per portal */
 import { AuthProvider } from "@/lib/auth-context";
 import AppShell from "@/components/AppShell";
 import { GoogleOAuthProvider } from "@react-oauth/google";

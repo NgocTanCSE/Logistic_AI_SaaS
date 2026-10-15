@@ -41,6 +41,7 @@ type Webhook struct {
     UpdatedAt  time.Time `json:"updatedAt,omitempty"`
 }
 
+type DeliveryRequest struct {
 	Id             string `json:"id"`
 	Url            string `json:"url"`
 	Event          string `json:"event"`

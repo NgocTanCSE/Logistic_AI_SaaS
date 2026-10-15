@@ -120,7 +120,7 @@ export class ClientOrdersController {
 
     // DĂ¹ng transaction Ä‘á»ƒ bulk create, Ä‘áº£m báº£o khĂ´ng lÆ°u 1 ná»­a dá»¯ liá»‡u náº¿u cĂ³ lá»—i
     return this.prisma.tenantClient.$transaction(async (tx: any) => {
-      const createdOrders = [];
+      const createdOrders: any[] = [];
       let successCount = 0;
 
       for (const ord of body.orders) {

@@ -74,6 +74,6 @@ export class MobileAuthController {
     if (!tenantSlug) {
       return { ok: false, message: "Missing x-tenant-slug header" };
     }
-    return this.authService.resetPasswordTenantUser(tenantSlug, body.email, body.token, body.newPassword);
+    return this.authService.resetPasswordTenantUser(tenantSlug, body.email, body.token, body.password);
   }
 }

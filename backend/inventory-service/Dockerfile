@@ -22,8 +22,7 @@ RUN pnpm --filter prisma-schemas exec prisma generate
 RUN pnpm --filter inventory-service build
 RUN pnpm deploy --filter inventory-service --prod /prod/app
 RUN cp -r /app/packages/prisma-schemas/prisma /prod/app/prisma && \
-    cd /prod/app && npx --yes prisma@5.18.0 generate && \
-    npx --yes prisma@5.18.0 db push --skip-generate --accept-data-loss
+    cd /prod/app && pnpm exec prisma generate
 
 FROM node:20-alpine AS runner
 WORKDIR /app
@@ -33,5 +32,5 @@ RUN apk add --no-cache openssl
 COPY --from=builder /prod/app ./
 
 EXPOSE 3000
-CMD ["node", "dist/backend/inventory-service/src/main.js"]
+CMD ["node", "dist/main.js"]
 

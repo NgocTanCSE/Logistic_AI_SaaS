@@ -458,4 +458,199 @@ await tx.delivery.create({
       return { ok: true, localId: localFeedback.id, warning: 'AI Worker unreachable, feedback saved locally' };
     }
   }
+
+  // --- SOS Alert Methods ---
+
+  async getSosAlerts(status?: string) {
+    const where: any = {};
+    if (status) where.status = status;
+
+    const [data, total] = await Promise.all([
+      this.prisma.tenantClient.sosAlert.findMany({
+        where,
+        include: { driver: { include: { user: true } }, trip: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.tenantClient.sosAlert.count({ where }),
+    ]);
+
+    return { data, total };
+  }
+
+  async resolveSos(id: string, status: string) {
+    const existing = await this.prisma.tenantClient.sosAlert.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException(`SOS alert ${id} not found`);
+    }
+    return this.prisma.tenantClient.sosAlert.update({
+      where: { id },
+      data: { status },
+    });
+  }
+
+  // --- Report Methods ---
+
+  async getTripReport(range: string = '7d') {
+    const days = parseInt(range) || 7;
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const [total, completed, inTransit, cancelled] = await Promise.all([
+      this.prisma.tenantClient.trip.count({ where: { createdAt: { gte: since } } }),
+      this.prisma.tenantClient.trip.count({ where: { status: 'COMPLETED', createdAt: { gte: since } } }),
+      this.prisma.tenantClient.trip.count({ where: { status: 'IN_TRANSIT', createdAt: { gte: since } } }),
+      this.prisma.tenantClient.trip.count({ where: { status: 'CANCELLED', createdAt: { gte: since } } }),
+    ]);
+
+    return {
+      range,
+      total,
+      completed,
+      inTransit,
+      cancelled,
+    };
+  }
+
+  async getFleetReport(range: string = '7d') {
+    const days = parseInt(range) || 7;
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const [totalDrivers, activeDrivers, totalVehicles, activeVehicles, trips] = await Promise.all([
+      this.prisma.tenantClient.driver.count(),
+      this.prisma.tenantClient.driver.count({ where: { status: { in: ['ACTIVE', 'ONLINE' ] } } }),
+      this.prisma.tenantClient.vehicle.count(),
+      this.prisma.tenantClient.vehicle.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.tenantClient.trip.findMany({
+        where: { createdAt: { gte: since } },
+        select: { actualDistanceKm: true, totalWeightKg: true },
+      }),
+    ]);
+
+    const totalDistance = trips.reduce((sum, t) => sum + Number(t.actualDistanceKm || 0), 0);
+    const totalCargo = trips.reduce((sum, t) => sum + Number(t.totalWeightKg || 0), 0);
+
+    return {
+      range,
+      drivers: { total: totalDrivers, active: activeDrivers },
+      vehicles: { total: totalVehicles, active: activeVehicles },
+      totalDistanceKm: totalDistance,
+      totalCargoWeightKg: totalCargo,
+    };
+  }
+
+  // --- Feedback & Finance Methods ---
+
+  async listAiModels(type?: string) {
+    const where: any = {};
+    if (type) where.type = type;
+    return this.prisma.tenantClient.aiModel.findMany({
+      where,
+      orderBy: { trainedAt: 'desc' },
+    });
+  }
+
+  async createAiModel(data: any) {
+    const existingCurrent = await this.prisma.tenantClient.aiModel.findFirst({
+      where: { isCurrent: true, type: data.type },
+    });
+    if (existingCurrent) {
+      await this.prisma.tenantClient.aiModel.update({
+        where: { id: existingCurrent.id },
+        data: { isCurrent: false },
+      });
+    }
+
+    return this.prisma.tenantClient.aiModel.create({
+      data: {
+        name: data.name,
+        version: data.version,
+        type: data.type,
+        accuracy: data.accuracy,
+        modelPath: data.modelPath,
+        metadata: data.metadata,
+        isCurrent: true,
+      },
+    });
+  }
+
+  async updateAiModel(id: string, body: any) {
+    return this.prisma.tenantClient.aiModel.update({
+      where: { id },
+      data: body,
+    });
+  }
+
+  async createAiFeedback(body: any) {
+    return this.prisma.tenantClient.aiFeedback.create({
+      data: {
+        modelId: body.modelId || 'demand-v1',
+        resourceType: body.resourceType,
+        resourceId: body.resourceId,
+        aiPrediction: body.aiPrediction,
+        humanCorrected: body.humanCorrected,
+        confidence: body.confidence || 1.0,
+      },
+    });
+  }
+
+  async getAiFeedbacks(params: { modelId?: string; isUsedForTrain?: boolean }) {
+    const where: any = {};
+    if (params.modelId) where.modelId = params.modelId;
+    if (typeof params.isUsedForTrain === 'boolean') where.isUsedForTrain = params.isUsedForTrain;
+
+    return this.prisma.tenantClient.aiFeedback.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async markFeedbackAsUsed(id: string) {
+    const existing = await this.prisma.tenantClient.aiFeedback.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundException(`AI feedback ${id} not found`);
+    }
+    return this.prisma.tenantClient.aiFeedback.update({
+      where: { id },
+      data: { isUsedForTrain: true },
+    });
+  }
+
+  async reconcileBankStatement(entries: any[]) {
+    const results: any[] = [];
+
+    for (const entry of entries) {
+      const reference = entry.reference;
+      const amount = Number(entry.amount);
+      const transactionDate = entry.transactionDate;
+
+      // Try to match with existing COD remittance by driver + amount
+      const matchedRemittance = await this.prisma.tenantClient.codRemittance.findFirst({
+        where: {
+          amountRemitted: { equals: amount as any },
+          createdAt: { gte: new Date(transactionDate) },
+        },
+      });
+
+      if (matchedRemittance) {
+        results.push({ reference, matched: true, remittanceId: matchedRemittance.id });
+        await this.prisma.tenantClient.codRemittance.update({
+          where: { id: matchedRemittance.id },
+          data: { status: 'RECONCILED' },
+        });
+      } else {
+        results.push({ reference, matched: false });
+      }
+    }
+
+    return { ok: true, reconciled: results.length, results };
+  }
+
+  async getDriverExpenses(driverId: string) {
+    return this.prisma.tenantClient.driverExpense.findMany({
+      where: { driverId },
+      orderBy: { createdAt: 'desc' },
+      include: { driver: { include: { user: true } } },
+    });
+  }
 }

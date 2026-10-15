@@ -12,12 +12,12 @@ const config: Config = {
       colors: {
         background: "#ffffff",
         surface: "#ffffff",
-        surfaceAlt: "#f8fafc",
+        "surface-alt": "#f8fafc",
         border: "#e2e8f0",
         ink: "#0f172a",
-        inkSoft: "#64748b",
+        "ink-soft": "#64748b",
         primary: "#2563eb",
-        primaryHover: "#1d4ed8",
+        "primary-hover": "#1d4ed8",
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

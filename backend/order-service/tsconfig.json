@@ -6,8 +6,11 @@
     "emitDecoratorMetadata": true,
     "baseUrl": "./",
     "paths": {
-      "@/*": ["src/*"]
-    }
+      "@/*": [
+        "src/*"
+      ]
+    },
+    "noImplicitAny": false
   },
   "include": [
     "src/**/*.ts"

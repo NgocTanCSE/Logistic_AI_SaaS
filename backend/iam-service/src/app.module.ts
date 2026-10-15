@@ -2,6 +2,7 @@
 import { CacheModule } from "@nestjs/cache-manager"
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler"
 import { APP_INTERCEPTOR, APP_GUARD, Reflector } from "@nestjs/core"
+import { PermissionsGuard } from "shared-types"
 import { HealthController } from "./controllers/health.controller"
 import { AuthController } from "./controllers/auth.controller"
 import { AdminAuthController } from "./controllers/admin-auth.controller"
@@ -76,7 +77,7 @@ import { MetricsController } from "./controllers/metrics.controller";
     MetricsController,
     ProbeController,
   ],
-  providers: [Reflector, StripeService, MfaService,
+  providers: [Reflector, PermissionsGuard, StripeService, MfaService,
     {
       provide: APP_INTERCEPTOR,
       useClass: TenantSchemaInterceptor,

@@ -1,12 +1,12 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy as GoogleStrategy, VerifyCallback } from 'passport-google-oauth20';
+import { Strategy as GooglePassportStrategy, VerifyCallback } from 'passport-google-oauth20';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
-export class GoogleStrategy extends PassportStrategy(GoogleStrategy, 'google') {
+export class GoogleStrategy extends PassportStrategy(GooglePassportStrategy, 'google') {
   private readonly logger = new Logger(GoogleStrategy.name);
 
   constructor(

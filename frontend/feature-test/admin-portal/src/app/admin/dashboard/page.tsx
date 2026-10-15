@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { StatCard } from '@/components/StatCard';
+import { StatCard } from '@/components/dashboard/StatCard';
 import { MRRChart } from '@/components/dashboard/MRRChart';
 import { GrowthChart } from '@/components/dashboard/GrowthChart';
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed';

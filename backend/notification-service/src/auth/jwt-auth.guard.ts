@@ -3,8 +3,6 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { Permissions } from 'shared-types';
 
-};
-
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   private jwtService: JwtService;
