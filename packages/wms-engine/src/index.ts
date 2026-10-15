@@ -204,24 +204,26 @@ export class WmsAllocationEngine {
 
     const waves: WavePickingResult[] = [];
     let currentWave: WavePickingOrder[] = [];
+    let waveIndex = 0;
 
     for (const order of sortedOrders) {
       currentWave.push(order);
 
       if (currentWave.length >= waveSize) {
-        waves.push(this.createWave(currentWave));
+        waves.push(this.createWave(currentWave, waveIndex));
+        waveIndex++;
         currentWave = [];
       }
     }
 
     if (currentWave.length > 0) {
-      waves.push(this.createWave(currentWave));
+      waves.push(this.createWave(currentWave, waveIndex));
     }
 
     return waves;
   }
 
-  private static createWave(orders: WavePickingOrder[]): WavePickingResult {
+  private static createWave(orders: WavePickingOrder[], waveIndex: number): WavePickingResult {
     const tasks: WaveTask[] = [];
     let totalItems = 0;
 
@@ -241,7 +243,7 @@ export class WmsAllocationEngine {
     }
 
     return {
-      waveId: `wave_${Date.now()}`,
+      waveId: `wave_${Date.now()}_${waveIndex}`,
       orders: orders.map(o => o.orderId),
       tasks,
       totalItems,

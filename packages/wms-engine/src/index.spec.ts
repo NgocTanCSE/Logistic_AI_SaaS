@@ -89,6 +89,21 @@ describe('WmsAllocationEngine', () => {
       expect(waves[0].orders).toContain('ord_2');
       expect(waves[0].totalItems).toBe(8);
     });
+
+    it('should produce unique wave IDs when multiple waves are created in the same tick', () => {
+      // Regression: createWave used `wave_${Date.now()}` which collides when
+      // several waves are built within the same millisecond.
+      const orders = Array.from({ length: 15 }, (_, i) => ({
+        orderId: `ord_${i}`,
+        items: [{ productId: 'prod_1', quantity: 1 }],
+      }));
+
+      const waves = WmsAllocationEngine.generateWave(orders, 5);
+
+      expect(waves.length).toBe(3);
+      const ids = waves.map(w => w.waveId);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
   });
 
   describe('assignPutawayBin', () => {

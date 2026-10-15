@@ -1,0 +1,132 @@
+/* ================================================================
+   LAYOUT TOKENS Layer  (adapted from Prj_Ecom_Design/FE layout system)
+   ─ Colors are NOT redefined here: keep the existing portal palette
+     (primary = #2563eb blue, background, ink, border). Only layout
+     structure / typography / motion is adopted.
+   ================================================================ */
+
+:root {
+  /* Adapt to each portal's own `primary`/`background`/`border` tokens so
+     the layout layer is portable across all 4 Next.js apps while keeping
+     every portal's existing color palette. */
+  --c-primary: theme('colors.primary');
+  --c-bg: theme('colors.background');
+  --c-border: theme('colors.border');
+  --c-ink: theme('colors.ink');
+}
+
+/* ── Base: smooth scroll + system font stacks ──────────────── */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Keep existing body styles; only enforce font stacks + scrollbars */
+  body {
+    font-feature-settings: "kern" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  /* Editorial serif for headings & labels — maps to system Georgia serif */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-editorial,
+  .font-heading {
+    font-family: 'Cormorant Garamond', Georgia, ui-serif, 'Times New Roman', serif;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  h1 { font-size: 2.25rem; line-height: 1.1; }
+  h2 { font-size: 1.85rem; line-height: 1.1; }
+  h3 { font-size: 1.5rem;  line-height: 1.15; }
+  h4 { font-size: 1.25rem; line-height: 1.2; }
+
+  /* Clean sans body (system stack — no external web font) */
+  .font-body, body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  p { max-width: 65ch; }
+
+  /* Selection tint uses the portal's own primary color */
+  ::selection {
+    background-color: rgba(theme('colors.primary'), 0.12);
+    color: theme('colors.primary');
+  }
+
+  /* Hide scrollbar visually but keep usability */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Editorial scrollbar (5-color: paper / stone border / terracotta hover) */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #FCFCFC; }
+  ::-webkit-scrollbar-thumb { background: var(--c-border); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--c-primary); }
+}
+
+/* ── Utility classes ───────────────────────────────────────── */
+@layer utilities {
+  /* Focus ring — brand primary, consistent across all interactive elements */
+  .focus-visible-ring:focus-visible {
+    outline: 3px solid var(--c-primary);
+    outline-offset: 2px;
+  }
+
+  /* Scroll reveal (fade + slide-up) — pairs with useScrollReveal ctx */
+  .scroll-reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.85s ease, transform 0.85s ease;
+    will-change: opacity, transform;
+  }
+  .scroll-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  /* Scroll progress bar accent = portal primary */
+  .scroll-progress {
+    background: var(--c-primary);
+  }
+  .delay-100 { transition-delay: 100ms; }
+  .delay-150 { transition-delay: 150ms; }
+  .delay-200 { transition-delay: 200ms; }
+  .delay-300 { transition-delay: 300ms; }
+  .delay-400 { transition-delay: 400ms; }
+
+  /* Paper-like elevation shadows (soft, low-contrast) */
+  .shadow-paper {
+    box-shadow: 0 1px 3px rgba(18, 18, 18, 0.04), 0 1px 2px rgba(18, 18, 18, 0.03);
+  }
+  .shadow-card {
+    box-shadow: 0 4px 12px -2px rgba(18, 18, 18, 0.06), 0 2px 6px -2px rgba(18, 18, 18, 0.05);
+  }
+  .shadow-card-hover {
+    box-shadow: 0 12px 24px -4px rgba(18, 18, 18, 0.09), 0 6px 12px -4px rgba(18, 18, 18, 0.06);
+  }
+  .shadow-floating {
+    box-shadow: 0 20px 40px -15px rgba(18, 18, 18, 0.12);
+  }
+
+  /* Text clamp */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+  }
+
+  /* Micro interactions */
+  .hover-tilt:hover {
+    transform: rotate(0.3deg) scale(1.01);
+  }
+}

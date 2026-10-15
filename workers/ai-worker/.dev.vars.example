@@ -1,0 +1,10 @@
+# Cloudflare Worker secrets (do NOT commit real values).
+# Copy to workers/ai-worker/.dev.vars for local `wrangler dev` and set real
+# values via `npx wrangler secret put <NAME>` before deploying.
+
+# HS256 secret shared with iam-service / api-gateway JWTs.
+JWT_SECRET=
+
+# Shared internal API key accepted for service-to-service calls (logistics-service
+# forwards feedback + routing requests here).
+AI_API_KEY=

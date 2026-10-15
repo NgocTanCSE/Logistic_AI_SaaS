@@ -55,7 +55,7 @@ export const Badge: React.FC<BadgeProps> = ({
         <button
           type="button"
           onClick={onDismiss}
-          className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-black/10 focus:outline-none"
+          className="ml-1 inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-slate-100 focus:outline-none"
           aria-label="Dismiss"
         >
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

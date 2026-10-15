@@ -12,5 +12,5 @@ dist
 .vscode
 *.md
 scripts/
+!scripts/convert_schema.py
 Pagetemp/
-k8s/

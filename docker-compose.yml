@@ -116,39 +116,17 @@ services:
     networks:
       - smartlogi-net
 
-  # --- AI Engine ---
-  ai-service:
-    build: ./services/ai-service
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      db-migrator:
-        condition: service_completed_successfully
-    networks:
-      - smartlogi-net
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: "1"
-
-  # --- Core Backends ---
+  # --- Core Backends (AI migrated to Cloudflare Worker — see workers/ai-worker) ---
   iam-service:
     build:
       context: .
-      dockerfile: services/iam-service/Dockerfile
+      dockerfile: backend/iam-service/Dockerfile
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:8081/api/v1/admin/auth/google/callback}
       - PORT=8081
     depends_on:
       postgres:
@@ -171,7 +149,7 @@ services:
   inventory-service:
     build:
       context: .
-      dockerfile: services/inventory-service/Dockerfile
+      dockerfile: backend/inventory-service/Dockerfile
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - PORT=8082
@@ -196,7 +174,7 @@ services:
   order-service:
     build:
       context: .
-      dockerfile: services/order-service/Dockerfile
+      dockerfile: backend/order-service/Dockerfile
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - PORT=8083
@@ -225,11 +203,11 @@ services:
   logistics-service:
     build:
       context: .
-      dockerfile: services/logistics-service/Dockerfile
+      dockerfile: backend/logistics-service/Dockerfile
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - PORT=8084
-      - AI_SERVICE_URL=http://ai-service:8000
+      - AI_WORKER_URL=${AI_WORKER_URL:-http://host.docker.internal:8787}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
     depends_on:
@@ -237,8 +215,6 @@ services:
         condition: service_healthy
       db-migrator:
         condition: service_completed_successfully
-      ai-service:
-        condition: service_started
       redis:
         condition: service_healthy
     networks:
@@ -257,7 +233,7 @@ services:
   customer-api:
     build:
       context: .
-      dockerfile: services/customer-api/Dockerfile
+      dockerfile: backend/customer-api/Dockerfile
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - PORT=8085
@@ -282,12 +258,15 @@ services:
   notification-service:
     build:
       context: .
-      dockerfile: services/notification-service/Dockerfile
+      dockerfile: backend/notification-service/Dockerfile
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - KAFKA_BROKERS=kafka:29092
       - PORT=8086
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:8081/api/v1/admin/auth/google/callback}
       - EMAIL_PROVIDER=console
       - SMS_PROVIDER=console
       - PUSH_PROVIDER=console
@@ -314,7 +293,7 @@ services:
 
   gps-ingestion-service:
     build:
-      context: ./services/gps-ingestion-service
+      context: ./backend/gps-ingestion-service
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - GPS_AUTH_TOKEN=${GPS_AUTH_TOKEN}
@@ -341,7 +320,7 @@ services:
 
   webhook-service:
     build:
-      context: ./services/webhook-service
+      context: ./backend/webhook-service
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - REDIS_HOST=redis
@@ -372,18 +351,21 @@ services:
   api-gateway:
     build:
       context: .
-      dockerfile: services/api-gateway/Dockerfile
+      dockerfile: api/api-gateway/Dockerfile
     ports:
       - "3000:3000"
     environment:
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:8081/api/v1/admin/auth/google/callback}
       - IAM_SERVICE_URL=http://iam-service:8081
       - INVENTORY_SERVICE_URL=http://inventory-service:8082
       - ORDER_SERVICE_URL=http://order-service:8083
       - LOGISTICS_SERVICE_URL=http://logistics-service:8084
       - CUSTOMER_API_URL=http://customer-api:8085
       - NOTIFICATION_SERVICE_URL=http://notification-service:8086
-      - AI_SERVICE_URL=http://ai-service:8000
+      - AI_WORKER_URL=${AI_WORKER_URL:-http://host.docker.internal:8787}
       - GPS_INGESTION_URL=http://gps-ingestion-service:8090
       - WEBHOOK_SERVICE_URL=http://webhook-service:8092
     depends_on:
@@ -416,11 +398,12 @@ services:
   tenant-portal:
     build:
       context: .
-      dockerfile: apps/tenant-portal/Dockerfile
+      dockerfile: frontend/reporting/tenant-portal/Dockerfile
     ports:
       - "4002:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://api-gateway:3000/api/v1
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -430,11 +413,12 @@ services:
   admin-portal:
     build:
       context: .
-      dockerfile: apps/admin-portal/Dockerfile
+      dockerfile: frontend/feature-test/admin-portal/Dockerfile
     ports:
       - "4001:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://api-gateway:3000/api/v1
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -444,11 +428,12 @@ services:
   customer-portal:
     build:
       context: .
-      dockerfile: apps/customer-portal/Dockerfile
+      dockerfile: frontend/reporting/customer-portal/Dockerfile
     ports:
       - "4003:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://api-gateway:3000/api/v1
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -458,11 +443,12 @@ services:
   pack-station-web:
     build:
       context: .
-      dockerfile: apps/pack-station-web/Dockerfile
+      dockerfile: frontend/reporting/pack-station-web/Dockerfile
     ports:
       - "4004:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://api-gateway:3000/api/v1
+      - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
     depends_on:
       api-gateway:
         condition: service_healthy
