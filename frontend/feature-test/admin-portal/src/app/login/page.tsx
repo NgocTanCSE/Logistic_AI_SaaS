@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleLoginButton } from '@/components/ui/GoogleLoginButton';
 import { useAuth } from '@/lib/auth-context';
+import { setToken } from '@/lib/auth';
 import api from '@/lib/api';
 
 export default function LoginPage() {
@@ -12,31 +13,30 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-   const handleGoogleSuccess = async (credential: string) => {
-     setLoading(true);
-     setError(null);
-     try {
-       const res = await api.post('/admin/auth/google', { credential });
-       if (res.data.accessToken) {
-         login(res.data.accessToken);
-         router.replace('/admin/dashboard');
-       } else {
-         setError(res.data?.message || 'Google authentication failed.');
-       }
-     } catch (err: any) {
-       setError(err?.response?.data?.message || 'Google authentication failed. Please try again.');
-     } finally {
-       setLoading(false);
-     }
-   };
+  const handleGoogleSuccess = async (credential: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post('/admin/auth/google', { credential });
+      if (res.data.accessToken) {
+        login(res.data.accessToken);
+        router.replace('/admin/dashboard');
+      } else {
+        setError(res.data?.message || 'Google authentication failed.');
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Google authentication failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-   const handleTestLogin = () => {
-     const fakeToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibWFpbCI6InRlc3RAZXhhbXBsZS5jb20iLCJyb2xlIjoiU1VQRVJfQ0FNRU5FIn0.XXXXXXXXXXXXXXXXXXXXXXXXXXX";
-     localStorage.setItem('smartlogi_admin_token', fakeToken);
-     const user = { id: "1234567890", email: "test@example.com", role: "SUPER_ADMIN" };
-     localStorage.setItem('smartlogi_admin_user', JSON.stringify(user));
-     router.replace('/admin/dashboard');
-   };
+  const handleTestLogin = () => {
+    const testToken = 'test-smartlogi-admin-token';
+    setToken(testToken);
+    login(testToken);
+    router.replace('/admin/dashboard');
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surface-alt p-6">
@@ -48,8 +48,8 @@ export default function LoginPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 12.75h.008v.008H12v-.008zM12 9.75h.008v.008H12V9.75z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-ink">Admin Portal</h1>
-          <p className="mt-2 text-sm text-ink-soft">Sign in to manage SmartLogi tenants and billing</p>
+          <h1 className="text-2xl font-bold text-ink">SmartLogi Admin Portal</h1>
+          <p className="mt-2 text-sm text-inkSoft">Sign in to manage logistics operations and AI models</p>
         </div>
 
         {error && (
@@ -70,13 +70,13 @@ export default function LoginPage() {
           <button
             onClick={handleTestLogin}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors hover:bg-muted/50 focus:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none rounded-lg border border-muted/30 bg-background"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition-colors hover:bg-slate-100 focus:bg-slate-100 disabled:opacity-50 disabled:pointer-events-none rounded-lg border border-slate-200 bg-white text-inkSoft"
           >
             Test Login (Skip Google)
           </button>
         </div>
 
-        <div className="text-center text-xs text-ink-soft">
+        <div className="text-center text-xs text-inkSoft">
           By signing in, you agree to the SmartLogi Terms of Service.
         </div>
       </div>

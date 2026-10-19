@@ -43,7 +43,7 @@ export default function AdminLogin() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-ink">Admin Portal</h1>
-          <p className="mt-2 text-sm text-ink-soft">Sign in to manage SmartLogi tenants and billing</p>
+          <p className="mt-2 text-sm text-inkSoft">Sign in to manage SmartLogi tenants and billing</p>
         </div>
 
         {error && (
@@ -60,7 +60,7 @@ export default function AdminLogin() {
           />
         </div>
 
-        <div className="text-center text-xs text-ink-soft">
+        <div className="text-center text-xs text-inkSoft">
           By signing in, you agree to the SmartLogi Terms of Service.
         </div>
       </div>

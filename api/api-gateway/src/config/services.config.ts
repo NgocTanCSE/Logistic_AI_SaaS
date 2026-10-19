@@ -121,6 +121,7 @@ export const ROUTE_MAP: Record<string, string> = {
   '/api/v1/clients': 'order-service',
   '/clients': 'order-service',
   '/api/v1/public': 'customer-api',
+  '/api/v1/health': 'iam-service',
   '/client/auth': 'iam-service',
   '/api/v1/client/auth': 'iam-service',
   '/api/v1/client': 'customer-api',
@@ -143,6 +144,7 @@ export const ROUTE_MAP: Record<string, string> = {
   '/api/v1/tasks': 'inventory-service',
   '/tasks': 'inventory-service',
   '/api/v1/tracking': 'order-service',
+  '/api/v1/track': 'customer-api',
   '/mobile/auth': 'iam-service',
   '/mobile/trips': 'logistics-service',
   '/mobile/uploads': 'logistics-service',
@@ -158,11 +160,28 @@ export const ROUTE_MAP: Record<string, string> = {
   '/api/v1/metrics': 'iam-service',
 };
 
+/**
+ * Paths that skip authentication in the JWT guard (matched with startsWith).
+ * These are public endpoints that do not require a valid JWT token.
+ */
 export const PUBLIC_PATHS = [
   '/health',
   '/api/health',
   '/routes',
   '/api/v1/public',
   '/api/v1/track',
-  '/gateway/health',
+  '/api/gateway/health',
+];
+
+/**
+ * Paths handled by the gateway itself that must NOT be forwarded
+ * to downstream services (exact-match check in ProxyMiddleware).
+ */
+export const PROXY_SKIP_PATHS = [
+  '/health',
+  '/api/health',
+  '/routes',
+  '/api/gateway/health',
+  '/api/gateway/metrics',
+  '/api/docs',
 ];

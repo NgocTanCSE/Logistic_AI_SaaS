@@ -1,11 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 
-export default function TenantDetailPage({ params }: { params: { id: string } }) {
+export default function TenantDetailPage() {
+  const { id } = useParams<{ id: string }>() as { id: string };
   const { token } = useAuth();
   const router = useRouter();
   const [tenant, setTenant] = useState<any>(null);
@@ -21,13 +22,13 @@ export default function TenantDetailPage({ params }: { params: { id: string } })
 
   useEffect(() => {
     fetchTenantDetails();
-  }, [params.id]);
+  }, [id]);
 
   const fetchTenantDetails = async () => {
     if (!token) return;
     try {
       setError(null);
-      const res = await api.get(`/admin/tenants/${params.id}`);
+      const res = await api.get(`/admin/tenants/${id}`);
       setTenant(res.data.data || res.data);
     } catch (err: any) {
       console.error('Failed to fetch tenant details:', err);

@@ -3,7 +3,10 @@
    ─ Colors are NOT redefined here: keep the existing portal palette
      (primary = #2563eb blue, background, ink, border). Only layout
      structure / typography / motion is adopted.
-   ================================================================ */
+   NOTE: @tailwind directives are needed in every CSS file that uses @layer,
+   even if globals.css also includes them — Next.js webpack processes
+   each CSS file independently.
+   ──────────────────────────────────────────────────────────────── */
 
 @tailwind base;
 @tailwind components;

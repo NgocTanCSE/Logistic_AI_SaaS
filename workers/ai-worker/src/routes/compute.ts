@@ -1,6 +1,6 @@
 import type { Hono, Context } from 'hono';
 import type { Bindings, JwtPayload } from '../env';
-import { llmChat, llmJson } from '../lib/llm';
+import { llmChat, llmChatVision, llmJson } from '../lib/llm';
 import { solveRouting, Location, Vehicle } from '../lib/vrp';
 import { latestModelId } from '../lib/db';
 
@@ -21,12 +21,13 @@ export const routingHandler = async (c: Context) => {
 };
 
 export function registerComputeRoutes(app: App) {
-  /* ---- POST /ai/v1/chat  (headline: AI chat phân tích) ---- */
+  /* ---- POST /ai/v1/chat  (headline: AI chat phân tích, hỗ trợ vision) ---- */
   app.post('/v1/chat', async (c: Context) => {
     const env = c.env as Bindings;
     const body = await c.req.json().catch(() => ({}));
     const messages: Array<{ role: string; content: string }> = body.messages || [];
     const context: string | undefined = body.context;
+    const images: string[] | undefined = body.images;
     const system = [
       'Bạn là trợ lý AI phân tích logistics của SmartLogi. Trả lời ngắn gọn, dựa trên dữ liệu đơn hàng, tồn kho và vận chuyển.',
       context ? `Bối cảnh: ${context}` : '',
@@ -34,7 +35,16 @@ export function registerComputeRoutes(app: App) {
       .filter(Boolean)
       .join('\n');
 
-    const text = await llmChat(env, system, JSON.stringify(messages, null, 2), env.DEFAULT_MODEL);
+    const userText = messages.length > 0
+      ? messages.map((m) => `[${m.role}] ${m.content}`).join('\n')
+      : '';
+
+    let text: string;
+    if (images && images.length > 0) {
+      text = await llmChatVision(env, system, userText, images, env.DEFAULT_MODEL);
+    } else {
+      text = await llmChat(env, system, userText, env.DEFAULT_MODEL);
+    }
     return c.json({
       ok: true,
       conversation_id: body.conversation_id || crypto.randomUUID(),

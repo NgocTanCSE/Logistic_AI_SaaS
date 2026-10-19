@@ -29,7 +29,7 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   app.enableCors({
-    origin: (process.env.CORS_ORIGINS || 'http://localhost:4001,http://localhost:4002,http://localhost:4003,http://localhost:4004').split(','),
+    origin: (process.env.CORS_ORIGINS || 'http://localhost:4001,http://localhost:4002,http://localhost:4003,http://localhost:4004,http://localhost:7860,http://localhost:7861,http://localhost:7862,http://localhost:7863').split(','),
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });

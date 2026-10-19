@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth-context';
 
 export interface MenuItem {
   title: string;
@@ -15,6 +16,13 @@ export interface SidebarProps {
 
 export function Sidebar({ items, basePath }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    router.replace('/admin/login');
+  };
 
   return (
     <aside className="w-64 min-h-[100dvh] fixed top-0 left-0 border-r border-slate-200 bg-white flex flex-col z-10 hidden md:flex">
@@ -54,14 +62,16 @@ export function Sidebar({ items, basePath }: SidebarProps) {
       </nav>
 
       <div className="p-4 border-t border-slate-200">
-        <Link href="/login" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:text-ink hover:bg-slate-50 transition-colors">
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:text-ink hover:bg-slate-50 transition-colors"
+        >
           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 11-6 0v-1m6-1V7a3 3 0 016 0v1" />
           </svg>
           Log out
-        </Link>
+        </button>
       </div>
     </aside>
-
   );
 }

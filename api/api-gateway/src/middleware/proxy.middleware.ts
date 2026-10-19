@@ -1,6 +1,6 @@
 ﻿import { Injectable, Logger, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
-import { SERVICES, ROUTE_MAP, PUBLIC_PATHS } from '../config/services.config';
+import { SERVICES, ROUTE_MAP, PROXY_SKIP_PATHS } from '../config/services.config';
 
 interface CircuitState {
   failures: number;
@@ -18,7 +18,7 @@ export class ProxyMiddleware implements NestMiddleware {
   use(req: Request, res: Response, next: NextFunction) {
     const path = req.originalUrl.split('?')[0];
 
-    if (PUBLIC_PATHS.includes(path)) {
+    if (PROXY_SKIP_PATHS.includes(path)) {
       return next();
     }
 

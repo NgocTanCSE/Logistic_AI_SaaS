@@ -114,9 +114,10 @@ services:
       dockerfile: packages/prisma-schemas/Dockerfile
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
-      - SEED_ON_START=false
+      - SEED_ON_START=true
+      - FORCE_RESEED=true
     command: >
-      sh -c "pnpm exec prisma db push && if [ \"$$SEED_ON_START\" = \"true\" ]; then pnpm exec prisma db seed; else echo 'Skip seed'; fi"
+      sh -c "pnpm exec prisma db push && if [ \"$$SEED_ON_START\" = \"true\" ]; then FORCE_RESEED=$$FORCE_RESEED pnpm exec prisma db seed; else echo 'Skip seed'; fi"
     depends_on:
       postgres:
         condition: service_healthy

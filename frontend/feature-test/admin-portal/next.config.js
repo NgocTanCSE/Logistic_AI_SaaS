@@ -110,6 +110,15 @@ const nextConfig = {
         source: '/api/v1/auth/:path*',
         destination: 'http://127.0.0.1:3001/api/v1/auth/:path*'
       },
+      // AI Worker — must come BEFORE the catch-all /api/v1/:path* rewrite
+      {
+        source: '/api/v1/ai/v1/:path*',
+        destination: `${process.env.AI_WORKER_URL || 'http://host.docker.internal:8787'}/api/v1/ai/v1/:path*`
+      },
+      {
+        source: '/api/v1/ai/:path*',
+        destination: `${process.env.AI_WORKER_URL || 'http://host.docker.internal:8787'}/api/v1/ai/:path*`
+      },
       {
         source: '/api/v1/metrics/:path*',
         destination: 'http://127.0.0.1:3001/api/v1/metrics/:path*'

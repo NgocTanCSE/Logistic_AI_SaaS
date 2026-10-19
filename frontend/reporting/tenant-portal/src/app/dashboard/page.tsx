@@ -45,7 +45,7 @@ export default function DashboardPage() {
         case 'WAREHOUSE_MANAGER':
         case 'WAREHOUSE_STAFF':
           promises.push(
-            api.get('/orders', { params: { status: 'PENDING', limit: 1 } }).then(r => ({ key: 'pendingOrders', data: r.data })).catch(() => null),
+            api.get('/orders', { params: { status: 'NEW', limit: 1 } }).then(r => ({ key: 'pendingOrders', data: r.data })).catch(() => null),
             api.get('/inventory', { params: { lowStock: true, limit: 1 } }).then(r => ({ key: 'lowStock', data: r.data })).catch(() => null),
             api.get('/wms/waves', { params: { status: 'ACTIVE' } }).then(r => ({ key: 'waves', data: r.data })).catch(() => null),
           );

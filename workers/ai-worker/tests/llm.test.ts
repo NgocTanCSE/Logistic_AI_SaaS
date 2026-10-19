@@ -39,10 +39,21 @@ async function run() {
   ok('CLOUDFLARE_MODEL override -> AI.run(model)', aiArgs?.model === '@cf/meta/llama-3.1-8b-instruct-fp8', aiArgs);
   ok('CLOUDFLARE_MODEL override returns reply', text2 === 'override-reply', { text2 });
 
-  // 3. No AI binding -> throws
-  let threw = false; let errMsg = '';
-  try { await llmChat(baseEnv, 'sys', 'hello'); } catch (e: any) { threw = true; errMsg = e.message; }
-  ok('No AI binding -> throws', threw && /No AI backend available/.test(errMsg), { errMsg });
+  // 3. No AI binding, no OPENAI_API_KEY -> rule-based fallback (no throw)
+  const fallbackText = await llmChat(baseEnv, 'sys', 'hello');
+  ok('No AI binding -> rule-based fallback (no throw)', typeof fallbackText === 'string' && fallbackText.length > 0, { fallbackSnippet: fallbackText?.slice(0, 60) });
+
+  // 3b. No AI binding, with OPENAI_API_KEY -> OpenAI path (mock fetch)
+  const origFetch = (globalThis as any).fetch;
+  let openAIAck = false;
+  (globalThis as any).fetch = async (url: string, opts: any) => {
+    openAIAck = url.includes('openai.com');
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'openai-reply' } }] }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  const openaiEnv: any = { ...baseEnv, OPENAI_API_KEY: 'sk-test' };
+  const text3b = await llmChat(openaiEnv, 'sys', 'hello');
+  (globalThis as any).fetch = origFetch;
+  ok('No AI binding + OPENAI_API_KEY -> calls OpenAI', openAIAck && text3b === 'openai-reply', { called: openAIAck, text: text3b });
 
   // 4. cache HIT -> returns cached, AI.run NOT called
   let aiCallCount = 0;

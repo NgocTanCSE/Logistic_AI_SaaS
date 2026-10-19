@@ -13,11 +13,12 @@ import api from '@/lib/api';
 
 type Order = {
   id: string;
-  orderNumber: string;
+  trackingCode: string;
   status: string;
-  customerName: string;
-  destination: string;
-  totalAmount: number;
+  recipientName: string;
+  recipientAddress: string;
+  codAmount: number;
+  shippingFee: number;
   createdAt: string;
 };
 
@@ -195,10 +196,13 @@ export default function OrdersPage() {
 
   const getStatusVariant = (status: string) => {
     switch(status) {
-      case 'PENDING': return 'warning';
-      case 'PROCESSING': return 'neutral';
-      case 'SHIPPED': return 'info';
+      case 'NEW': return 'warning';
+      case 'UNASSIGNED': return 'neutral';
+      case 'PENDING_PICKUP': return 'neutral';
+      case 'IN_TRANSIT': return 'info';
       case 'DELIVERED': return 'success';
+      case 'RETURNED': return 'error';
+      case 'RETURN_REQUESTED': return 'warning';
       case 'CANCELLED': return 'error';
       default: return 'neutral';
     }
@@ -255,12 +259,12 @@ export default function OrdersPage() {
               ) : (
                 orders.map(order => {
                   // BƯỚC 1/4: Defensive logic for Cancel button
-                  const canCancel = order.status === 'PENDING' || order.status === 'PROCESSING';
+                  const canCancel = order.status === 'NEW' || order.status === 'PENDING_PICKUP' || order.status === 'UNASSIGNED';
 
                   return (
                     <tr key={order.id} className="hover:bg-slate-50/80 transition-all group">
                       <td className="px-8 py-6">
-                        <div className="font-bold text-ink">{(order as any).trackingCode}</div>
+                        <div className="font-bold text-ink">{order.trackingCode}</div>
                       </td>
                       <td className="px-8 py-6">
                         <Badge variant={getStatusVariant(order.status)}>
@@ -268,14 +272,14 @@ export default function OrdersPage() {
                         </Badge>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="font-semibold text-ink leading-tight">{(order as any).recipientName}</div>
+                        <div className="font-semibold text-ink leading-tight">{order.recipientName}</div>
                         <div className="text-xs text-inkSoft flex items-center gap-1.5 mt-1.5">
                           <svg className="w-3.5 h-3.5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                          <span className="truncate max-w-[240px]">{(order as any).recipientAddress}</span>
+                          <span className="truncate max-w-[240px]">{order.recipientAddress}</span>
                         </div>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="text-sm font-bold text-ink">${Number((order as any).codAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                        <div className="text-sm font-bold text-ink">${Number(order.codAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
                       </td>
                       <td className="px-8 py-6 text-right">
                         <div className="flex justify-end gap-3 items-center">

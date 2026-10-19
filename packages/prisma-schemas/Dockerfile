@@ -25,4 +25,4 @@ COPY --from=builder /app/pnpm-workspace.yaml ./
 COPY --from=builder /app/package.json ./
 
 WORKDIR /app/packages/prisma-schemas
-CMD sh -c "pnpm exec prisma db push --schema prisma/schema.prisma && pnpm exec prisma db seed --schema prisma/schema.prisma && echo 'Database ready'"
+CMD sh -c "FORCE_RESEED=true pnpm exec prisma db push --schema prisma/schema.prisma && pnpm exec prisma db seed --schema prisma/schema.prisma && echo 'Database ready'"

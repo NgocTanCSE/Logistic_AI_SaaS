@@ -37,9 +37,13 @@ async function bootstrap() {
       'http://localhost:4002',
       'http://localhost:4003',
       'http://localhost:4004',
+      'http://localhost:7860',
+      'http://localhost:7861',
+      'http://localhost:7862',
+      'http://localhost:7863',
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-User-Id', 'X-Request-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-User-Id', 'X-Request-Id', 'x-tenant-slug', 'x-ai-api-key'],
     credentials: true,
   });
 

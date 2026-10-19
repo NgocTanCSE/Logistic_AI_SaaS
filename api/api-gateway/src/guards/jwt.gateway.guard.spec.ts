@@ -4,7 +4,7 @@ import * as jwt from 'jsonwebtoken';
 
 jest.mock('../config/services.config', () => ({
   getJwtSecret: jest.fn(() => 'test-secret-key'),
-  PUBLIC_PATHS: ['/health', '/api/health', '/routes', '/api/v1/public', '/api/v1/track', '/gateway/health', '/api/v1/tenant/auth/mock-login'],
+  PUBLIC_PATHS: ['/health', '/api/health', '/routes', '/api/v1/public', '/api/v1/track', '/api/gateway/health'],
 }));
 
 describe('JwtGatewayGuard', () => {
@@ -55,5 +55,18 @@ describe('JwtGatewayGuard', () => {
 
     const result = guard.canActivate(mockContext);
     expect(result).toBe(true);
+  });
+
+  it('should NOT allow access to /api/v1/tracking (authenticated) even though /api/v1/track is public', () => {
+    const mockContext = {
+      switchToHttp: () => ({
+        getRequest: () => ({
+          originalUrl: '/api/v1/tracking/123',
+          headers: {},
+        }),
+      }),
+    } as any;
+
+    expect(() => guard.canActivate(mockContext)).toThrow(UnauthorizedException);
   });
 });

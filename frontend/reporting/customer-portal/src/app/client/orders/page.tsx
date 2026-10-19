@@ -111,7 +111,7 @@ const fetchOrders = async () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right text-white">
-                    ${order.shippingFee.toFixed(2)}
+                    ${(order.shippingFee || 0).toFixed(2)}
                   </td>
                 </tr>
               ))}

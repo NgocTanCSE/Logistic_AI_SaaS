@@ -138,6 +138,9 @@ export class JwtGatewayGuard implements CanActivate {
   }
 
   private isPublicPath(path: string): boolean {
-    return PUBLIC_PATHS.some((publicPath) => path.startsWith(publicPath));
+    const cleanPath = path.split('?')[0];
+    return PUBLIC_PATHS.some((publicPath) => {
+      return cleanPath === publicPath || cleanPath.startsWith(publicPath + '/');
+    });
   }
 }

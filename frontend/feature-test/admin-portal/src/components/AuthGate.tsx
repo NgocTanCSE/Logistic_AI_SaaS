@@ -8,19 +8,26 @@ type AuthGateProps = {
   children: ReactNode;
 };
 
+// All routes that should be accessible without authentication
+const PUBLIC_ROUTES = ['/login', '/admin/login', '/admin/forgot-password', '/admin/reset-password'];
+
 export default function AuthGate({ children }: AuthGateProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [checked, setChecked] = useState(false);
 
+  const isPublicRoute = PUBLIC_ROUTES.some((route) =>
+    pathname === route || pathname.startsWith(route + '/')
+  );
+
   useEffect(() => {
     const token = getToken();
-    if (!token && !pathname.startsWith('/login')) {
-      router.replace('/login');
+    if (!token && !isPublicRoute) {
+      router.replace('/admin/login');
       return;
     }
     setChecked(true);
-  }, [pathname, router]);
+  }, [pathname, router, isPublicRoute]);
 
   if (!checked) {
     return (

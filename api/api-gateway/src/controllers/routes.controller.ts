@@ -20,7 +20,7 @@ export class RoutesController {
         inventory: '/api/v1/inventory',
         orders: '/api/v1/orders',
         logistics: '/api/v1/logistics',
-        customers: '/api/v1/customer',
+        customers: '/api/v1/client',
         notifications: '/api/v1/notifications',
         ai: '/api/v1/ai',
         gps: '/gps',

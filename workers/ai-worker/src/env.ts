@@ -15,6 +15,7 @@ export interface Bindings {
   // Secrets (wrangler secret / .dev.vars)
   JWT_SECRET: string;
   AI_API_KEY?: string;
+  OPENAI_API_KEY?: string; // Fallback LLM provider (vision + chat) when Cloudflare AI is not available
   // Services
   DB: D1Database;
   AI: any; // Workers AI binding (global `ai`)

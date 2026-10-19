@@ -1,6 +1,6 @@
-FROM node:22-bullseye
+FROM node:22-bookworm
 
-# Build cache bust: 2026-07-15 fix-sqlite-tenant-client
+# Build cache bust: 2026-10-19 fix-bullseye-404-bookworm
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y postgresql-client supervisor dos2unix python3 python3-pip && rm -rf /var/lib/apt/lists/*
@@ -90,7 +90,6 @@ RUN pnpm --filter customer-portal run build
 RUN dos2unix /app/start.sh && chmod +x /app/start.sh
 RUN chmod -R 777 /app
 
-EXPOSE 7860
-EXPOSE 7861
-EXPOSE 7862
+ENV PORT=3007
+EXPOSE $PORT
 CMD ["/app/start.sh"]

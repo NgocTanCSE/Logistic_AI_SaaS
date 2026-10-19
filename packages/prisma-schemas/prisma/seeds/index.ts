@@ -23,6 +23,28 @@ const prisma = new PrismaClient();
 async function clearDatabase() {
   console.log('🧹 Wiping existing data...');
   try {
+    // System-level records first (top of the hierarchy)
+    await prisma.systemAdmin.deleteMany();
+    await prisma.systemSetting.deleteMany();
+    await prisma.subscriptionPlan.deleteMany();
+    await prisma.clientUser.deleteMany();
+    await prisma.shippingRate.deleteMany();
+    await prisma.tenantApiKey.deleteMany();
+    await prisma.clientApiKey.deleteMany();
+    await prisma.featureFlag.deleteMany();
+    await prisma.tenantSetting.deleteMany();
+    await prisma.tenantUiConfig.deleteMany();
+    await prisma.tenant.deleteMany();
+
+    // Notification & AI
+    await prisma.notification.deleteMany();
+    await prisma.notificationTemplate.deleteMany();
+    await prisma.aiFeedback.deleteMany();
+    await prisma.aiModel.deleteMany();
+    await prisma.demandForecast.deleteMany();
+    await prisma.routeOptimizationJob.deleteMany();
+
+    // Tracking & Logistics
     await prisma.taskItem.deleteMany();
     await prisma.task.deleteMany();
     await prisma.delivery.deleteMany();
@@ -33,38 +55,53 @@ async function clearDatabase() {
     await prisma.trip.deleteMany();
     await prisma.orderTrackingEvent.deleteMany();
     await prisma.orderItem.deleteMany();
+    await prisma.sosAlert.deleteMany();
+
+    // Returns & Finance
     await prisma.returnItem.deleteMany();
     await prisma.returnRequest.deleteMany();
     await prisma.returnReason.deleteMany();
+    await prisma.returnInspection.deleteMany();
+    await prisma.refund.deleteMany();
     await prisma.paymentTransaction.deleteMany();
     await prisma.invoiceLineItem.deleteMany();
     await prisma.invoice.deleteMany();
-    await prisma.order.deleteMany();
-    await prisma.sosAlert.deleteMany();
+
+    // Clients & Orders
+    await prisma.clientWebhook.deleteMany();
     await prisma.client.deleteMany();
+    await prisma.order.deleteMany();
+
+    // Fleet
     await prisma.geofence.deleteMany();
     await prisma.vehicle.deleteMany();
     await prisma.driver.deleteMany();
+    await prisma.equipmentCheckout.deleteMany();
+    await prisma.staffShift.deleteMany();
+
+    // Inventory
     await prisma.adjustment.deleteMany();
     await prisma.cycleCount.deleteMany();
     await prisma.scanLog.deleteMany();
     await prisma.stockMovement.deleteMany();
     await prisma.inventory.deleteMany();
-    await prisma.demandForecast.deleteMany();
-    await prisma.aiModel.deleteMany();
+    await prisma.packStationLog.deleteMany();
     await prisma.product.deleteMany();
     await prisma.category.deleteMany();
     await prisma.bin.deleteMany();
     await prisma.rack.deleteMany();
     await prisma.zone.deleteMany();
     await prisma.warehouse.deleteMany();
-    await prisma.branch.deleteMany();
-    await prisma.notification.deleteMany();
-    await prisma.tenantUiConfig.deleteMany();
+    await prisma.wavePicking.deleteMany();
+    await prisma.fileAttachment.deleteMany();
+
+    // Users & Roles
     await prisma.userRole.deleteMany();
     await prisma.rolePermission.deleteMany();
     await prisma.customRole.deleteMany();
     await prisma.tenantUser.deleteMany();
+    await prisma.branch.deleteMany();
+    await prisma.apiUsageDaily.deleteMany();
   } catch (e) {
     console.error('Error wiping database:', e);
   }
@@ -74,7 +111,14 @@ async function main() {
   console.log('🚀 Starting Enterprise Data Seeding (Scale: 400 Employees)...');
 
   try {
-    await clearDatabase();
+    const forceReseed = process.env.FORCE_RESEED === 'true';
+    
+    if (forceReseed) {
+      console.log('⚠️  FORCE_RESEED=true — wiping existing data before seeding.');
+      await clearDatabase();
+    } else {
+      console.log('🔒 FORCE_RESEED not set — skipping database wipe for idempotent seeding.');
+    }
     
     // 1. Roles
     const roleIds = await seedRoles(prisma);
