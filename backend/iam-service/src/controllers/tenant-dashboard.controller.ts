@@ -14,7 +14,7 @@ export class TenantDashboardController {
   @RequirePermissions(Permissions.TenantDashboardRead)
   async stats(@Req() req: any) {
     try {
-      const client = this.prisma.tenantClient;
+      const client = this.prisma.getTenantDb();
       
       const [
         totalOrders,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
+import { formatVnd } from '@/lib/format';
 
 type Invoice = {
   id: string;
@@ -50,11 +51,11 @@ export default function InvoicesPage() {
       PAID: 'bg-green-100 text-green-800',
       PENDING: 'bg-yellow-100 text-yellow-800',
       FAILED: 'bg-red-100 text-red-800',
-      CANCELLED: 'bg-gray-100 text-gray-800',
+      CANCELLED: 'bg-surface-alt text-ink',
     };
 
     return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusStyles[status] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusStyles[status] || 'bg-surface-alt text-ink'}`}>
         {status}
       </span>
     );
@@ -93,9 +94,9 @@ export default function InvoicesPage() {
       <h1 className="text-2xl font-bold mb-6">Invoices</h1>
 
       {invoices.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
+        <div className="text-center py-12 bg-surface-alt rounded-lg">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-ink-soft"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -107,50 +108,50 @@ export default function InvoicesPage() {
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No invoices</h3>
-          <p className="mt-1 text-sm text-gray-500">You don&apos;t have any invoices yet.</p>
+          <h3 className="mt-2 text-sm font-medium text-ink">No invoices</h3>
+          <p className="mt-1 text-sm text-ink-soft">You don&apos;t have any invoices yet.</p>
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-surface-alt">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-ink-soft uppercase tracking-wider">
                   Invoice Number
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-ink-soft uppercase tracking-wider">
                   Amount
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-ink-soft uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-ink-soft uppercase tracking-wider">
                   Issued Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-ink-soft uppercase tracking-wider">
                   Due Date
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-ink-soft uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-border">
               {invoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                <tr key={invoice.id} className="hover:bg-surface-alt">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-ink">
                     {invoice.invoiceNumber}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    ${invoice.totalAmount.toFixed(2)}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-ink">
+                    {formatVnd(invoice.totalAmount)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {getStatusBadge(invoice.status)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-ink-soft">
                     {new Date(invoice.issuedAt).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-ink-soft">
                     {invoice.dueAt ? new Date(invoice.dueAt).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">

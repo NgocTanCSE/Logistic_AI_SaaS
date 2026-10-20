@@ -14,7 +14,7 @@ export class BranchesController {
   @RequirePermissions(Permissions.TripsRead)
   async listBranches() {
     try {
-      return await this.prisma.tenantClient.branch.findMany({
+      return await this.prisma.getTenantDb().branch.findMany({
         select: {
           id: true,
           code: true,
@@ -42,7 +42,7 @@ export class BranchesController {
   @RequirePermissions(Permissions.TripsRead)
   async getBranch(@Param("id") id: string) {
     try {
-      const branch = await this.prisma.tenantClient.branch.findUnique({
+      const branch = await this.prisma.getTenantDb().branch.findUnique({
         where: { id },
         include: {
           manager: {
@@ -66,7 +66,7 @@ export class BranchesController {
   @RequirePermissions(Permissions.TripsDispatch)
   async createBranch(@Body() body: { code: string, name: string, address: string, lat?: number, lng?: number, managerId?: string, type?: string }) {
     try {
-      return await this.prisma.tenantClient.branch.create({
+      return await this.prisma.getTenantDb().branch.create({
         data: {
           code: body.code,
           name: body.name,
@@ -86,10 +86,10 @@ export class BranchesController {
   @RequirePermissions(Permissions.TripsDispatch)
   async updateBranch(@Param("id") id: string, @Body() body: { name?: string, address?: string, lat?: number, lng?: number, managerId?: string, status?: string }) {
     try {
-      const branch = await this.prisma.tenantClient.branch.findUnique({ where: { id } });
+      const branch = await this.prisma.getTenantDb().branch.findUnique({ where: { id } });
       if (!branch) throw new NotFoundException(`Branch with ID ${id} not found`);
 
-      return await this.prisma.tenantClient.branch.update({
+      return await this.prisma.getTenantDb().branch.update({
         where: { id },
         data: body
       });

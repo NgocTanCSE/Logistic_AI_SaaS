@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Get, Patch, UseGuards, Req, Res } from "@nestjs/common";
+import { Body, Controller, Post, Get, Patch, UseGuards, Req, Res, UnauthorizedException, HttpException } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { LoginResponse } from "../shared-types";
 import { LoginRequestDto } from "../dtos/login.dto";
@@ -22,23 +22,27 @@ export class AdminAuthController {
       return {
         ok: true,
         accessToken: result.access_token,
-      };
+        role: result.role,
+      } as any;
     } catch (error: any) {
-      return { ok: false, message: error.message || "Invalid credentials" };
+      if (error instanceof HttpException) throw error;
+      throw new UnauthorizedException(error.message || "Invalid credentials");
     }
   }
 
   @Post("google")
-  async googleLogin(@Body() body: { credential: string }, @Res() res: any) {
+  async googleLogin(@Body() body: { credential: string }) {
     try {
-      const result = await this.authService.verifyGoogleToken(undefined, body.credential);
+      const result = await this.authService.loginSuperAdminWithGoogle(body.credential);
       return {
         ok: true,
         accessToken: result.access_token,
         refreshToken: result.refresh_token,
+        role: result.role,
       };
     } catch (error: any) {
-      return { ok: false, message: error.message || "Google authentication failed" };
+      if (error instanceof HttpException) throw error;
+      throw new UnauthorizedException(error.message || "Google authentication failed");
     }
   }
 

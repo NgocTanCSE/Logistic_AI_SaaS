@@ -16,7 +16,7 @@ export class MobileController {
     const userId = req.user?.sub;
     if (!userId) throw new UnauthorizedException("User ID not found in token");
     
-    return this.prisma.tenantClient.task.findMany({
+    return this.prisma.getTenantDb().task.findMany({
       where: { assigneeId: userId, status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
       include: { product: true }
     });
@@ -27,7 +27,7 @@ export class MobileController {
   async submitScanLogs(@Body() body: { logs: any[] }, @Request() req: any) {
     const actorId = req.user?.sub;
     
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       let processedCount = 0;
 
       for (const log of body.logs) {

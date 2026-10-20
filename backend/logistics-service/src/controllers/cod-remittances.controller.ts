@@ -27,7 +27,7 @@ export class CodRemittancesController {
       if (status) where.status = status;
 
       const [data, total] = await Promise.all([
-        this.prisma.tenantClient.codRemittance.findMany({
+        this.prisma.getTenantDb().codRemittance.findMany({
           where,
           skip,
           take,
@@ -42,7 +42,7 @@ export class CodRemittancesController {
           },
           orderBy: { createdAt: 'desc' }
         }),
-        this.prisma.tenantClient.codRemittance.count({ where })
+        this.prisma.getTenantDb().codRemittance.count({ where })
       ]);
 
       return {
@@ -63,7 +63,7 @@ export class CodRemittancesController {
   @RequirePermissions(Permissions.OrdersRead)
   async getRemittance(@Param("id") id: string) {
     try {
-      const remittance = await this.prisma.tenantClient.codRemittance.findUnique({
+      const remittance = await this.prisma.getTenantDb().codRemittance.findUnique({
         where: { id },
         include: {
           driver: {
@@ -87,10 +87,10 @@ export class CodRemittancesController {
   @RequirePermissions(Permissions.OrdersCreate)
   async approveRemittance(@Param("id") id: string) {
     try {
-      const remittance = await this.prisma.tenantClient.codRemittance.findUnique({ where: { id } });
+      const remittance = await this.prisma.getTenantDb().codRemittance.findUnique({ where: { id } });
       if (!remittance) throw new NotFoundException(`Remittance with ID ${id} not found`);
       
-      return await this.prisma.tenantClient.codRemittance.update({
+      return await this.prisma.getTenantDb().codRemittance.update({
         where: { id },
         data: { status: 'APPROVED' }
       });
@@ -104,10 +104,10 @@ export class CodRemittancesController {
   @RequirePermissions(Permissions.OrdersCreate)
   async rejectRemittance(@Param("id") id: string) {
     try {
-      const remittance = await this.prisma.tenantClient.codRemittance.findUnique({ where: { id } });
+      const remittance = await this.prisma.getTenantDb().codRemittance.findUnique({ where: { id } });
       if (!remittance) throw new NotFoundException(`Remittance with ID ${id} not found`);
       
-      return await this.prisma.tenantClient.codRemittance.update({
+      return await this.prisma.getTenantDb().codRemittance.update({
         where: { id },
         data: { status: 'REJECTED' }
       });

@@ -13,7 +13,7 @@ export class TasksController {
   @Get()
   @RequirePermissions(Permissions.TasksRead)
   async listTasks() {
-    return this.prisma.tenantClient.task.findMany({
+    return this.prisma.getTenantDb().task.findMany({
       include: { product: true, assignee: true }
     });
   }
@@ -21,13 +21,13 @@ export class TasksController {
   @Post()
   @RequirePermissions(Permissions.TasksCreate)
   async createTask(@Body() body: any) {
-    return this.prisma.tenantClient.task.create({ data: body });
+    return this.prisma.getTenantDb().task.create({ data: body });
   }
 
   @Post(":id/assign")
   @RequirePermissions(Permissions.TasksUpdate)
   async assignTask(@Param("id") id: string, @Body() body: { assigneeId: string }) {
-    return this.prisma.tenantClient.task.update({
+    return this.prisma.getTenantDb().task.update({
       where: { id },
       data: { assigneeId: body.assigneeId, status: "ASSIGNED" }
     });
@@ -38,7 +38,7 @@ export class TasksController {
   async completeTask(@Param("id") id: string, @Body() body: { actualQty: number }, @Request() req: any) {
     const actorId = req.user?.sub || "00000000-0000-0000-0000-000000000000";
 
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       // 1. Láº¥y thĂ´ng tin Task vĂ  Inventory liĂªn quan
       const task = await tx.task.findUnique({
         where: { id },

@@ -31,7 +31,7 @@ export class RoutingProcessor extends WorkerHost {
 
       if (response.data.ok) {
         // Cáº­p nháº­t Database thĂ nh cĂ´ng
-        await this.prisma.tenantClient.routeOptimizationJob.update({
+        await this.prisma.getTenantDb().routeOptimizationJob.update({
           where: { id: jobId },
           data: {
             status: 'COMPLETED',
@@ -42,7 +42,7 @@ export class RoutingProcessor extends WorkerHost {
         this.logger.log(` Routing job ${jobId} COMPLETED`);
       } else {
         // Cáº­p nháº­t Database tháº¥t báº¡i
-        await this.prisma.tenantClient.routeOptimizationJob.update({
+        await this.prisma.getTenantDb().routeOptimizationJob.update({
           where: { id: jobId },
           data: {
             status: 'FAILED',
@@ -53,7 +53,7 @@ export class RoutingProcessor extends WorkerHost {
       }
     } catch (error: any) {
       this.logger.error(`đŸ”¥ Lá»—i khi gá»i AI Service cho job ${jobId}: ${error.message}`);
-      await this.prisma.tenantClient.routeOptimizationJob.update({
+      await this.prisma.getTenantDb().routeOptimizationJob.update({
         where: { id: jobId },
         data: {
           status: 'FAILED',

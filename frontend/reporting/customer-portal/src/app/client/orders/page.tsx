@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { Search, Upload, Plus, FileText } from '@/components/icons';
+import { formatVnd } from '@/lib/format';
 
 export default function ClientOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -39,11 +40,11 @@ const fetchOrders = async () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white">Orders</h1>
-          <p className="text-zinc-400 mt-1">Manage your B2B shipments</p>
+          <h1 className="text-3xl font-bold text-ink">Orders</h1>
+          <p className="text-ink-soft mt-1">Manage your B2B shipments</p>
         </div>
         <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-white text-white rounded-lg transition-colors">
+          <button className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-surface-alt text-ink rounded-lg transition-colors">
             <Upload className="w-4 h-4" />
             Bulk Upload
           </button>
@@ -57,19 +58,19 @@ const fetchOrders = async () => {
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex justify-between items-center">
           <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-soft" />
             <input 
               type="text" 
               placeholder="Search by tracking code..." 
-              className="w-full bg-white border border-slate-200 rounded-lg py-2 pl-9 pr-4 text-sm text-white focus:outline-none focus:border-primary/50"
+              className="w-full bg-white border border-slate-200 rounded-lg py-2 pl-9 pr-4 text-sm text-ink focus:outline-none focus:border-primary/50"
             />
           </div>
         </div>
 
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm flex items-center justify-between">
+          <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-sm flex items-center justify-between">
             <span>{error}</span>
-            <button onClick={fetchOrders} className="text-xs text-red-400 hover:text-red-300 underline ml-2">
+            <button onClick={fetchOrders} className="text-xs text-red-600 hover:text-red-300 underline ml-2">
               Try again
             </button>
           </div>
@@ -80,12 +81,12 @@ const fetchOrders = async () => {
           </div>
         ) : orders.length === 0 && !error ? (
           <div className="p-12 text-center">
-            <FileText className="w-8 h-8 text-zinc-600 mx-auto mb-3" />
-            <p className="text-zinc-500">No orders found</p>
+            <FileText className="w-8 h-8 text-ink-soft mx-auto mb-3" />
+            <p className="text-ink-soft">No orders found</p>
           </div>
         ) : (
-          <table className="w-full text-left text-sm text-zinc-400">
-            <thead className="bg-white text-xs uppercase text-zinc-500">
+          <table className="w-full text-left text-sm text-ink-soft">
+            <thead className="bg-white text-xs uppercase text-ink-soft">
               <tr>
                 <th className="px-6 py-4 font-medium">Tracking Code</th>
                 <th className="px-6 py-4 font-medium">Reference</th>
@@ -94,13 +95,13 @@ const fetchOrders = async () => {
                 <th className="px-6 py-4 font-medium text-right">Fee</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-border">
               {orders.map((order, i) => (
                 <tr
                   key={order.id}
-                  className="hover:bg-white transition-colors group cursor-pointer"
+                  className="hover:bg-surface-alt transition-colors group cursor-pointer"
                 >
-                  <td className="px-6 py-4 font-mono text-white group-hover:text-primary transition-colors">
+                  <td className="px-6 py-4 font-mono text-ink group-hover:text-primary transition-colors">
                     {order.trackingCode}
                   </td>
                   <td className="px-6 py-4">{order.clientOrderRef}</td>
@@ -110,8 +111,8 @@ const fetchOrders = async () => {
                       {order.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right text-white">
-                    ${(order.shippingFee || 0).toFixed(2)}
+                  <td className="px-6 py-4 text-right text-ink">
+                    {formatVnd(order.shippingFee)}
                   </td>
                 </tr>
               ))}

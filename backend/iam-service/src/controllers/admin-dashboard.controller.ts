@@ -72,4 +72,57 @@ export class AdminDashboardController {
       throw new InternalServerErrorException("Failed to fetch dashboard stats");
     }
   }
+
+  @Get("logistics")
+  @RequirePermissions(Permissions.BillingRead)
+  @CacheKey('admin_dashboard_logistics')
+  async logistics() {
+    try {
+      const db = this.prisma.getTenantDb();
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+
+      const activeStatuses = ["IN_TRANSIT", "OUT_FOR_DELIVERY", "PICKUP"];
+
+      const [
+        totalOrders,
+        activeShipments,
+        inTransit,
+        deliveredToday,
+        delayedShipments,
+        activeVehicles,
+        activeDrivers,
+        inventoryAlerts,
+      ] = await Promise.all([
+        db.order.count(),
+        db.order.count({ where: { status: { in: activeStatuses } } }),
+        db.order.count({ where: { status: "IN_TRANSIT" } }),
+        db.order.count({
+          where: { status: "DELIVERED", updatedAt: { gte: startOfDay } },
+        }),
+        db.trip.count({ where: { status: "DELAYED" } }),
+        db.vehicle.count({ where: { status: "ACTIVE" } }),
+        db.driver.count({ where: { status: "ACTIVE" } }),
+        db.inventory.count({ where: { quantityOnHand: { lt: 10 } } }),
+      ]);
+
+      return {
+        totalOrders,
+        activeShipments,
+        inTransit,
+        deliveredToday,
+        delayedShipments,
+        activeVehicles,
+        activeDrivers,
+        inventoryAlerts,
+        avgOptimization: "—",
+        onTimeDelivery: "—",
+        predictedShipments: [],
+      };
+    } catch (error) {
+      throw new InternalServerErrorException(
+        "Failed to fetch logistics dashboard stats",
+      );
+    }
+  }
 }

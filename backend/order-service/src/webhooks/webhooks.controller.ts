@@ -15,12 +15,12 @@ export class WebhooksController {
   async listWebhooks(@Request() req: any) {
     const clientId = req.user?.client_id;
     if (!clientId) {
-      return this.prisma.tenantClient.clientWebhook.findMany({
+      return this.prisma.getTenantDb().clientWebhook.findMany({
         orderBy: { id: 'desc' },
         take: 50,
       });
     }
-    return this.prisma.tenantClient.clientWebhook.findMany({
+    return this.prisma.getTenantDb().clientWebhook.findMany({
       where: { clientId },
       orderBy: { id: 'desc' },
     });
@@ -33,7 +33,7 @@ export class WebhooksController {
       throw new NotFoundException("Webhook URL must be a valid HTTPS URL");
     }
 
-    return this.prisma.tenantClient.clientWebhook.create({
+    return this.prisma.getTenantDb().clientWebhook.create({
       data: {
         clientId: body.clientId,
         url: body.url,
@@ -47,11 +47,11 @@ export class WebhooksController {
   @Delete(":id")
   @RequirePermissions(Permissions.SettingsManage)
   async removeWebhook(@Param("id") id: string) {
-    const webhook = await this.prisma.tenantClient.clientWebhook.findUnique({ where: { id } });
+    const webhook = await this.prisma.getTenantDb().clientWebhook.findUnique({ where: { id } });
     if (!webhook) {
       throw new NotFoundException("Webhook not found");
     }
-    await this.prisma.tenantClient.clientWebhook.delete({ where: { id } });
+    await this.prisma.getTenantDb().clientWebhook.delete({ where: { id } });
     return { ok: true, message: "Webhook deleted" };
   }
 }

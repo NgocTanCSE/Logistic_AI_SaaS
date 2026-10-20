@@ -61,14 +61,14 @@ export class BinsController {
     }
 
     const [data, total] = await Promise.all([
-      this.prisma.tenantClient.bin.findMany({
+      this.prisma.getTenantDb().bin.findMany({
         where,
         skip,
         take,
         include: { rack: { include: { zone: true } }, warehouse: true },
         orderBy: [{ warehouseId: "asc" }, { rackId: "asc" }, { rowIndex: "asc" }, { levelIndex: "asc" }],
       }),
-      this.prisma.tenantClient.bin.count({ where }),
+      this.prisma.getTenantDb().bin.count({ where }),
     ])
 
     return {
@@ -80,7 +80,7 @@ export class BinsController {
   @Get(":id")
   @RequirePermissions(Permissions.InventoryRead)
   async detail(@Param("id") id: string) {
-    const bin = await this.prisma.tenantClient.bin.findUnique({
+    const bin = await this.prisma.getTenantDb().bin.findUnique({
       where: { id },
       include: { rack: { include: { zone: true } }, warehouse: true, inventory: { include: { product: true } } },
     })
@@ -91,20 +91,20 @@ export class BinsController {
   @Post()
   @RequirePermissions(Permissions.InventoryAdjust)
   async create(@Body() body: CreateBinDto) {
-    const rack = await this.prisma.tenantClient.rack.findUnique({ where: { id: body.rackId } })
+    const rack = await this.prisma.getTenantDb().rack.findUnique({ where: { id: body.rackId } })
     if (!rack) throw new NotFoundException(`Rack ${body.rackId} not found`)
 
-    const existing = await this.prisma.tenantClient.bin.findUnique({ where: { barcode: body.barcode } })
+    const existing = await this.prisma.getTenantDb().bin.findUnique({ where: { barcode: body.barcode } })
     if (existing) throw new BadRequestException(`Bin with barcode ${body.barcode} already exists`)
 
-    return this.prisma.tenantClient.bin.create({ data: body })
+    return this.prisma.getTenantDb().bin.create({ data: body })
   }
 
   @Patch(":id")
   @RequirePermissions(Permissions.InventoryAdjust)
   async update(@Param("id") id: string, @Body() body: Partial<CreateBinDto>) {
-    const bin = await this.prisma.tenantClient.bin.findUnique({ where: { id } })
+    const bin = await this.prisma.getTenantDb().bin.findUnique({ where: { id } })
     if (!bin) throw new NotFoundException(`Bin ${id} not found`)
-    return this.prisma.tenantClient.bin.update({ where: { id }, data: body })
+    return this.prisma.getTenantDb().bin.update({ where: { id }, data: body })
   }
 }

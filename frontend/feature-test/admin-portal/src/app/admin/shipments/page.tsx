@@ -41,7 +41,9 @@ export default function ShipmentsPage() {
       setLoading(true);
       try {
         const res = await api.get('/logistics/shipments?limit=20');
-        const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        // Logistics service wraps responses as { success, data: { data: [...] } }.
+        const payload = res.data?.data?.data ?? res.data?.data ?? res.data;
+        const data = Array.isArray(payload) ? payload : [];
         setShipments(data.length > 0 ? data : MOCK_SHIPMENTS);
       } catch {
         setShipments(MOCK_SHIPMENTS);

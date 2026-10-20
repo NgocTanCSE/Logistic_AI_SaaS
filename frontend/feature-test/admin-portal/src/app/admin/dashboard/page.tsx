@@ -1,15 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import api from '@/lib/api';
-import { StatCard } from '@/components/dashboard/StatCard';
 import { MRRChart } from '@/components/dashboard/MRRChart';
 import { GrowthChart } from '@/components/dashboard/GrowthChart';
-import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 import { ShipmentMap } from '@/components/dashboard/ShipmentMap';
 import { AIInsightsPanel } from '@/components/dashboard/AIInsightsPanel';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  EmptyNote,
+  MetricBand,
+  StatusLabel,
+} from '../../../../../../../packages/ui-kit/editorial';
 
 type StatData = {
   totalTenants: number;
@@ -33,13 +47,42 @@ type LogisticsData = {
   predictedShipments: { day: string; predicted: number; actual: number }[];
 };
 
+type AuditActivity = {
+  id: string | number;
+  actorEmail?: string;
+  action?: string;
+  resourceType?: string;
+  resourceId?: string;
+  createdAt?: string;
+};
+
+const number = new Intl.NumberFormat('en-US');
+
+function formatMoney(value?: number) {
+  if (value == null) return '—';
+  return `$${number.format(value)}`;
+}
+
+function formatDate(value?: string) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
 export default function AdminDashboardPage() {
   const { token } = useAuth();
   const [stats, setStats] = useState<StatData | null>(null);
   const [logistics, setLogistics] = useState<LogisticsData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [systemActivities, setSystemActivities] = useState<any[]>([]);
+  const [systemActivities, setSystemActivities] = useState<AuditActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
 
@@ -56,9 +99,9 @@ export default function AdminDashboardPage() {
         revenueData: Array.isArray(data?.revenueData) ? data.revenueData : [],
         growthData: Array.isArray(data?.growthData) ? data.growthData : [],
       });
-    } catch (err: any) {
-      setApiError(err.response?.data?.message || err.message || 'Failed to fetch dashboard data');
-      setStats({ totalTenants: 0, totalUsers: 0, totalMrr: 0, revenueData: [], growthData: [] });
+    } catch (error: any) {
+      setApiError(error.response?.data?.message || error.message || 'Failed to fetch dashboard data.');
+      setStats(null);
     } finally {
       setLoading(false);
     }
@@ -89,216 +132,264 @@ export default function AdminDashboardPage() {
 
   const fetchActivities = async () => {
     if (!token) return;
+    setActivitiesLoading(true);
     try {
       setActivitiesError(null);
-      const res = await api.get('/admin/audit-logs?limit=10');
-      setSystemActivities(res.data?.data || []);
-    } catch (err: any) {
-      setActivitiesError(err.response?.data?.message || err.message || 'Failed to load activities');
+      const response = await api.get('/admin/audit-logs?limit=10');
+      setSystemActivities(response.data?.data || []);
+    } catch (error: any) {
+      setActivitiesError(error.response?.data?.message || error.message || 'Failed to load activities.');
     } finally {
       setActivitiesLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchStats();
-    fetchLogistics();
-    fetchActivities();
+    void fetchStats();
+    void fetchLogistics();
+    void fetchActivities();
   }, [token]);
 
-  if (loading || !stats) {
+  const refresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchStats(), fetchLogistics(), fetchActivities()]);
+    setRefreshing(false);
+  };
+
+  if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 pb-10">
-        {[1,2,3,4].map((i) => (
-          <div key={i} className="h-32 rounded-xl border border-slate-200 bg-white animate-pulse"></div>
-        ))}
-        <div className="h-80 rounded-xl border border-slate-200 bg-white animate-pulse mt-4 lg:col-span-2"></div>
-        <div className="h-80 rounded-xl border border-slate-200 bg-white animate-pulse mt-4 lg:col-span-2"></div>
+      <div className="max-w-[1180px] space-y-4">
+        <div className="h-8 w-64 animate-pulse bg-surface-alt" />
+        <div className="h-4 w-96 animate-pulse bg-surface-alt" />
+        <div className="grid grid-cols-2 border-b border-line bg-line lg:grid-cols-4">
+          {[1, 2, 3, 4].map((item) => (
+            <div key={item} className="h-24 animate-pulse bg-canvas" />
+          ))}
+        </div>
+        <div className="h-64 animate-pulse border-b border-line bg-surface" />
       </div>
     );
   }
 
+  const apiStatus = apiError ? 'Degraded' : refreshing ? 'Syncing' : 'Operational';
+  const apiTone = apiError ? 'danger' : refreshing ? 'warning' : 'success';
+  const predicted = logistics?.predictedShipments ?? [];
+
   return (
-    <div>
-      {/* ── Page header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-ink">Dashboard Overview</h2>
-          <p className="mt-1 text-sm text-inkSoft">Monitor platform performance, revenue, and logistics operations.</p>
+    <div className="max-w-[1180px] space-y-4">
+      <EditorialPageHeader
+        eyebrow={
+          <>
+            <span>{new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date())}</span>
+            <span className="text-line-strong" aria-hidden="true">
+              /
+            </span>
+            <span>Platform control</span>
+          </>
+        }
+        title="Operations overview"
+        description="Platform health, revenue, tenant growth, and live logistics in one view. Figures come directly from the admin API."
+        meta={
+          <>
+            <p>{stats ? `${number.format(stats.totalTenants)} tenants · ${number.format(stats.totalUsers)} users` : 'Platform totals unavailable'}</p>
+            <p className="mt-0.5">
+              <StatusLabel tone={apiTone}>{apiStatus}</StatusLabel>
+            </p>
+          </>
+        }
+        actions={
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={refreshing}
+            className="h-9 rounded-md border border-line px-3 text-[12px] font-medium text-ink-soft transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-wait disabled:opacity-60"
+          >
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        }
+      />
+
+      {apiError ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-l-2 border-danger bg-surface px-3 py-2 text-[12px] text-ink-soft">
+          <span>{apiError}</span>
+          <button
+            type="button"
+            onClick={refresh}
+            className="font-medium text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent"
+          >
+            Try again
+          </button>
         </div>
+      ) : null}
+
+      <MetricBand
+        metrics={[
+          {
+            label: 'Monthly recurring revenue',
+            value: formatMoney(stats?.totalMrr),
+            meta: 'Platform-wide MRR',
+          },
+          {
+            label: 'Tenants',
+            value: stats ? number.format(stats.totalTenants) : '—',
+            meta: 'Provisioned workspaces',
+          },
+          {
+            label: 'Users',
+            value: stats ? number.format(stats.totalUsers) : '—',
+            meta: 'Across all portals',
+          },
+          {
+            label: 'API status',
+            value: apiStatus,
+            meta: apiError ? 'Dashboard data may be stale' : 'api-gateway reachable',
+            tone: apiTone === 'success' ? 'success' : apiTone,
+          },
+        ]}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <EditorialSection eyebrow="Revenue" title="Monthly recurring revenue">
+          <div className="h-64">
+            <MRRChart data={stats?.revenueData} />
+          </div>
+        </EditorialSection>
+        <EditorialSection eyebrow="Growth" title="Tenant acquisition">
+          <div className="h-64">
+            <GrowthChart data={stats?.growthData} />
+          </div>
+        </EditorialSection>
       </div>
 
-      {apiError && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 mb-6">
-          {apiError}
-        </div>
-      )}
+      <EditorialSection eyebrow="Logistics" title="Operations">
+        <MetricBand
+          metrics={[
+            {
+              label: 'Active shipments',
+              value: logistics ? number.format(logistics.activeShipments) : '—',
+              meta: logistics ? `${number.format(logistics.inTransit)} in transit` : 'Logistics data unavailable',
+            },
+            {
+              label: 'Delayed',
+              value: logistics ? number.format(logistics.delayedShipments) : '—',
+              meta: logistics ? 'Needs attention' : 'Logistics data unavailable',
+              tone: logistics && logistics.delayedShipments > 0 ? 'warning' : 'default',
+            },
+            {
+              label: 'On-time delivery',
+              value: logistics?.onTimeDelivery ?? '—',
+              meta: '24h rolling average',
+            },
+            {
+              label: 'Route optimization',
+              value: logistics?.avgOptimization ?? '—',
+              meta: 'AI route efficiency',
+            },
+          ]}
+        />
+      </EditorialSection>
 
-      {/* ── Platform KPIs ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          title="Total MRR"
-          value={`$${(stats.totalMrr || 0).toLocaleString()}`}
-          trend={{ value: "+15.2%", isPositive: true }}
-          icon={
-            <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 10v1m-6-5a6 6 0 1112 0 6 6 0 01-12 0z" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="Active Tenants"
-          value={String(stats.totalTenants || 0)}
-          trend={{ value: "+3 this week", isPositive: true }}
-          icon={
-            <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="Total Users"
-          value={String(stats.totalUsers || 0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-          trend={{ value: "+120", isPositive: true }}
-          icon={
-            <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.533.167-1.04.447-1.484L9.8 12.94a2 2 0 011.611-.806h.178M7 20H2v-2a3 3 0 013-3h3m0 0v-5a3 3 0 016 0v5m0 0h3" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="System Health"
-          value="Operational"
-          trend={{ value: "All systems nominal", isPositive: true }}
-          icon={
-            <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15l3-3m0 0l3-3m-3 3l-3-3m3 3v6" />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* ── Revenue & Growth charts ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-ink">Monthly Recurring Revenue</h3>
-              <p className="mt-1 text-sm text-inkSoft">Platform-wide MRR over 6 months</p>
-            </div>
-          </div>
-          <div className="h-80 -ml-4 mt-2">
-            <MRRChart data={stats.revenueData} />
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-ink">Tenant Growth</h3>
-              <p className="mt-1 text-sm text-inkSoft">Active tenant acquisition trend</p>
-            </div>
-          </div>
-          <div className="h-80 -ml-4 mt-2">
-            <GrowthChart data={stats.growthData} />
-          </div>
-        </div>
-      </div>
-
-      {/* ── Logistics KPIs ── */}
-      <h3 className="text-lg font-semibold text-ink mb-4">Logistics Operations</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          title="Active Shipments"
-          value={String(logistics?.activeShipments || 0)}
-          trend={{ value: `${logistics?.delayedShipments || 0} delayed`, isPositive: false }}
-          icon={
-            <svg className="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 7.5l.415-.208a3 3 0 013.277.356l.7.593a3 3 0 002.113.857L19.5 10.5a3 3 0 011.5 2.612v2.136a3 3 0 01-1.5 2.612l-1.5.75a3 3 0 01-2.25.133l-2-.7a3 3 0 00-2.75-.655l-1.15.46a3 3 0 01-1.85.14l-2.5-.5a3 3 0 01-1.75-1.75l-.5-2.5a3 3 0 01.655-2.75l1.25-1.25a3 3 0 011.85-.955l1.65-.66a3 3 0 001.5-1.164L14.25 7.5a3 3 0 013-3h.75" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="In Transit"
-          value={String(logistics?.inTransit || 0)}
-          trend={{ value: "+5 live", isPositive: true }}
-          icon={
-            <svg className="h-6 w-6 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 12h6M9.5 12a3 3 0 11-3-3 3 3 0 013 3zm0 0v.01M15.5 12a3 3 0 11-3-3 3 3 0 013 3zm0 0v.01M15.5 12h-6" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="On-Time Delivery"
-          value={logistics?.onTimeDelivery || '—'}
-          trend={{ value: "24h rolling avg", isPositive: true }}
-          icon={
-            <svg className="h-6 w-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3M12 8V6m0 0L9 9m3-3l3 3" />
-            </svg>
-          }
-        />
-        <StatCard
-          title="AI Optimization"
-          value={logistics?.avgOptimization || '—'}
-          trend={{ value: "Route efficiency", isPositive: true }}
-          icon={
-            <svg className="h-6 w-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.674 18.25a8.25 8.25 0 11-1.44-1.44 8.25 8.25 0 011.44 1.44zM12 20a8 8 0 100-16 8 8 0 000 16zM8 12h.01M16 12h.01" />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* ── Predictive Delivery Chart ── */}
-      {logistics && logistics.predictedShipments.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-card mb-8">
-          <h3 className="text-lg font-semibold text-ink mb-1">Predicted vs Actual Shipments</h3>
-          <p className="text-sm text-inkSoft mb-4">7-day forecast accuracy from AI demand predictor</p>
-          <div className="h-72">
+      <EditorialSection eyebrow="Forecast" title="Predicted vs actual shipments">
+        {predicted.length === 0 ? (
+          <EmptyNote>No forecast data available. The AI demand predictor has not returned a series yet.</EmptyNote>
+        ) : (
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={logistics.predictedShipments} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="1 1" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #e2e8f0', color: '#1e293b' }}
-                  formatter={(value, name) => [value, name]}
+              <BarChart data={predicted} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="1 1" vertical={false} stroke="#ded7cb" />
+                <XAxis
+                  dataKey="day"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 11, fill: '#62665c' }}
                 />
-                <Bar dataKey="predicted" fill="#2563eb" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="actual" fill="#0d9488" radius={[4, 4, 0, 0]} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#62665c' }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fbf9f5',
+                    borderRadius: '6px',
+                    border: '1px solid #ded7cb',
+                    color: '#20241f',
+                    fontSize: '12px',
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11, color: '#62665c' }} />
+                <Bar dataKey="predicted" name="Predicted" fill="#2f4a3c" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="actual" name="Actual" fill="#c9c0b2" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
-      )}
+        )}
+      </EditorialSection>
 
-      {/* ── Shipment Map + AI Insights ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid gap-6 lg:grid-cols-2">
         <ShipmentMap logistics={logistics} />
         <AIInsightsPanel token={token} />
       </div>
 
-      {/* ── Recent Activity ── */}
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-card">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-ink">Recent Activity</h3>
-            <p className="mt-1 text-sm text-inkSoft">Latest platform audit log entries</p>
+      <EditorialSection
+        eyebrow="Audit"
+        title="Recent activity"
+        action={activitiesLoading ? 'Loading…' : `${systemActivities.length} entries`}
+      >
+        {activitiesLoading ? (
+          <p className="text-[12px] text-ink-faint">Loading activity log…</p>
+        ) : activitiesError ? (
+          <div className="border-l-2 border-danger bg-surface px-3 py-2 text-[12px] leading-5 text-ink-soft">
+            {activitiesError}
           </div>
-        </div>
-        <div className="overflow-x-auto">
-          {activitiesLoading ? (
-            <div className="py-8 text-center text-slate-400">Loading activity log...</div>
-          ) : activitiesError ? (
-            <div className="py-8 text-center text-rose-600">
-              {activitiesError}
-            </div>
-          ) : (
-            <ActivityFeed activities={systemActivities} />
-          )}
-        </div>
-      </div>
+        ) : systemActivities.length === 0 ? (
+          <EmptyNote>No audit entries yet.</EmptyNote>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse text-left">
+              <caption className="sr-only">Latest platform audit log entries</caption>
+              <thead>
+                <tr className="border-b border-line">
+                  <th scope="col" className="h-8 pr-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Time
+                  </th>
+                  <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Actor
+                  </th>
+                  <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Action
+                  </th>
+                  <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Resource
+                  </th>
+                  <th scope="col" className="h-8 pl-3 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Result
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {systemActivities.map((activity) => {
+                  const result = activity.resourceId === 'FAILED' ? 'Failed' : activity.resourceId === 'SUCCESS' ? 'Success' : '—';
+                  return (
+                    <tr
+                      key={activity.id}
+                      className="h-[42px] border-b border-line/80 transition-colors hover:bg-surface-alt/60"
+                    >
+                      <td className="pr-3 text-[12px] tabular-nums text-ink-soft">{formatDate(activity.createdAt)}</td>
+                      <td className="px-3 text-[12px] text-ink-soft">
+                        <span className="block max-w-[240px] truncate">{activity.actorEmail || '—'}</span>
+                      </td>
+                      <td className="px-3 text-[12px] font-medium uppercase text-ink">{activity.action || '—'}</td>
+                      <td className="px-3 text-[12px] text-ink-soft">{activity.resourceType || '—'}</td>
+                      <td className="pl-3 text-right">
+                        <StatusLabel tone={result === 'Failed' ? 'danger' : result === 'Success' ? 'success' : 'neutral'}>
+                          {result}
+                        </StatusLabel>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </EditorialSection>
     </div>
   );
 }

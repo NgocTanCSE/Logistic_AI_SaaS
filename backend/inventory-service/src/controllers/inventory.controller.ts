@@ -14,6 +14,12 @@ export class InventoryController {
     private readonly prisma: PrismaService
   ) {}
 
+  @Get("summary")
+  @RequirePermissions(Permissions.InventoryRead)
+  async getSummary() {
+    return this.inventoryService.getSummary()
+  }
+
   @Get("ledger")
   @RequirePermissions(Permissions.InventoryRead)
   async getLedger(@Query("page") page: number, @Query("limit") limit: number) {
@@ -25,9 +31,9 @@ export class InventoryController {
   async adjustStock(@Body() body: { inventoryId?: string, sku?: string, qtyChange: number, reason: string }, @Request() req: any) {
     let inventoryId = body.inventoryId;
     if (!inventoryId && body.sku) {
-      const product = await this.prisma.tenantClient.product.findUnique({ where: { sku: body.sku } });
+      const product = await this.prisma.getTenantDb().product.findUnique({ where: { sku: body.sku } });
       if (!product) throw new NotFoundException(`Product SKU ${body.sku} not found`);
-      const inventory = await this.prisma.tenantClient.inventory.findFirst({ where: { productId: product.id } });
+      const inventory = await this.prisma.getTenantDb().inventory.findFirst({ where: { productId: product.id } });
       if (!inventory) throw new NotFoundException(`No inventory record found for SKU ${body.sku}`);
       inventoryId = inventory.id;
     }
@@ -40,13 +46,13 @@ export class InventoryController {
     let { warehouseId, binId, productId } = body;
     
     if (body.sku) {
-      const product = await this.prisma.tenantClient.product.findUnique({ where: { sku: body.sku } });
+      const product = await this.prisma.getTenantDb().product.findUnique({ where: { sku: body.sku } });
       if (!product) throw new NotFoundException(`Product SKU ${body.sku} not found`);
       productId = product.id;
     }
     
     if (body.binBarcode) {
-      const bin = await this.prisma.tenantClient.bin.findUnique({ where: { barcode: body.binBarcode } });
+      const bin = await this.prisma.getTenantDb().bin.findUnique({ where: { barcode: body.binBarcode } });
       if (!bin) throw new NotFoundException(`Bin barcode ${body.binBarcode} not found`);
       binId = bin.id;
       warehouseId = bin.warehouseId;
@@ -68,15 +74,15 @@ export class InventoryController {
 
     if (body.barcode && body.sourceBin) {
       // Find inventory by product barcode or SKU in source bin
-      const product = await this.prisma.tenantClient.product.findFirst({
+      const product = await this.prisma.getTenantDb().product.findFirst({
         where: { OR: [{ barcode: body.barcode }, { sku: body.barcode }] }
       });
       if (!product) throw new NotFoundException(`Product ${body.barcode} not found`);
 
-      const srcBin = await this.prisma.tenantClient.bin.findUnique({ where: { barcode: body.sourceBin } });
+      const srcBin = await this.prisma.getTenantDb().bin.findUnique({ where: { barcode: body.sourceBin } });
       if (!srcBin) throw new NotFoundException(`Source bin ${body.sourceBin} not found`);
 
-      const inv = await this.prisma.tenantClient.inventory.findFirst({
+      const inv = await this.prisma.getTenantDb().inventory.findFirst({
         where: { productId: product.id, binId: srcBin.id }
       });
       if (!inv) throw new NotFoundException(`Inventory for ${body.barcode} in ${body.sourceBin} not found`);
@@ -85,7 +91,7 @@ export class InventoryController {
     }
 
     if (body.destBin) {
-      const dstBin = await this.prisma.tenantClient.bin.findUnique({ where: { barcode: body.destBin } });
+      const dstBin = await this.prisma.getTenantDb().bin.findUnique({ where: { barcode: body.destBin } });
       if (!dstBin) throw new NotFoundException(`Destination bin ${body.destBin} not found`);
       targetBinId = dstBin.id;
     }

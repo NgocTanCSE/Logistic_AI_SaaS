@@ -34,6 +34,7 @@ export const setToken = (token: string) => {
       id: payload.sub || '',
       email: payload.email || '',
       role: payload.role || 'CUSTOMER_CLIENT',
+      slug: payload.tenant_slug || '',
     };
     window.localStorage.setItem('smartlogi_customer_user', JSON.stringify(user));
   }

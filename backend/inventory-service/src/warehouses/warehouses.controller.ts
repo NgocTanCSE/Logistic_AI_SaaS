@@ -38,7 +38,7 @@ export class WarehousesController {
   @RequirePermissions(Permissions.WarehousesManage)
   async list() {
     try {
-      return await this.prisma.tenantClient.warehouse.findMany({ 
+      return await this.prisma.getTenantDb().warehouse.findMany({ 
         include: { manager: true },
         orderBy: { name: 'asc' }
       });
@@ -51,7 +51,7 @@ export class WarehousesController {
   @RequirePermissions(Permissions.WarehousesManage)
   async detail(@Param("id") id: string) {
     try {
-      const warehouse = await this.prisma.tenantClient.warehouse.findUnique({
+      const warehouse = await this.prisma.getTenantDb().warehouse.findUnique({
         where: { id },
         include: { 
           manager: true,
@@ -78,7 +78,7 @@ export class WarehousesController {
   @RequirePermissions(Permissions.WarehousesManage)
   async create(@Body() body: CreateWarehouseDto) {
     try {
-      return await this.prisma.tenantClient.warehouse.create({
+      return await this.prisma.getTenantDb().warehouse.create({
         data: {
           name: body.name,
           code: body.code,
@@ -98,11 +98,11 @@ export class WarehousesController {
   @RequirePermissions(Permissions.WarehousesManage)
   async update(@Param("id") id: string, @Body() body: Partial<CreateWarehouseDto>) {
     try {
-      const warehouse = await this.prisma.tenantClient.warehouse.findUnique({ where: { id } });
+      const warehouse = await this.prisma.getTenantDb().warehouse.findUnique({ where: { id } });
       if (!warehouse) {
         throw new NotFoundException(`Warehouse with ID ${id} not found`);
       }
-      return await this.prisma.tenantClient.warehouse.update({
+      return await this.prisma.getTenantDb().warehouse.update({
         where: { id },
         data: body,
       });
@@ -116,11 +116,11 @@ export class WarehousesController {
   @RequirePermissions(Permissions.WarehousesManage)
   async softDelete(@Param("id") id: string) {
     try {
-      const warehouse = await this.prisma.tenantClient.warehouse.findUnique({ where: { id } });
+      const warehouse = await this.prisma.getTenantDb().warehouse.findUnique({ where: { id } });
       if (!warehouse) {
         throw new NotFoundException(`Warehouse with ID ${id} not found`);
       }
-      return await this.prisma.tenantClient.warehouse.update({
+      return await this.prisma.getTenantDb().warehouse.update({
         where: { id },
         data: { deletedAt: new Date() },
       });

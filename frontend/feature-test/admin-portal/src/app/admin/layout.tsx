@@ -1,75 +1,126 @@
-"use client";
+'use client';
 
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Sidebar, MenuItem } from '@/components/layout/Sidebar';
-import { TopBar } from '@/components/layout/TopBar';
 import { useAuth } from '@/lib/auth-context';
 import AIChatButton from '@/components/AIChatButton';
-import { House, Users, CreditCard, ShieldCheck, ChartBar, Cube, Package } from 'phosphor-react';
+import { AppShell } from '../../../../../../packages/ui-kit/AppShell';
+import { ShellProvider } from '../../../../../../packages/ui-kit/shell-context';
+import { Sidebar, type NavSection } from '../../../../../../packages/ui-kit/Sidebar';
+import { Topbar } from '../../../../../../packages/ui-kit/Topbar';
 
-const adminMenuItems: MenuItem[] = [
-  { title: 'Dashboard', href: '/admin/dashboard', icon: <ChartBar className="w-5 h-5" /> },
-  { title: 'Orders', href: '/admin/orders', icon: <Package className="w-5 h-5" /> },
-  { title: 'Shipments', href: '/admin/shipments', icon: <Cube className="w-5 h-5" /> },
-  { title: 'Tenants', href: '/admin/tenants', icon: <Users className="w-5 h-5" /> },
-  { title: 'Billing', href: '/admin/billing', icon: <CreditCard className="w-5 h-5" /> },
-  { title: 'Audit Logs', href: '/admin/audit-logs', icon: <ShieldCheck className="w-5 h-5" /> },
-  { title: 'AI Models', href: '/admin/ai-models', icon: <House className="w-5 h-5" /> },
+const adminSections: NavSection[] = [
+  {
+    title: 'Overview',
+    items: [
+      { label: 'Dashboard', href: '/admin/dashboard' },
+      { label: 'Orders', href: '/admin/orders' },
+      { label: 'Shipments', href: '/admin/shipments' },
+    ],
+  },
+  {
+    title: 'Administration',
+    items: [
+      { label: 'Tenants', href: '/admin/tenants' },
+      { label: 'Billing', href: '/admin/billing' },
+      { label: 'Audit Logs', href: '/admin/audit-logs' },
+      { label: 'AI Models', href: '/admin/ai-models' },
+    ],
+  },
 ];
 
-// Public admin routes that should render without the admin shell
+// Public admin routes that should render without the admin shell.
 const ADMIN_PUBLIC_ROUTES = ['/admin/login', '/admin/forgot-password', '/admin/reset-password'];
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+function pageTitle(pathname: string) {
+  const parts = pathname.split('/').filter(Boolean);
+  // Drop trailing resource ids so /admin/tenants/<uuid> still reads "Tenants".
+  while (parts.length > 1 && /^[0-9a-f-]{8,}$/i.test(parts[parts.length - 1])) {
+    parts.pop();
+  }
+  if (parts.length <= 1) return 'Home';
+  return parts[parts.length - 1]
+    .replace(/-/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function AdminChrome({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { token, logout } = useAuth();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    router.replace('/admin/login');
+  };
+
+  return (
+    <AppShell
+      maxWidth="full"
+      sidebar={
+        <Sidebar
+          brand={{
+            name: 'SmartLogi',
+            tagline: 'Super Admin',
+            href: '/admin/dashboard',
+            initials: 'SA',
+          }}
+          sections={adminSections}
+          labels={{ navigation: 'Admin navigation' }}
+        />
+      }
+      topbar={
+        <Topbar
+          title={pageTitle(pathname)}
+          user={{ name: user?.email?.split('@')[0], email: user?.email, role: user?.role }}
+          onLogout={handleLogout}
+          logoutLabel="Logout"
+          showNotifications
+        />
+      }
+      ai={<AIChatButton />}
+    >
+      {children}
+    </AppShell>
+  );
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { token, isLoading } = useAuth();
 
   const isPublicRoute = ADMIN_PUBLIC_ROUTES.some(
-    (route) => pathname === route || pathname.startsWith(route + '/')
+    (route) => pathname === route || pathname.startsWith(route + '/'),
   );
 
-  // Public auth pages — render children directly without sidebar/topbar
+  useEffect(() => {
+    if (!isPublicRoute && !isLoading && typeof window !== 'undefined' && !token) {
+      router.push('/admin/login');
+    }
+  }, [isPublicRoute, isLoading, router, token]);
+
+  // Public auth pages — render children directly without sidebar/topbar.
   if (isPublicRoute) {
     return <>{children}</>;
   }
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !token) {
-      router.push('/admin/login');
-    }
-  }, [router, token]);
-
-  // While redirecting (no token), don't render the shell
-  if (!token) {
+  // Wait for the stored session before deciding to redirect.
+  if (isLoading || !token) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-background text-ink">
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
-          <p className="text-sm font-medium text-slate-600">Redirecting to login…</p>
+        <div className="rounded-2xl border border-border bg-surface px-6 py-4 shadow-sm">
+          <p className="text-sm font-medium text-ink-soft">
+            {isLoading ? 'Checking session…' : 'Redirecting to login…'}
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-[100dvh] bg-background overflow-hidden">
-      <Sidebar items={adminMenuItems} basePath="/admin" />
-      <div className="flex-1 flex flex-col min-h-[100dvh]">
-        <TopBar />
-        <main className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-7xl mx-auto">
-            {children}
-          </div>
-        </main>
-      </div>
-
-      {/* AI Assistant — available on every admin page */}
-      <AIChatButton />
-    </div>
+    <ShellProvider>
+      <AdminChrome>{children}</AdminChrome>
+    </ShellProvider>
   );
 }

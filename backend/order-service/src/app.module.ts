@@ -17,7 +17,6 @@ import { PrismaModule } from "./prisma/prisma.module"
 import { AuthModule } from "./auth/auth.module"
 import { KafkaEventService } from "./services/kafka-event.service"
 import { AuditLogInterceptor, TenantSchemaInterceptor } from "./middleware/audit-log.interceptor"
-import { PermissionsGuard } from "shared-types"
 
 const kafkaBrokers = process.env.KAFKA_BROKERS?.trim()
 
@@ -65,10 +64,6 @@ const kafkaBrokers = process.env.KAFKA_BROKERS?.trim()
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: PermissionsGuard,
     },
     {
       provide: APP_INTERCEPTOR,

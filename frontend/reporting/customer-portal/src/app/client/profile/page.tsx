@@ -96,26 +96,26 @@ export default function ClientProfile() {
             <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary">
               <Building2 className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-bold text-white">My Profile</h1>
-            <p className="text-zinc-400 mt-2">Manage your account information</p>
+            <h1 className="text-2xl font-bold text-ink">My Profile</h1>
+            <p className="text-ink-soft mt-2">Manage your account information</p>
           </div>
 
           {loading ? (
-            <div className="text-zinc-400 text-center py-8">Loading profile...</div>
+            <div className="text-ink-soft text-center py-8">Loading profile...</div>
           ) : profile ? (
             <>
               <div className="grid grid-cols-1 gap-4 mb-6 p-4 bg-white rounded-xl border border-slate-200">
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1">Email</label>
+                  <label className="block text-xs font-bold text-ink-soft uppercase tracking-wider mb-1">Email</label>
                   <p className="text-slate-700 font-medium flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-zinc-500" />
+                    <Mail className="w-4 h-4 text-ink-soft" />
                     {profile.email}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1">Role</label>
+                  <label className="block text-xs font-bold text-ink-soft uppercase tracking-wider mb-1">Role</label>
                   <p className="text-slate-700 font-medium flex items-center gap-2">
-                    <User className="w-4 h-4 text-zinc-500" />
+                    <User className="w-4 h-4 text-ink-soft" />
                     {String(profile.role || profile.roleName || 'CUSTOMER_CLIENT').replace(/_/g, ' ')}
                   </p>
                 </div>
@@ -123,14 +123,14 @@ export default function ClientProfile() {
 
               <form onSubmit={handleSaveProfile} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-1">Full Name</label>
+                  <label className="block text-sm font-medium text-ink-soft mb-1">Full Name</label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
                     <input
                       type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-primary/50 transition-colors"
+                      className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
                       placeholder="Your full name"
                       required
                     />
@@ -138,14 +138,14 @@ export default function ClientProfile() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-1">Phone</label>
+                  <label className="block text-sm font-medium text-ink-soft mb-1">Phone</label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
                     <input
                       type="text"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-primary/50 transition-colors"
+                      className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
                       placeholder="Phone number"
                     />
                   </div>
@@ -153,7 +153,7 @@ export default function ClientProfile() {
 
                 {saveMsg && (
                   <div className={`p-3 rounded-lg text-sm text-center font-medium ${
-                    saveMsg.includes('successfully') ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400' : 'bg-rose-500/20 border border-rose-500/50 text-rose-400'
+                    saveMsg.includes('successfully') ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-600' : 'bg-rose-500/20 border border-rose-500/50 text-rose-600'
                   }`}>
                     {saveMsg}
                   </div>
@@ -169,7 +169,7 @@ export default function ClientProfile() {
               </form>
             </>
           ) : (
-            <div className="text-rose-400 text-center py-8">Failed to load profile.</div>
+            <div className="text-rose-600 text-center py-8">Failed to load profile.</div>
           )}
         </div>
 
@@ -180,19 +180,19 @@ export default function ClientProfile() {
             <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
               <KeyRound className="w-5 h-5" />
             </div>
-            <h2 className="text-lg font-bold text-white">Change Password</h2>
+            <h2 className="text-lg font-bold text-ink">Change Password</h2>
           </div>
 
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1">Current Password</label>
+              <label className="block text-sm font-medium text-ink-soft mb-1">Current Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
                 <input
                   type="password"
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-primary/50 transition-colors"
+                  className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
                   placeholder="Enter current password"
                   required
                 />
@@ -200,14 +200,14 @@ export default function ClientProfile() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1">New Password</label>
+              <label className="block text-sm font-medium text-ink-soft mb-1">New Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
                 <input
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-primary/50 transition-colors"
+                  className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
                   placeholder="Min. 8 characters"
                   required
                   minLength={8}
@@ -216,14 +216,14 @@ export default function ClientProfile() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-zinc-400 mb-1">Confirm New Password</label>
+              <label className="block text-sm font-medium text-ink-soft mb-1">Confirm New Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
                 <input
                   type="password"
                   value={confirmNewPassword}
                   onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-primary/50 transition-colors"
+                  className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
                   placeholder="Re-enter new password"
                   required
                   minLength={8}
@@ -233,7 +233,7 @@ export default function ClientProfile() {
 
             {passwordMsg && (
               <div className={`p-3 rounded-lg text-sm text-center font-medium ${
-                passwordMsg.includes('successfully') ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-400' : 'bg-rose-500/20 border border-rose-500/50 text-rose-400'
+                passwordMsg.includes('successfully') ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-600' : 'bg-rose-500/20 border border-rose-500/50 text-rose-600'
               }`}>
                 {passwordMsg}
               </div>

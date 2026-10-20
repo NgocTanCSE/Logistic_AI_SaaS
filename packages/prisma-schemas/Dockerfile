@@ -23,6 +23,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/pnpm-workspace.yaml ./
 COPY --from=builder /app/package.json ./
+COPY --from=builder /app/tsconfig.base.json ./
 
 WORKDIR /app/packages/prisma-schemas
 CMD sh -c "FORCE_RESEED=true pnpm exec prisma db push --schema prisma/schema.prisma && pnpm exec prisma db seed --schema prisma/schema.prisma && echo 'Database ready'"

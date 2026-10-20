@@ -30,7 +30,7 @@ export class ReturnsController {
       if (status) where.status = status
 
       const [data, total] = await Promise.all([
-        this.prisma.tenantClient.returnRequest.findMany({
+        this.prisma.getTenantDb().returnRequest.findMany({
           where,
           skip,
           take,
@@ -42,7 +42,7 @@ export class ReturnsController {
           },
           orderBy: { createdAt: "desc" }
         }),
-        this.prisma.tenantClient.returnRequest.count({ where })
+        this.prisma.getTenantDb().returnRequest.count({ where })
       ])
 
       return {
@@ -59,7 +59,7 @@ export class ReturnsController {
   @RequirePermissions(Permissions.ReturnsRead)
   async getReturnRequest(@Param("id") id: string) {
     try {
-      const request = await this.prisma.tenantClient.returnRequest.findUnique({
+      const request = await this.prisma.getTenantDb().returnRequest.findUnique({
         where: { id },
         include: {
           order: true,
@@ -86,7 +86,7 @@ export class ReturnsController {
     @Body() body: { driverId: string; vehicleId?: string; scheduledAt?: string }
   ) {
     try {
-      const request = await this.prisma.tenantClient.returnRequest.findUnique({
+      const request = await this.prisma.getTenantDb().returnRequest.findUnique({
         where: { id },
         include: { order: true, items: true }
       })
@@ -95,7 +95,7 @@ export class ReturnsController {
         throw new BadRequestException(`Cannot create pickup trip for return with status ${request.status}`)
       }
 
-      return await this.prisma.tenantClient.$transaction(async (tx: any) => {
+      return await this.prisma.getTenantDb().$transaction(async (tx: any) => {
         const trip = await tx.trip.create({
           data: {
             tripCode: `RMA-${request.returnCode}`,
@@ -129,7 +129,7 @@ export class ReturnsController {
   @RequirePermissions(Permissions.ReturnsApprove)
   async confirmPickup(@Param("id") id: string) {
     try {
-      const request = await this.prisma.tenantClient.returnRequest.findUnique({
+      const request = await this.prisma.getTenantDb().returnRequest.findUnique({
         where: { id },
         include: { pickupTrip: true, order: true }
       })
@@ -138,7 +138,7 @@ export class ReturnsController {
         throw new BadRequestException(`Cannot confirm pickup for return with status ${request.status}`)
       }
 
-      return await this.prisma.tenantClient.$transaction(async (tx: any) => {
+      return await this.prisma.getTenantDb().$transaction(async (tx: any) => {
         const updated = await tx.returnRequest.update({
           where: { id },
           data: { status: "PICKED_UP", pickedUpAt: new Date() }
@@ -175,7 +175,7 @@ export class ReturnsController {
     @Body() body: { warehouseId: string; binId?: string }
   ) {
     try {
-      const request = await this.prisma.tenantClient.returnRequest.findUnique({
+      const request = await this.prisma.getTenantDb().returnRequest.findUnique({
         where: { id },
         include: { order: { include: { items: true } }, items: true }
       })
@@ -184,7 +184,7 @@ export class ReturnsController {
         throw new BadRequestException(`Cannot complete return with status ${request.status}`)
       }
 
-      return await this.prisma.tenantClient.$transaction(async (tx: any) => {
+      return await this.prisma.getTenantDb().$transaction(async (tx: any) => {
         const updated = await tx.returnRequest.update({
           where: { id },
           data: { status: "CLOSED" }

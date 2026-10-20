@@ -1,12 +1,13 @@
-"use client";
+import type { Metadata } from 'next';
+import './globals.css';
+import '../styles/layout-tokens.css';
+import AppShell from '@/components/AppShell';
+import { Providers } from '@/components/Providers';
 
-import "./globals.css";
-import "../styles/layout-tokens.css"; /* editorial layout tokens — colors kept per portal */
-import { AuthProvider } from "@/lib/auth-context";
-import AppShell from "@/components/AppShell";
-import { GoogleOAuthProvider } from "@react-oauth/google";
-
-const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+export const metadata: Metadata = {
+  title: 'SmartLogi | Pack Station',
+  description: 'Trạm đóng gói và bàn giao kiện hàng',
+};
 
 export default function RootLayout({
   children,
@@ -14,13 +15,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="vi">
       <body className="bg-background text-ink antialiased">
-        <GoogleOAuthProvider clientId={googleClientId}>
-          <AuthProvider>
-            <AppShell>{children}</AppShell>
-          </AuthProvider>
-        </GoogleOAuthProvider>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
       </body>
     </html>
   );

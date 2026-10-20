@@ -23,7 +23,7 @@ export class NotificationService {
     }
 
     try {
-      await this.prisma.tenantClient.notification.create({
+      await this.prisma.getTenantDb().notification.create({
         data: {
           userId,
           type,

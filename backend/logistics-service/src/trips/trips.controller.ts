@@ -18,7 +18,7 @@ export class TripsController {
   @RequirePermissions(Permissions.TripsDispatch)
   async createTrip(@Body() body: any) {
     try {
-      return await this.prisma.tenantClient.trip.create({
+      return await this.prisma.getTenantDb().trip.create({
         data: {
           tripCode: `TRIP-${Date.now()}`,
           status: "DRAFT",
@@ -45,14 +45,14 @@ export class TripsController {
       if (status) where.status = status;
 
       const [data, total] = await Promise.all([
-        this.prisma.tenantClient.trip.findMany({
+        this.prisma.getTenantDb().trip.findMany({
           where,
           skip,
           take,
           include: { driver: { include: { user: true } }, vehicle: true, stops: true },
           orderBy: { createdAt: "desc" },
         }),
-        this.prisma.tenantClient.trip.count({ where }),
+        this.prisma.getTenantDb().trip.count({ where }),
       ]);
 
       return {
@@ -68,7 +68,7 @@ export class TripsController {
   @RequirePermissions(Permissions.TripsRead)
   async getTrip(@Param("id") id: string) {
     try {
-      const trip = await this.prisma.tenantClient.trip.findUnique({
+      const trip = await this.prisma.getTenantDb().trip.findUnique({
         where: { id },
         include: {
           driver: { include: { user: true } },
@@ -89,9 +89,9 @@ export class TripsController {
   @RequirePermissions(Permissions.TripsDispatch)
   async updateTrip(@Param("id") id: string, @Body() body: any) {
     try {
-      const trip = await this.prisma.tenantClient.trip.findUnique({ where: { id } });
+      const trip = await this.prisma.getTenantDb().trip.findUnique({ where: { id } });
       if (!trip) throw new NotFoundException(`Trip ${id} not found`);
-      return await this.prisma.tenantClient.trip.update({ where: { id }, data: body });
+      return await this.prisma.getTenantDb().trip.update({ where: { id }, data: body });
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
       throw new InternalServerErrorException("Failed to update trip");
@@ -102,9 +102,9 @@ export class TripsController {
   @RequirePermissions(Permissions.TripsDispatch)
   async startTrip(@Param("id") id: string) {
     try {
-      const trip = await this.prisma.tenantClient.trip.findUnique({ where: { id } });
+      const trip = await this.prisma.getTenantDb().trip.findUnique({ where: { id } });
       if (!trip) throw new NotFoundException(`Trip ${id} not found`);
-      return await this.prisma.tenantClient.trip.update({
+      return await this.prisma.getTenantDb().trip.update({
         where: { id },
         data: { status: "IN_PROGRESS", departureTime: new Date() },
       });
@@ -118,9 +118,9 @@ export class TripsController {
   @RequirePermissions(Permissions.TripsDispatch)
   async completeTrip(@Param("id") id: string) {
     try {
-      const trip = await this.prisma.tenantClient.trip.findUnique({ where: { id } });
+      const trip = await this.prisma.getTenantDb().trip.findUnique({ where: { id } });
       if (!trip) throw new NotFoundException(`Trip ${id} not found`);
-      return await this.prisma.tenantClient.trip.update({
+      return await this.prisma.getTenantDb().trip.update({
         where: { id },
         data: { status: "COMPLETED", returnTime: new Date() },
       });
@@ -134,9 +134,9 @@ export class TripsController {
   @RequirePermissions(Permissions.TripsDispatch)
   async cancelTrip(@Param("id") id: string) {
     try {
-      const trip = await this.prisma.tenantClient.trip.findUnique({ where: { id } });
+      const trip = await this.prisma.getTenantDb().trip.findUnique({ where: { id } });
       if (!trip) throw new NotFoundException(`Trip ${id} not found`);
-      return await this.prisma.tenantClient.trip.update({
+      return await this.prisma.getTenantDb().trip.update({
         where: { id },
         data: { status: "CANCELLED" },
       });
@@ -150,7 +150,7 @@ export class TripsController {
   @RequirePermissions(Permissions.TripsDispatch)
   async addStop(@Param("id") id: string, @Body() body: any) {
     try {
-      return await this.prisma.tenantClient.tripStop.create({
+      return await this.prisma.getTenantDb().tripStop.create({
         data: {
           tripId: id,
           stopType: body.stopType,

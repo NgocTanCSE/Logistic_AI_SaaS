@@ -13,6 +13,25 @@ export async function seedClientsAndOrders(prisma: PrismaClient) {
   await prisma.client.createMany({ data: clientsData });
   const allClients = await prisma.client.findMany();
 
+  // Map the demo customer login to a real client so /client/* endpoints can
+  // resolve a clientId. The login itself uses TenantUser (IAM), while the
+  // customer API authorizes against ClientUser.
+  if (allClients.length > 0) {
+    const existingClientUser = await prisma.clientUser.findFirst({
+      where: { email: 'client@customer.vn' },
+    });
+    if (!existingClientUser) {
+      await prisma.clientUser.create({
+        data: {
+          clientId: allClients[0].id,
+          email: 'client@customer.vn',
+          fullName: 'Client User',
+          status: 'ACTIVE',
+        },
+      });
+    }
+  }
+
   // Orders
   const allOrders = [];
   for (let i = 0; i < 600; i++) {

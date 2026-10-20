@@ -15,7 +15,7 @@ export class DriversController {
   async createDriver(@Body() body: any) {
     let { userId, licenseClass, licenseExpiry } = body;
     if (!userId) {
-      const anyUser = await this.prisma.tenantClient.tenantUser.findFirst({
+      const anyUser = await this.prisma.getTenantDb().tenantUser.findFirst({
         where: {
           driver: null,
           status: 'ACTIVE'
@@ -34,7 +34,7 @@ export class DriversController {
       throw new BadRequestException("License expiry date cannot be in the past");
     }
 
-    return this.prisma.tenantClient.driver.create({
+    return this.prisma.getTenantDb().driver.create({
       data: {
         userId,
         licenseClass,
@@ -47,7 +47,7 @@ export class DriversController {
   @Get()
   @RequirePermissions(Permissions.TripsRead)
   async listDrivers() {
-    const drivers = await this.prisma.tenantClient.driver.findMany({
+    const drivers = await this.prisma.getTenantDb().driver.findMany({
       include: {
         user: true,
         trips: {
@@ -75,7 +75,7 @@ export class DriversController {
   @RequirePermissions(Permissions.TripsRead)
   async getDriver(@Param("id") id: string) {
     try {
-      const driver = await this.prisma.tenantClient.driver.findUnique({
+      const driver = await this.prisma.getTenantDb().driver.findUnique({
         where: { id },
         include: {
           user: { select: { id: true, email: true, fullName: true, phone: true, status: true } },
@@ -94,9 +94,9 @@ export class DriversController {
   @RequirePermissions(Permissions.TenantsManage)
   async updateDriver(@Param("id") id: string, @Body() body: { licenseClass?: string; licenseExpiry?: string; status?: string }) {
     try {
-      const driver = await this.prisma.tenantClient.driver.findUnique({ where: { id } });
+      const driver = await this.prisma.getTenantDb().driver.findUnique({ where: { id } });
       if (!driver) throw new NotFoundException(`Driver ${id} not found`);
-      return await this.prisma.tenantClient.driver.update({ where: { id }, data: body });
+      return await this.prisma.getTenantDb().driver.update({ where: { id }, data: body });
     } catch (error) {
       if (error instanceof NotFoundException) throw error;
       throw new InternalServerErrorException("Failed to update driver");

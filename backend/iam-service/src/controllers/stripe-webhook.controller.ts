@@ -61,7 +61,7 @@ export class StripeWebhookController {
     if (!invoiceId) return;
 
     try {
-      await (this.prisma as any).tenantClient.invoice.update({
+      await (this.prisma as any).getTenantDb().invoice.update({
         where: { id: invoiceId },
         data: { status: "PAID", paidAt: new Date() },
       });

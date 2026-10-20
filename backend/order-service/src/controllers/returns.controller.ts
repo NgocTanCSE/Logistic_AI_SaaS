@@ -29,7 +29,7 @@ export class ReturnsController {
     @Body() body: { reasonId?: string; reasonNote?: string; returnType?: string; items: { productId: string; quantity: number }[] }
   ) {
     try {
-      const order = await this.prisma.tenantClient.order.findUnique({
+      const order = await this.prisma.getTenantDb().order.findUnique({
         where: { id: orderId },
         include: { items: true }
       })
@@ -42,7 +42,7 @@ export class ReturnsController {
         throw new BadRequestException("Return request must have at least one item")
       }
 
-      return await this.prisma.tenantClient.$transaction(async (tx: any) => {
+      return await this.prisma.getTenantDb().$transaction(async (tx: any) => {
         const returnRequest = await tx.returnRequest.create({
           data: {
             returnCode: this.generateReturnCode(),
@@ -84,13 +84,13 @@ export class ReturnsController {
   @RequirePermissions(Permissions.ReturnsRead)
   async listReturnRequests(@Param("orderId") orderId: string) {
     try {
-      const order = await this.prisma.tenantClient.order.findUnique({
+      const order = await this.prisma.getTenantDb().order.findUnique({
         where: { id: orderId },
         select: { id: true }
       })
       if (!order) throw new NotFoundException(`Order ${orderId} not found`)
 
-      return this.prisma.tenantClient.returnRequest.findMany({
+      return this.prisma.getTenantDb().returnRequest.findMany({
         where: { orderId },
         include: { items: true, inspections: true, refunds: true },
         orderBy: { createdAt: "desc" }
@@ -105,7 +105,7 @@ export class ReturnsController {
   @RequirePermissions(Permissions.ReturnsRead)
   async getReturnRequest(@Param("id") id: string) {
     try {
-      const request = await this.prisma.tenantClient.returnRequest.findUnique({
+      const request = await this.prisma.getTenantDb().returnRequest.findUnique({
         where: { id },
         include: { items: true, inspections: true, refunds: true, reason: true }
       })
@@ -124,7 +124,7 @@ export class ReturnsController {
     @Body() body: { approvedItems?: { itemId: string; quantityApproved: number; unitRefundAmount: number }[] }
   ) {
     try {
-      const request = await this.prisma.tenantClient.returnRequest.findUnique({
+      const request = await this.prisma.getTenantDb().returnRequest.findUnique({
         where: { id },
         include: { items: true }
       })
@@ -133,7 +133,7 @@ export class ReturnsController {
         throw new BadRequestException(`Cannot approve return with status ${request.status}`)
       }
 
-      return await this.prisma.tenantClient.$transaction(async (tx: any) => {
+      return await this.prisma.getTenantDb().$transaction(async (tx: any) => {
         const updated = await tx.returnRequest.update({
           where: { id },
           data: {
@@ -182,7 +182,7 @@ export class ReturnsController {
     }
 
     try {
-      const request = await this.prisma.tenantClient.returnRequest.findUnique({
+      const request = await this.prisma.getTenantDb().returnRequest.findUnique({
         where: { id }
       })
       if (!request) throw new NotFoundException(`Return request ${id} not found`)
@@ -190,7 +190,7 @@ export class ReturnsController {
         throw new BadRequestException(`Cannot reject return with status ${request.status}`)
       }
 
-      return await this.prisma.tenantClient.$transaction(async (tx: any) => {
+      return await this.prisma.getTenantDb().$transaction(async (tx: any) => {
         const updated = await tx.returnRequest.update({
           where: { id },
           data: {
@@ -225,7 +225,7 @@ export class ReturnsController {
     @Body() body: { pickupAddress: string; pickupLat?: number; pickupLng?: number; pickupDriverId: string; pickupScheduledAt: string }
   ) {
     try {
-      const request = await this.prisma.tenantClient.returnRequest.findUnique({
+      const request = await this.prisma.getTenantDb().returnRequest.findUnique({
         where: { id }
       })
       if (!request) throw new NotFoundException(`Return request ${id} not found`)
@@ -233,7 +233,7 @@ export class ReturnsController {
         throw new BadRequestException(`Cannot schedule pickup for return with status ${request.status}`)
       }
 
-      const updated = await this.prisma.tenantClient.returnRequest.update({
+      const updated = await this.prisma.getTenantDb().returnRequest.update({
         where: { id },
         data: {
           status: "PICKUP_SCHEDULED",
@@ -262,7 +262,7 @@ export class ReturnsController {
     @Body() body: { condition: string; damageNotes?: string; imagesJson?: string; approvedRefund?: number; warehouseId?: string; binId?: string }
   ) {
     try {
-      const request = await this.prisma.tenantClient.returnRequest.findUnique({
+      const request = await this.prisma.getTenantDb().returnRequest.findUnique({
         where: { id }
       })
       if (!request) throw new NotFoundException(`Return request ${id} not found`)
@@ -271,7 +271,7 @@ export class ReturnsController {
         throw new BadRequestException(`Cannot inspect return with status ${request.status}`)
       }
 
-      return await this.prisma.tenantClient.$transaction(async (tx: any) => {
+      return await this.prisma.getTenantDb().$transaction(async (tx: any) => {
         await tx.returnInspection.create({
           data: {
             returnRequestId: id,
@@ -314,7 +314,7 @@ export class ReturnsController {
     @Body() body: { amount: number; method?: string; invoiceId?: string; transactionId?: string }
   ) {
     try {
-      const request = await this.prisma.tenantClient.returnRequest.findUnique({
+      const request = await this.prisma.getTenantDb().returnRequest.findUnique({
         where: { id },
         include: { refunds: true }
       })
@@ -333,7 +333,7 @@ export class ReturnsController {
         throw new BadRequestException("Total refund amount exceeds eligible refund amount")
       }
 
-      return await this.prisma.tenantClient.$transaction(async (tx: any) => {
+      return await this.prisma.getTenantDb().$transaction(async (tx: any) => {
         const refund = await tx.refund.create({
           data: {
             returnRequestId: id,
@@ -379,7 +379,7 @@ export class ReturnsController {
   @Get("return-reasons")
   async listReturnReasons() {
     try {
-      return this.prisma.tenantClient.returnReason.findMany({
+      return this.prisma.getTenantDb().returnReason.findMany({
         where: { isActive: true },
         orderBy: { name: "asc" }
       })

@@ -96,6 +96,7 @@ const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
     Permissions.NotificationsRead,
     Permissions.ReturnsRead,
     Permissions.ReturnsCreate,
+    Permissions.BillingRead,
   ],
 };
 

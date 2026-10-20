@@ -14,7 +14,7 @@ export class ClientInventoryController {
     const email = req.user?.email;
     if (!email) throw new NotFoundException("User email not found in token");
     
-    const clientUser = await this.prisma.tenantClient.clientUser.findFirst({
+    const clientUser = await this.prisma.getTenantDb().clientUser.findFirst({
       where: { email },
     });
 
@@ -30,7 +30,7 @@ export class ClientInventoryController {
   async list(@Request() req: any) {
     const clientId = await this.getClientId(req);
 
-    const clientOrders = await this.prisma.tenantClient.order.findMany({
+    const clientOrders = await this.prisma.getTenantDb().order.findMany({
       where: { clientId },
       select: { items: { select: { productId: true } } },
     });
@@ -43,12 +43,12 @@ export class ClientInventoryController {
       return [];
     }
 
-    const inventories = await this.prisma.tenantClient.inventory.findMany({
+    const inventories = await this.prisma.getTenantDb().inventory.findMany({
       where: { productId: { in: productIds } },
       include: {
         product: true,
         warehouse: true,
-        bin: { include: { zone: true } }
+        bin: { include: { rack: { include: { zone: true } } } }
       },
       take: 50
     });
@@ -61,7 +61,7 @@ export class ClientInventoryController {
       allocated: inv.quantityAllocated,
       available: inv.quantityOnHand - inv.quantityAllocated,
       warehouse: inv.warehouse?.name,
-      location: inv.bin ? `${inv.bin.zone?.code}-${inv.bin.barcode}` : null,
+      location: inv.bin ? `${inv.bin.rack?.zone?.code}-${inv.bin.barcode}` : null,
       status: inv.status
     }));
   }

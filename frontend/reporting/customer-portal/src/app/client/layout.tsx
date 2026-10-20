@@ -1,48 +1,37 @@
-"use client";
+'use client';
 
 import React, { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import Link from 'next/link';
-import clsx from 'clsx';
 import { useAuth } from '@/lib/auth-context';
-import {
-  LayoutDashboard,
-  Package,
-  Inbox,
-  Globe,
-  Receipt,
-  RotateCcw,
-  LogOut,
-} from '@/components/icons';
+import { AppShell } from '../../../../../../packages/ui-kit/AppShell';
+import { ShellProvider } from '../../../../../../packages/ui-kit/shell-context';
+import { Sidebar, type NavSection } from '../../../../../../packages/ui-kit/Sidebar';
+import { Topbar } from '../../../../../../packages/ui-kit/Topbar';
 
-export default function ClientLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
+const customerSections: NavSection[] = [
+  {
+    title: 'B2B Dashboard',
+    items: [
+      { label: 'Dashboard', href: '/client/dashboard' },
+      { label: 'Orders', href: '/client/orders' },
+      { label: 'Inventory', href: '/client/inventory' },
+      { label: 'Webhooks', href: '/client/webhooks' },
+      { label: 'Invoices', href: '/client/invoices' },
+      { label: 'Returns', href: '/client/returns' },
+    ],
+  },
+];
+
+function pageTitle(pathname: string) {
+  const parts = pathname.split('/').filter(Boolean);
+  const last = parts[parts.length - 1] ?? 'Dashboard';
+  return last.replace(/-/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function CustomerChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { token, logout } = useAuth();
-  const isAuthenticated = !!token;
-
-  useEffect(() => {
-    if (!isAuthenticated && pathname !== '/client/login') {
-      router.push('/client/login');
-    }
-  }, [isAuthenticated, router, pathname]);
-
-  if (pathname === '/client/login') {
-    return <>{children}</>;
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  const menuItems = [
-    { href: '/client/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { href: '/client/orders', icon: Package, label: 'Orders' },
-    { href: '/client/inventory', icon: Inbox, label: 'Inventory' },
-    { href: '/client/webhooks', icon: Globe, label: 'Webhooks' },
-    { href: '/client/invoices', icon: Receipt, label: 'Invoices' },
-    { href: '/client/returns', icon: RotateCcw, label: 'Returns' },
-  ];
+  const router = useRouter();
+  const { user, logout } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -50,51 +39,63 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   };
 
   return (
-    <div className="flex-1 flex overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 border-r border-slate-200 bg-white flex flex-col">
-        <div className="p-6">
-          <p className="text-[10px] font-editorial font-bold text-ink-soft uppercase tracking-wider mb-4">B2B Dashboard</p>
-          <nav className="space-y-2">
-            {menuItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname.startsWith(item.href) && item.href !== '#';
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className={clsx(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-colors",
-                    isActive 
-                      ? "bg-primary/5 text-primary font-semibold ring-1 ring-primary/20" 
-                      : "text-ink-soft hover:text-ink hover:bg-primary/5"
-                  )}
-                >
-                  <Icon className="w-5 h-5" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
+    <AppShell
+      maxWidth="full"
+      sidebar={
+        <Sidebar
+          brand={{
+            name: 'SmartLogi',
+            tagline: 'Customer Portal',
+            href: '/client/dashboard',
+            initials: 'SL',
+          }}
+          sections={customerSections}
+          labels={{ navigation: 'Customer navigation' }}
+        />
+      }
+      topbar={
+        <Topbar
+          title={pageTitle(pathname)}
+          user={{ name: user?.fullName ?? user?.name, email: user?.email, role: user?.role }}
+          onLogout={handleLogout}
+          logoutLabel="Logout"
+          showNotifications
+        />
+      }
+    >
+      {children}
+    </AppShell>
+  );
+}
 
-        <div className="mt-auto p-6 border-t border-slate-200">
-          <button 
-            onClick={handleLogout}
-            className="flex items-center gap-3 text-ink-soft hover:text-ink transition-colors w-full px-4 py-2"
-          >
-            <LogOut className="w-5 h-5" />
-            Logout
-          </button>
-        </div>
-      </aside>
+export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { token, isLoading } = useAuth();
+  const isAuthenticated = !!token;
+  const isPublicRoute = ['/client/login', '/client/forgot-password', '/client/reset-password'].some(
+    (route) => pathname === route || pathname.startsWith(route + '/'),
+  );
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-8 relative">
-        <div className="max-w-6xl mx-auto">
-          {children}
-        </div>
-      </main>
-    </div>
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && !isPublicRoute) {
+      router.push('/client/login');
+    }
+  }, [isAuthenticated, isLoading, isPublicRoute, router, pathname]);
+
+  // Login / forgot / reset must stay reachable without a session.
+  if (isPublicRoute) {
+    return <>{children}</>;
+  }
+
+  // Wait for the stored session to be read before deciding to redirect.
+  if (isLoading || !isAuthenticated) {
+    return null;
+  }
+
+  return (
+    <ShellProvider>
+      <CustomerChrome>{children}</CustomerChrome>
+    </ShellProvider>
   );
 }

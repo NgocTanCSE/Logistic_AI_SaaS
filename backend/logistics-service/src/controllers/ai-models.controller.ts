@@ -14,7 +14,7 @@ export class AiModelsController {
   @RequirePermissions(Permissions.TripsRead)
   async listAiModels(@Query('type') type?: string) {
     try {
-      return await this.prisma.tenantClient.aiModel.findMany({
+      return await this.prisma.getTenantDb().aiModel.findMany({
         where: type ? { type } : {},
         orderBy: { trainedAt: 'desc' }
       });
@@ -27,7 +27,7 @@ export class AiModelsController {
   @RequirePermissions(Permissions.TripsRead)
   async getAiModel(@Param("id") id: string) {
     try {
-      const model = await this.prisma.tenantClient.aiModel.findUnique({
+      const model = await this.prisma.getTenantDb().aiModel.findUnique({
         where: { id }
       });
       if (!model) throw new NotFoundException(`AI Model with ID ${id} not found`);
@@ -42,17 +42,17 @@ export class AiModelsController {
   @RequirePermissions(Permissions.TripsDispatch)
   async createAiModel(@Body() body: { name: string, version: string, type: string, accuracy?: number, modelPath: string, metadata?: string }) {
     try {
-      const existingCurrent = await this.prisma.tenantClient.aiModel.findFirst({
+      const existingCurrent = await this.prisma.getTenantDb().aiModel.findFirst({
         where: { isCurrent: true, type: body.type }
       });
       if (existingCurrent) {
-        await this.prisma.tenantClient.aiModel.update({
+        await this.prisma.getTenantDb().aiModel.update({
           where: { id: existingCurrent.id },
           data: { isCurrent: false }
         });
       }
 
-      return await this.prisma.tenantClient.aiModel.create({
+      return await this.prisma.getTenantDb().aiModel.create({
         data: {
           name: body.name,
           version: body.version,
@@ -72,17 +72,17 @@ export class AiModelsController {
   @RequirePermissions(Permissions.TripsDispatch)
   async updateAiModel(@Param("id") id: string, @Body() body: { name?: string, version?: string, accuracy?: number, isCurrent?: boolean, metadata?: string }) {
     try {
-      const model = await this.prisma.tenantClient.aiModel.findUnique({ where: { id } });
+      const model = await this.prisma.getTenantDb().aiModel.findUnique({ where: { id } });
       if (!model) throw new NotFoundException(`AI Model with ID ${id} not found`);
 
       if (body.isCurrent) {
-        await this.prisma.tenantClient.aiModel.updateMany({
+        await this.prisma.getTenantDb().aiModel.updateMany({
           where: { type: model.type, id: { not: id } },
           data: { isCurrent: false }
         });
       }
 
-      return await this.prisma.tenantClient.aiModel.update({
+      return await this.prisma.getTenantDb().aiModel.update({
         where: { id },
         data: body
       });

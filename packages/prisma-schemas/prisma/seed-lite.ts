@@ -86,7 +86,7 @@ const rolePermissionMap: Record<string, string[]> = {
       "trips:read", "mobile:sync:pull", "mobile:sync:push", "mobile:uploads", "mobile:gps:batch", "mobile:sos"
     ],
     'CUSTOMER_CLIENT': [
-      "orders:read", "orders:create", "inventory:read", "notifications:read", "returns:read", "returns:create"
+      "orders:read", "orders:create", "inventory:read", "notifications:read", "returns:read", "returns:create", "billing:read"
     ],
     'TENANT_USER': [
       "inventory:read", "orders:read", "tasks:read", "trips:read"
@@ -300,6 +300,23 @@ const allInventories = await prisma.inventory.findMany({ take: 50 });
   }));
   await prisma.client.createMany({ data: clientsData }).catch(e => console.warn('  [WARN] clients:', e.message));
   const allClients = await prisma.client.findMany();
+
+  // Link the demo customer login (TenantUser) to a Client row.
+  if (allClients.length > 0) {
+    const existingClientUser = await prisma.clientUser.findFirst({
+      where: { email: 'client@customer.vn' },
+    }).catch(() => null);
+    if (!existingClientUser) {
+      await prisma.clientUser.create({
+        data: {
+          clientId: allClients[0].id,
+          email: 'client@customer.vn',
+          fullName: 'Client User',
+          status: 'ACTIVE',
+        },
+      }).catch(e => console.warn('  [WARN] clientUser:', e.message));
+    }
+  }
 
 
   console.log('--- Seeding 500 Orders & Tracking ---');

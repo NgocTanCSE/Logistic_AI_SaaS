@@ -10,7 +10,10 @@ const showToast = (message: string, type: 'error' | 'warning' | 'info' = 'error'
 };
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1',
+  baseURL:
+    typeof window === 'undefined'
+      ? process.env.API_INTERNAL_URL || 'http://api-gateway:3000/api/v1'
+      : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -36,7 +39,8 @@ api.interceptors.response.use(
   },
   (error) => {
     if (error?.response?.status === 401) {
-      if (typeof window !== 'undefined') {
+      const isAuthRequest = String(error.config?.url || '').includes('/auth/');
+      if (!isAuthRequest && typeof window !== 'undefined') {
         localStorage.removeItem('smartlogi_pack_token');
         window.location.href = '/login';
       }

@@ -20,14 +20,19 @@
     "emitDecoratorMetadata": true,
     "baseUrl": ".",
     "paths": {
-      "shared-types": ["../../../packages/shared-types/src/index.ts"],
-      "@/*": ["./src/*"]
+      "shared-types": [
+        "../../../packages/shared-types/src/index.ts"
+      ],
+      "@/*": [
+        "./src/*"
+      ]
     },
     "plugins": [
       {
         "name": "next"
       }
-    ]
+    ],
+    "target": "ES2017"
   },
   "include": [
     "next-env.d.ts",

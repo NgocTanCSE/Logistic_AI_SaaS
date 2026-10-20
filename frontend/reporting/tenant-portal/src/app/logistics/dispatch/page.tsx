@@ -10,10 +10,20 @@ import dynamic from 'next/dynamic';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 // Dynamically import LeafletMap to avoid SSR issues
-const LeafletMap = dynamic(() => import('map-components').then(m => m.LeafletMap).catch(() => () => <div />), { 
-  ssr: false,
-  loading: () => <div className="w-full h-full bg-slate-100 animate-pulse flex items-center justify-center text-slate-400 font-bold">LOADING MAP ENGINE...</div>
-});
+const LeafletMap: any = dynamic(
+  (() =>
+    import('map-components')
+      .then((m) => m.LeafletMap)
+      .catch(() => () => <div />)) as any,
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full w-full items-center justify-center bg-surface-alt font-medium text-ink-faint">
+        Đang tải bản đồ…
+      </div>
+    ),
+  },
+);
 
 type Driver = {
   id: string;

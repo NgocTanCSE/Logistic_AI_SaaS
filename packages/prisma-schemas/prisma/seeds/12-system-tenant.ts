@@ -1,8 +1,26 @@
 import { PrismaClient } from '@prisma/client';
 import { fakerVI as faker } from '@faker-js/faker';
+import * as bcrypt from 'bcrypt';
 
 export async function seedSystemAndTenant(prisma: PrismaClient) {
   console.log('--- Seeding System & Tenant ---');
+
+  // 1. Super admin for the admin-portal (password login).
+  //    The Google login flow never auto-creates a SUPER_ADMIN; it only accepts
+  //    accounts that already exist here or that are listed in
+  //    SUPER_ADMIN_GOOGLE_EMAILS.
+  const superAdminEmail = process.env.SEED_SUPER_ADMIN_EMAIL || 'admin@smartlogi.vn';
+  const superAdminPassword = process.env.SEED_SUPER_ADMIN_PASSWORD || 'Admin@123';
+  await prisma.systemAdmin.upsert({
+    where: { email: superAdminEmail },
+    update: { status: 'ACTIVE' },
+    create: {
+      email: superAdminEmail,
+      fullName: 'Super Admin',
+      passwordHash: await bcrypt.hash(superAdminPassword, 10),
+      status: 'ACTIVE',
+    },
+  });
 
   const users = await prisma.tenantUser.findMany({ select: { id: true }, take: 100 });
 

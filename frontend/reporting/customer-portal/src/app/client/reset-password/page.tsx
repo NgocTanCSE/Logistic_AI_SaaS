@@ -53,8 +53,8 @@ function ResetPasswordForm() {
         <div className="w-16 h-16 bg-rose-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-rose-500">
           <Building2 className="w-8 h-8" />
         </div>
-        <h1 className="text-2xl font-bold text-white mb-2">Invalid Link</h1>
-        <p className="text-zinc-400 mb-6">This password reset link is invalid or has expired.</p>
+        <h1 className="text-2xl font-bold text-ink mb-2">Invalid Link</h1>
+        <p className="text-ink-soft mb-6">This password reset link is invalid or has expired.</p>
         <Link href="/client/forgot-password" className="text-primary hover:text-primary/80 font-medium">
           Request a new reset link
         </Link>
@@ -68,8 +68,8 @@ function ResetPasswordForm() {
         <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-emerald-500">
           <Lock className="w-8 h-8" />
         </div>
-        <h1 className="text-2xl font-bold text-white mb-2">Password Reset</h1>
-        <p className="text-zinc-400 mb-6">Your password has been reset successfully.</p>
+        <h1 className="text-2xl font-bold text-ink mb-2">Password Reset</h1>
+        <p className="text-ink-soft mb-6">Your password has been reset successfully.</p>
         <Link href="/client/login" className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium">
           <ArrowLeft className="w-4 h-4" />
           Back to Login
@@ -84,30 +84,30 @@ function ResetPasswordForm() {
         <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary">
           <Lock className="w-8 h-8" />
         </div>
-        <h1 className="text-2xl font-bold text-white">Set New Password</h1>
-        <p className="text-zinc-400 mt-2">Enter your new password for <strong className="text-white">{email}</strong></p>
+        <h1 className="text-2xl font-bold text-ink">Set New Password</h1>
+        <p className="text-ink-soft mt-2">Enter your new password for <strong className="text-ink">{email}</strong></p>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-sm text-rose-400 text-center">{error}</div>
+        <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-sm text-rose-600 text-center">{error}</div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-1">New Password</label>
+          <label className="block text-sm font-medium text-ink-soft mb-1">New Password</label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-primary/50 transition-colors"
+              className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
               placeholder="Min. 8 characters" required minLength={8} />
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-400 mb-1">Confirm Password</label>
+          <label className="block text-sm font-medium text-ink-soft mb-1">Confirm Password</label>
           <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
             <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-primary/50 transition-colors"
+              className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
               placeholder="Re-enter password" required minLength={8} />
           </div>
         </div>
@@ -125,7 +125,7 @@ export default function B2BResetPassword() {
     <div className="flex-1 flex items-center justify-center p-4 relative">
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-primary/10 blur-[100px] rounded-full pointer-events-none z-[-1]"></div>
         <div className="bg-white border border-slate-200 w-full max-w-md p-8 rounded-2xl">
-        <Suspense fallback={<div className="text-zinc-400 text-center py-8">Loading...</div>}>
+        <Suspense fallback={<div className="text-ink-soft text-center py-8">Loading...</div>}>
           <ResetPasswordForm />
         </Suspense>
       </div>

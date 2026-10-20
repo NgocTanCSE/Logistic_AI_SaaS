@@ -16,7 +16,7 @@ export class ClientReturnsController {
     const email = req.user?.email
     if (!email) throw new NotFoundException("User email not found in token")
 
-    const clientUser = await this.prisma.tenantClient.clientUser.findFirst({
+    const clientUser = await this.prisma.getTenantDb().clientUser.findFirst({
       where: { email },
     })
     if (!clientUser) throw new NotFoundException("Client account not found for this user")
@@ -28,7 +28,7 @@ export class ClientReturnsController {
   async listMyReturns(@Request() req: any) {
     try {
       const clientId = await this.getClientId(req)
-      return this.prisma.tenantClient.returnRequest.findMany({
+      return this.prisma.getTenantDb().returnRequest.findMany({
         where: { clientId },
         include: {
           order: { select: { trackingCode: true, recipientName: true } },
@@ -50,7 +50,7 @@ export class ClientReturnsController {
   async getMyReturn(@Param("id") id: string, @Request() req: any) {
     try {
       const clientId = await this.getClientId(req)
-      const request = await this.prisma.tenantClient.returnRequest.findFirst({
+      const request = await this.prisma.getTenantDb().returnRequest.findFirst({
         where: { id, clientId },
         include: {
           order: true,
@@ -74,7 +74,7 @@ export class ClientReturnsController {
     try {
       const clientId = await this.getClientId(req)
 
-      const order = await this.prisma.tenantClient.order.findFirst({
+      const order = await this.prisma.getTenantDb().order.findFirst({
         where: { id: body.orderId, clientId },
         include: { items: true }
       })
@@ -91,7 +91,7 @@ export class ClientReturnsController {
       const randomSuffix = Math.floor(Math.random() * 100000).toString().padStart(5, "0")
       const returnCode = `RMA-${dateStr}-${randomSuffix}`
 
-      return await this.prisma.tenantClient.$transaction(async (tx: any) => {
+      return await this.prisma.getTenantDb().$transaction(async (tx: any) => {
         const returnRequest = await tx.returnRequest.create({
           data: {
             returnCode,

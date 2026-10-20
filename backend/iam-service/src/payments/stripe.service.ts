@@ -129,7 +129,7 @@ export class StripeService {
     }
 
     try {
-      await (this.prisma as any).tenantClient.invoice.update({
+      await (this.prisma as any).getTenantDb().invoice.update({
         where: { id: invoiceId },
         data: { status: 'PAID', paidAt: new Date() },
       });
@@ -147,7 +147,7 @@ export class StripeService {
   private async handleInvoicePaid(invoice: any): Promise<void> {
     this.logger.log(`Invoice paid: ${invoice.id}`);
     try {
-      await (this.prisma as any).tenantClient.invoice.update({
+      await (this.prisma as any).getTenantDb().invoice.update({
         where: { id: invoice.id },
         data: { status: 'PAID', paidAt: new Date() },
       });
@@ -159,7 +159,7 @@ export class StripeService {
   private async handleInvoicePaymentFailed(invoice: any): Promise<void> {
     this.logger.warn(`Invoice payment failed: ${invoice.id}`);
     try {
-      await (this.prisma as any).tenantClient.invoice.update({
+      await (this.prisma as any).getTenantDb().invoice.update({
         where: { id: invoice.id },
         data: { status: 'FAILED' },
       });

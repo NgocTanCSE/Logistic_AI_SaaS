@@ -1,7 +1,11 @@
 ﻿import { Controller, Get } from "@nestjs/common"
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger"
+import { SkipThrottle } from "@nestjs/throttler"
 
 @ApiTags('health')
+// Skip every named throttler (default + auth); otherwise the container
+// healthcheck gets throttled by the stricter "auth" limiter.
+@SkipThrottle({ default: true, auth: true })
 @Controller("health")
 export class HealthController {
   @Get()

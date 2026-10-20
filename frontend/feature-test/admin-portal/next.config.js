@@ -5,162 +5,17 @@ const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   reactStrictMode: true,
   async rewrites() {
+    // All API traffic is proxied to the API Gateway. This keeps SSR requests
+    // working inside Docker (where 127.0.0.1 points at the portal container,
+    // not at the backend services).
+    const gateway = process.env.API_INTERNAL_URL || 'http://api-gateway:3000';
     return [
       {
-        source: '/api/v1/inventory/:path*',
-        destination: 'http://127.0.0.1:3002/api/v1/inventory/:path*'
-      },
-      {
-        source: '/api/v1/warehouses/:path*',
-        destination: 'http://127.0.0.1:3002/api/v1/warehouses/:path*'
-      },
-      {
-        source: '/api/v1/branches/:path*',
-        destination: 'http://127.0.0.1:3002/api/v1/branches/:path*'
-      },
-      {
-        source: '/api/v1/wms/:path*',
-        destination: 'http://127.0.0.1:3002/api/v1/wms/:path*'
-      },
-      {
-        source: '/api/v1/orders/:path*',
-        destination: 'http://127.0.0.1:3003/api/v1/orders/:path*'
-      },
-      {
-        source: '/api/v1/logistics/:path*',
-        destination: 'http://127.0.0.1:3004/api/v1/logistics/:path*'
-      },
-      {
-        source: '/api/v1/vehicles/:path*',
-        destination: 'http://127.0.0.1:3004/api/v1/vehicles/:path*'
-      },
-      {
-        source: '/api/v1/drivers/:path*',
-        destination: 'http://127.0.0.1:3004/api/v1/drivers/:path*'
-      },
-      {
-        source: '/api/v1/waves/:path*',
-        destination: 'http://127.0.0.1:3002/api/v1/waves/:path*'
-      },
-      {
-        source: '/api/v1/products/:path*',
-        destination: 'http://127.0.0.1:3002/api/v1/products/:path*'
-      },
-      {
-        source: '/api/v1/clients/:path*',
-        destination: 'http://127.0.0.1:3003/api/v1/clients/:path*'
-      },
-      {
-        source: '/api/v1/tracking/:path*',
-        destination: 'http://127.0.0.1:3003/api/v1/tracking/:path*'
-      },
-      {
-        source: '/api/v1/webhooks/:path*',
-        destination: 'http://127.0.0.1:3003/api/v1/webhooks/:path*'
-      },
-      {
-        source: '/api/v1/trips/:path*',
-        destination: 'http://127.0.0.1:3004/api/v1/trips/:path*'
-      },
-      {
-        source: '/api/v1/gps/:path*',
-        destination: 'http://127.0.0.1:3004/api/v1/gps/:path*'
-      },
-      {
-        source: '/api/v1/geofences/:path*',
-        destination: 'http://127.0.0.1:3004/api/v1/geofences/:path*'
-      },
-      {
-        source: '/api/v1/driver-app/:path*',
-        destination: 'http://127.0.0.1:3004/api/v1/driver-app/:path*'
-      },
-      {
-        source: '/api/v1/admin/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/admin/:path*'
-      },
-      {
-        source: '/api/v1/tenant/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/tenant/:path*'
-      },
-      {
-        source: '/api/v1/iam/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/iam/:path*'
-      },
-      {
-        source: '/api/v1/users/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/users/:path*'
-      },
-      {
-        source: '/api/v1/roles/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/roles/:path*'
-      },
-      {
-        source: '/api/v1/feature-flags/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/feature-flags/:path*'
-      },
-      {
-        source: '/api/v1/api-keys/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/api-keys/:path*'
-      },
-      {
-        source: '/api/v1/billing/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/billing/:path*'
-      },
-      {
-        source: '/api/v1/auth/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/auth/:path*'
-      },
-      // AI Worker — must come BEFORE the catch-all /api/v1/:path* rewrite
-      {
-        source: '/api/v1/ai/v1/:path*',
-        destination: `${process.env.AI_WORKER_URL || 'http://host.docker.internal:8787'}/api/v1/ai/v1/:path*`
-      },
-      {
-        source: '/api/v1/ai/:path*',
-        destination: `${process.env.AI_WORKER_URL || 'http://host.docker.internal:8787'}/api/v1/ai/:path*`
-      },
-      {
-        source: '/api/v1/metrics/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/metrics/:path*'
-      },
-      {
-        source: '/api/v1/notifications/:path*',
-        destination: 'http://127.0.0.1:3005/api/v1/notifications/:path*'
-      },
-      {
-        source: '/api/v1/public/:path*',
-        destination: 'http://127.0.0.1:3006/api/v1/public/:path*'
-      },
-      {
-        source: '/api/v1/client/:path*',
-        destination: 'http://127.0.0.1:3006/api/v1/client/:path*'
-      },
-      {
-        source: '/api/v1/health',
-        destination: 'http://127.0.0.1:3001/api/v1/health'
-      },
-      {
-        source: '/api/v1/keys',
-        destination: 'http://127.0.0.1:3001/api/v1/admin/keys'
-      },
-      {
-        source: '/api/v1/config',
-        destination: 'http://127.0.0.1:3001/api/v1/tenant/settings'
-      },
-      {
-        source: '/api/v1/env',
-        destination: 'http://127.0.0.1:3001/api/v1/admin/env'
-      },
-      {
-        source: '/api/v1/models',
-        destination: 'http://127.0.0.1:3001/api/v1/admin/models'
-      },
-      {
         source: '/api/v1/:path*',
-        destination: 'http://127.0.0.1:3001/api/v1/:path*'
-      }
-    ]
-  }
+        destination: `${gateway}/api/v1/:path*`,
+      },
+    ];
+  },
 }
 
 module.exports = nextConfig

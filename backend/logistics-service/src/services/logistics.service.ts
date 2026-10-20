@@ -24,13 +24,13 @@ export class LogisticsService {
     const take = Number(params.limit || 20);
 
     const [data, total] = await Promise.all([
-      this.prisma.tenantClient.trip.findMany({
+      this.prisma.getTenantDb().trip.findMany({
         skip,
         take,
         include: { driver: { include: { user: true } }, vehicle: true },
         orderBy: { tripCode: 'desc' },
       }),
-      this.prisma.tenantClient.trip.count(),
+      this.prisma.getTenantDb().trip.count(),
     ]);
 
     return {
@@ -45,7 +45,7 @@ export class LogisticsService {
   }
 
   async getUnassignedOrders() {
-    return this.prisma.tenantClient.order.findMany({
+    return this.prisma.getTenantDb().order.findMany({
       where: { status: 'PENDING', driverId: null },
       take: 50,
     });
@@ -56,12 +56,12 @@ export class LogisticsService {
     this.logger.log(` Báº¯t Ä‘áº§u táº¡o Job tá»‘i Æ°u lá»™ trĂ¬nh cho ${orderIds.length} Ä‘Æ¡n hĂ ng...`);
 
     // 1. Láº¥y thĂ´ng tin Ä‘Æ¡n hĂ ng
-    const orders = await this.prisma.tenantClient.order.findMany({
+    const orders = await this.prisma.getTenantDb().order.findMany({
       where: { id: { in: orderIds } },
     });
 
     // 2. Láº¥y thĂ´ng tin Ä‘á»™i xe
-    const vehicles = await this.prisma.tenantClient.vehicle.findMany({
+    const vehicles = await this.prisma.getTenantDb().vehicle.findMany({
       where: { status: 'ACTIVE' },
       take: 10,
     });
@@ -80,7 +80,7 @@ export class LogisticsService {
           lat = coords.lat;
           lng = coords.lng;
           // LÆ°u láº¡i tá»a Ä‘á»™ vĂ o DB Ä‘á»ƒ dĂ¹ng cho láº§n sau (Cache)
-          await this.prisma.tenantClient.order.update({
+          await this.prisma.getTenantDb().order.update({
             where: { id: o.id },
             data: { lat, lng }
           });
@@ -117,7 +117,7 @@ export class LogisticsService {
     });
 
     // 4. Táº¡o Job trong DB vá»›i tráº¡ng thĂ¡i PENDING
-    const job = await this.prisma.tenantClient.routeOptimizationJob.create({
+    const job = await this.prisma.getTenantDb().routeOptimizationJob.create({
         data: {
           status: 'PENDING',
           payload: JSON.stringify(payload),
@@ -141,7 +141,7 @@ export class LogisticsService {
     };
   }
   async startTrip(id: string) {
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const trip = await tx.trip.findUnique({ where: { id } });
       if (!trip) throw new NotFoundException(`Trip ${id} not found`);
       if (trip.status !== 'DISPATCHED') {
@@ -155,7 +155,7 @@ export class LogisticsService {
   }
 
   async completeTrip(id: string) {
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const trip = await tx.trip.findUnique({ where: { id } });
       if (!trip) throw new NotFoundException(`Trip ${id} not found`);
       if (trip.status !== 'IN_TRANSIT') {
@@ -177,20 +177,20 @@ export class LogisticsService {
       'COMPLETED': [],
       'CANCELLED': [],
     };
-    const trip = await this.prisma.tenantClient.trip.findUnique({ where: { id } });
+    const trip = await this.prisma.getTenantDb().trip.findUnique({ where: { id } });
     if (!trip) throw new NotFoundException(`Trip ${id} not found`);
     const allowed = allowedTransitions[trip.status] || [];
     if (!allowed.includes(status)) {
       throw new BadRequestException(`Cannot transition from ${trip.status} to ${status}. Allowed: ${allowed.join(', ') || 'none'}`);
     }
-    return this.prisma.tenantClient.trip.update({
+    return this.prisma.getTenantDb().trip.update({
       where: { id },
       data: { status },
     });
   }
 
   async dispatchTrip(id: string, driverId?: string, vehicleId?: string, targetStatus: string = 'DISPATCHED') {
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const trip = await tx.trip.findUnique({
         where: { id },
       });
@@ -257,7 +257,7 @@ export class LogisticsService {
   }
 
   async getRoutingJob(jobId: string) {
-    const job = await this.prisma.tenantClient.routeOptimizationJob.findUnique({
+    const job = await this.prisma.getTenantDb().routeOptimizationJob.findUnique({
       where: { id: jobId },
     });
 
@@ -269,7 +269,7 @@ export class LogisticsService {
   }
 
   async applyRoutingJob(jobId: string) {
-    const job = await this.prisma.tenantClient.routeOptimizationJob.findUnique({
+    const job = await this.prisma.getTenantDb().routeOptimizationJob.findUnique({
       where: { id: jobId },
     });
 
@@ -289,7 +289,7 @@ export class LogisticsService {
     this.logger.log(`đŸ› ï¸ Applying routing job ${jobId} with ${routes.length} routes...`);
 
     // DĂ¹ng transaction Ä‘á»ƒ Ä‘áº£m báº£o táº¡o Trips vĂ  Deliveries Ä‘á»“ng bá»™, khĂ´ng táº¡o ra data rĂ¡c náº¿u lá»—i giá»¯a chá»«ng
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       let createdTripsCount = 0;
 
       for (let i = 0; i < routes.length; i++) {
@@ -355,7 +355,7 @@ await tx.delivery.create({
   // --- Delivery & Driver Methods ---
 
   async completeDelivery(id: string, data: { codCollected: number, podUrl?: string, syncVersion: number }) {
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const delivery = await tx.delivery.findUnique({ where: { id } });
       if (!delivery) throw new NotFoundException(`Delivery ${id} not found`);
 
@@ -384,7 +384,7 @@ await tx.delivery.create({
       throw new BadRequestException(`Remittance amount (${data.amount}) does not match expected calculation (${data.totalCod} - ${data.expenses} = ${expectedAmount})`);
     }
 
-    return this.prisma.tenantClient.codRemittance.create({
+    return this.prisma.getTenantDb().codRemittance.create({
       data: {
         driverId: data.driverId,
         totalCodCollected: data.totalCod,
@@ -404,21 +404,21 @@ await tx.delivery.create({
     if (params.status) where.status = params.status;
 
     const [data, total] = await Promise.all([
-      this.prisma.tenantClient.codRemittance.findMany({
+      this.prisma.getTenantDb().codRemittance.findMany({
         where,
         skip,
         take,
         include: { driver: { include: { user: true } } },
         orderBy: { id: 'desc' },
       }),
-      this.prisma.tenantClient.codRemittance.count({ where }),
+      this.prisma.getTenantDb().codRemittance.count({ where }),
     ]);
 
     return { data, total, page: params.page, limit: take };
   }
 
   async updateRemittanceStatus(id: string, status: string) {
-    return this.prisma.tenantClient.codRemittance.update({
+    return this.prisma.getTenantDb().codRemittance.update({
       where: { id },
       data: { status }
     });
@@ -434,7 +434,7 @@ await tx.delivery.create({
     const aiApiKey = process.env.AI_API_KEY || '';
 
     // 1. Record in our DB for tracking
-    const localFeedback = await this.prisma.tenantClient.aiFeedback.create({
+    const localFeedback = await this.prisma.getTenantDb().aiFeedback.create({
       data: {
         modelId: body.modelId || 'demand-v1',
         resourceType: body.resourceType,
@@ -466,23 +466,23 @@ await tx.delivery.create({
     if (status) where.status = status;
 
     const [data, total] = await Promise.all([
-      this.prisma.tenantClient.sosAlert.findMany({
+      this.prisma.getTenantDb().sosAlert.findMany({
         where,
         include: { driver: { include: { user: true } }, trip: true },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.tenantClient.sosAlert.count({ where }),
+      this.prisma.getTenantDb().sosAlert.count({ where }),
     ]);
 
     return { data, total };
   }
 
   async resolveSos(id: string, status: string) {
-    const existing = await this.prisma.tenantClient.sosAlert.findUnique({ where: { id } });
+    const existing = await this.prisma.getTenantDb().sosAlert.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException(`SOS alert ${id} not found`);
     }
-    return this.prisma.tenantClient.sosAlert.update({
+    return this.prisma.getTenantDb().sosAlert.update({
       where: { id },
       data: { status },
     });
@@ -496,10 +496,10 @@ await tx.delivery.create({
     since.setDate(since.getDate() - days);
 
     const [total, completed, inTransit, cancelled] = await Promise.all([
-      this.prisma.tenantClient.trip.count({ where: { createdAt: { gte: since } } }),
-      this.prisma.tenantClient.trip.count({ where: { status: 'COMPLETED', createdAt: { gte: since } } }),
-      this.prisma.tenantClient.trip.count({ where: { status: 'IN_TRANSIT', createdAt: { gte: since } } }),
-      this.prisma.tenantClient.trip.count({ where: { status: 'CANCELLED', createdAt: { gte: since } } }),
+      this.prisma.getTenantDb().trip.count({ where: { createdAt: { gte: since } } }),
+      this.prisma.getTenantDb().trip.count({ where: { status: 'COMPLETED', createdAt: { gte: since } } }),
+      this.prisma.getTenantDb().trip.count({ where: { status: 'IN_TRANSIT', createdAt: { gte: since } } }),
+      this.prisma.getTenantDb().trip.count({ where: { status: 'CANCELLED', createdAt: { gte: since } } }),
     ]);
 
     return {
@@ -517,11 +517,11 @@ await tx.delivery.create({
     since.setDate(since.getDate() - days);
 
     const [totalDrivers, activeDrivers, totalVehicles, activeVehicles, trips] = await Promise.all([
-      this.prisma.tenantClient.driver.count(),
-      this.prisma.tenantClient.driver.count({ where: { status: { in: ['ACTIVE', 'ONLINE' ] } } }),
-      this.prisma.tenantClient.vehicle.count(),
-      this.prisma.tenantClient.vehicle.count({ where: { status: 'ACTIVE' } }),
-      this.prisma.tenantClient.trip.findMany({
+      this.prisma.getTenantDb().driver.count(),
+      this.prisma.getTenantDb().driver.count({ where: { status: { in: ['ACTIVE', 'ONLINE' ] } } }),
+      this.prisma.getTenantDb().vehicle.count(),
+      this.prisma.getTenantDb().vehicle.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.getTenantDb().trip.findMany({
         where: { createdAt: { gte: since } },
         select: { actualDistanceKm: true, totalWeightKg: true },
       }),
@@ -544,24 +544,24 @@ await tx.delivery.create({
   async listAiModels(type?: string) {
     const where: any = {};
     if (type) where.type = type;
-    return this.prisma.tenantClient.aiModel.findMany({
+    return this.prisma.getTenantDb().aiModel.findMany({
       where,
       orderBy: { trainedAt: 'desc' },
     });
   }
 
   async createAiModel(data: any) {
-    const existingCurrent = await this.prisma.tenantClient.aiModel.findFirst({
+    const existingCurrent = await this.prisma.getTenantDb().aiModel.findFirst({
       where: { isCurrent: true, type: data.type },
     });
     if (existingCurrent) {
-      await this.prisma.tenantClient.aiModel.update({
+      await this.prisma.getTenantDb().aiModel.update({
         where: { id: existingCurrent.id },
         data: { isCurrent: false },
       });
     }
 
-    return this.prisma.tenantClient.aiModel.create({
+    return this.prisma.getTenantDb().aiModel.create({
       data: {
         name: data.name,
         version: data.version,
@@ -575,14 +575,14 @@ await tx.delivery.create({
   }
 
   async updateAiModel(id: string, body: any) {
-    return this.prisma.tenantClient.aiModel.update({
+    return this.prisma.getTenantDb().aiModel.update({
       where: { id },
       data: body,
     });
   }
 
   async createAiFeedback(body: any) {
-    return this.prisma.tenantClient.aiFeedback.create({
+    return this.prisma.getTenantDb().aiFeedback.create({
       data: {
         modelId: body.modelId || 'demand-v1',
         resourceType: body.resourceType,
@@ -599,18 +599,18 @@ await tx.delivery.create({
     if (params.modelId) where.modelId = params.modelId;
     if (typeof params.isUsedForTrain === 'boolean') where.isUsedForTrain = params.isUsedForTrain;
 
-    return this.prisma.tenantClient.aiFeedback.findMany({
+    return this.prisma.getTenantDb().aiFeedback.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async markFeedbackAsUsed(id: string) {
-    const existing = await this.prisma.tenantClient.aiFeedback.findUnique({ where: { id } });
+    const existing = await this.prisma.getTenantDb().aiFeedback.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException(`AI feedback ${id} not found`);
     }
-    return this.prisma.tenantClient.aiFeedback.update({
+    return this.prisma.getTenantDb().aiFeedback.update({
       where: { id },
       data: { isUsedForTrain: true },
     });
@@ -625,7 +625,7 @@ await tx.delivery.create({
       const transactionDate = entry.transactionDate;
 
       // Try to match with existing COD remittance by driver + amount
-      const matchedRemittance = await this.prisma.tenantClient.codRemittance.findFirst({
+      const matchedRemittance = await this.prisma.getTenantDb().codRemittance.findFirst({
         where: {
           amountRemitted: { equals: amount as any },
           createdAt: { gte: new Date(transactionDate) },
@@ -634,7 +634,7 @@ await tx.delivery.create({
 
       if (matchedRemittance) {
         results.push({ reference, matched: true, remittanceId: matchedRemittance.id });
-        await this.prisma.tenantClient.codRemittance.update({
+        await this.prisma.getTenantDb().codRemittance.update({
           where: { id: matchedRemittance.id },
           data: { status: 'RECONCILED' },
         });
@@ -647,7 +647,7 @@ await tx.delivery.create({
   }
 
   async getDriverExpenses(driverId: string) {
-    return this.prisma.tenantClient.driverExpense.findMany({
+    return this.prisma.getTenantDb().driverExpense.findMany({
       where: { driverId },
       orderBy: { createdAt: 'desc' },
       include: { driver: { include: { user: true } } },

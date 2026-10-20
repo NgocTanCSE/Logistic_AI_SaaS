@@ -43,7 +43,7 @@ async function bootstrap() {
       'http://localhost:7863',
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-User-Id', 'X-Request-Id', 'x-tenant-slug', 'x-ai-api-key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Id', 'X-User-Id', 'X-Request-Id', 'x-tenant-slug', 'x-portal', 'x-api-key', 'x-ai-api-key'],
     credentials: true,
   });
 

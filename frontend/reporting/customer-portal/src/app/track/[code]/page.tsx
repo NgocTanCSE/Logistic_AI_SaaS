@@ -1,4 +1,5 @@
 'use client';
+import { use } from 'react';
 import useSWR from 'swr';
 import api from '@/lib/api';
 import { Card } from '@/components/ui-new/Card';
@@ -9,9 +10,10 @@ const fetcher = async (url: string) => {
   return res.data;
 };
 
-export default function TrackPage({ params }: { params: { code: string } }) {
-  const { data: order, error, isLoading } = useSWR(`/public/track/${params.code}`, fetcher);
-  const { data: verifyData } = useSWR(order ? `/public/verify/${params.code}` : null, fetcher);
+export default function TrackPage({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = use(params);
+  const { data: order, error, isLoading } = useSWR(`/public/track/${code}`, fetcher);
+  const { data: verifyData } = useSWR(order ? `/public/verify/${code}` : null, fetcher);
 
   const events = order?.events || [];
 
@@ -31,7 +33,7 @@ export default function TrackPage({ params }: { params: { code: string } }) {
           </svg>
         </div>
         <h2 className="text-xl font-bold text-white mb-2">Tracking Not Found</h2>
-        <p className="text-sm text-zinc-400">No shipment matches code <span className="font-mono text-primary">{params.code}</span>. Please verify your tracking number.</p>
+        <p className="text-sm text-zinc-400">No shipment matches code <span className="font-mono text-primary">{code}</span>. Please verify your tracking number.</p>
       </div>
     </div>
   );
@@ -57,7 +59,7 @@ export default function TrackPage({ params }: { params: { code: string } }) {
 
              <div>
                 <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.3em] mb-2">Tracking Identifier</p>
-                <h1 className="text-4xl font-black text-white tracking-tighter font-mono">{params.code}</h1>
+                <h1 className="text-4xl font-black text-white tracking-tighter font-mono">{code}</h1>
              </div>
 
              <div className="mt-10 grid grid-cols-2 gap-8 border-t border-slate-200 pt-8">

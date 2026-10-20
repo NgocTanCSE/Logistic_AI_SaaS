@@ -13,6 +13,7 @@ type Order = {
   codAmount: number;
   shippingFee?: number;
   createdAt: string;
+  client?: { name?: string };
 };
 
 const STATUS_COLORS: Record<string, string> = {

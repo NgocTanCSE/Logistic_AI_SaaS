@@ -13,7 +13,7 @@ export class PublicTrackingController {
   @Get("track/:trackingCode")
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async track(@Param("trackingCode") trackingCode: string) {
-    const order = await this.prisma.tenantClient.order.findUnique({
+    const order = await this.prisma.getTenantDb().order.findUnique({
       where: { trackingCode },
       include: { events: { orderBy: { timestamp: "desc" } } }
     });
@@ -33,7 +33,7 @@ export class PublicTrackingController {
 
   @Get("verify/:trackingCode")
   async verify(@Param("trackingCode") trackingCode: string) {
-    const order = await this.prisma.tenantClient.order.findUnique({
+    const order = await this.prisma.getTenantDb().order.findUnique({
       where: { trackingCode },
     });
 
@@ -41,7 +41,7 @@ export class PublicTrackingController {
       throw new NotFoundException("Order not found");
     }
 
-    const deliveries = await this.prisma.tenantClient.delivery.findMany({
+    const deliveries = await this.prisma.getTenantDb().delivery.findMany({
       where: { orderId: order.id },
       orderBy: { syncVersion: "desc" },
       take: 1
@@ -71,7 +71,7 @@ export class TrackingController {
   @Get(":trackingCode")
   @Throttle({ default: { limit: 20, ttl: 60000 } })
   async track(@Param("trackingCode") trackingCode: string) {
-    const order = await this.prisma.tenantClient.order.findUnique({
+    const order = await this.prisma.getTenantDb().order.findUnique({
       where: { trackingCode },
       include: { events: { orderBy: { timestamp: "desc" } } }
     });

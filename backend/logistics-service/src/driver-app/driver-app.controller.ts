@@ -17,7 +17,7 @@ export class DriverAppController {
   @Get("profile")
   @RequirePermissions(Permissions.TripsRead)
   async getProfile(@Request() req: any) {
-    const driver = await this.prisma.tenantClient.driver.findUnique({
+    const driver = await this.prisma.getTenantDb().driver.findUnique({
       where: { userId: req.user?.sub },
       include: { user: { select: { id: true, email: true, fullName: true, phone: true } } },
     })
@@ -37,7 +37,7 @@ export class DriverAppController {
   @Post("deliveries/:id/check-in")
   @RequirePermissions(Permissions.MobileUploads)
   async checkIn(@Param("id") id: string, @Body() body: { lat: number, lng: number }) {
-    return this.prisma.tenantClient.delivery.update({
+    return this.prisma.getTenantDb().delivery.update({
       where: { id },
       data: {
         checkinLat: body.lat,
@@ -56,10 +56,10 @@ export class DriverAppController {
   @Post("expenses")
   @RequirePermissions(Permissions.MobileUploads)
   async reportExpense(@Body() body: any, @Request() req: any) {
-    const driver = await this.prisma.tenantClient.driver.findUnique({ where: { userId: req.user?.sub } });
+    const driver = await this.prisma.getTenantDb().driver.findUnique({ where: { userId: req.user?.sub } });
     if (!driver) throw new NotFoundException("Driver not found");
 
-    return this.prisma.tenantClient.driverExpense.create({
+    return this.prisma.getTenantDb().driverExpense.create({
       data: {
         driverId: driver.id,
         tripId: body.tripId,
@@ -73,10 +73,10 @@ export class DriverAppController {
   @Post("sos")
   @RequirePermissions(Permissions.MobileSos)
   async triggerSos(@Body() body: any, @Request() req: any) {
-    const driver = await this.prisma.tenantClient.driver.findUnique({ where: { userId: req.user?.sub } });
+    const driver = await this.prisma.getTenantDb().driver.findUnique({ where: { userId: req.user?.sub } });
     if (!driver) throw new NotFoundException("Driver not found");
 
-    return this.prisma.tenantClient.sosAlert.create({
+    return this.prisma.getTenantDb().sosAlert.create({
       data: {
         driverId: driver.id,
         tripId: body.tripId,
@@ -88,7 +88,7 @@ export class DriverAppController {
   @Post("remittance")
   @RequirePermissions(Permissions.MobileUploads)
   async createRemittance(@Body() body: any, @Request() req: any) {
-    const driver = await this.prisma.tenantClient.driver.findUnique({ where: { userId: req.user?.sub } });
+    const driver = await this.prisma.getTenantDb().driver.findUnique({ where: { userId: req.user?.sub } });
     if (!driver) throw new NotFoundException("Driver not found");
 
     return this.logisticsService.createRemittance({

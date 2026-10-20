@@ -7,21 +7,21 @@ export class WavesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async generateWave(warehouseId: string, orderIds: string[], strategy: AllocationStrategy = AllocationStrategy.FIFO) {
-    let warehouse = await this.prisma.tenantClient.warehouse.findUnique({ where: { id: warehouseId } });
+    let warehouse = await this.prisma.getTenantDb().warehouse.findUnique({ where: { id: warehouseId } });
     if (!warehouse) {
-      warehouse = await this.prisma.tenantClient.warehouse.findFirst();
+      warehouse = await this.prisma.getTenantDb().warehouse.findFirst();
       if (!warehouse) throw new BadRequestException("No warehouses available.");
       warehouseId = warehouse.id;
     }
 
     if (!orderIds || orderIds.length === 0) {
-      const orders = await this.prisma.tenantClient.order.findMany({ where: { status: 'PENDING' }, take: 10 });
+      const orders = await this.prisma.getTenantDb().order.findMany({ where: { status: 'PENDING' }, take: 10 });
       orderIds = orders.map((o: any) => o.id);
     }
     if (orderIds.length === 0) {
       throw new BadRequestException("No pending orders available to generate wave.");
     }
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const wave = await tx.wavePicking.create({
         data: {
           warehouseId,
@@ -102,7 +102,7 @@ export class WavesService {
   }
 
   async listWaves() {
-    return this.prisma.tenantClient.wavePicking.findMany({
+    return this.prisma.getTenantDb().wavePicking.findMany({
       include: { tasks: true },
       orderBy: { createdAt: 'desc' },
     });

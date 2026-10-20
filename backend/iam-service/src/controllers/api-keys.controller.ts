@@ -26,7 +26,7 @@ export class ApiKeysController {
   @RequirePermissions(Permissions.ApiKeysManage)
   async list(@Request() req: any) {
     const tenantId = req.tenantId ?? req.user?.tenant_id;
-    const keys = await this.prisma.tenantClient.tenantApiKey.findMany({
+    const keys = await this.prisma.getTenantDb().tenantApiKey.findMany({
       where: { tenantId },
       select: {
         id: true,
@@ -56,7 +56,7 @@ export class ApiKeysController {
     const rawKey = crypto.randomBytes(32).toString('hex');
     const keyHash = await bcrypt.hash(rawKey, 10);
 
-    await this.prisma.tenantClient.tenantApiKey.create({
+    await this.prisma.getTenantDb().tenantApiKey.create({
       data: {
         tenantId,
         keyHash,
@@ -73,13 +73,13 @@ export class ApiKeysController {
   @RequirePermissions(Permissions.ApiKeysManage)
   async revoke(@Request() req: any, @Param('id') id: string) {
     const tenantId = req.tenantId ?? req.user?.tenant_id;
-    const existing = await this.prisma.tenantClient.tenantApiKey.findUnique({
+    const existing = await this.prisma.getTenantDb().tenantApiKey.findUnique({
       where: { id },
     });
     if (!existing || existing.tenantId !== tenantId) {
       throw new NotFoundException('API key not found');
     }
-    await this.prisma.tenantClient.tenantApiKey.update({
+    await this.prisma.getTenantDb().tenantApiKey.update({
       where: { id },
       data: { revokedAt: new Date() },
     });

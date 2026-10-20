@@ -28,7 +28,7 @@ export async function seedRoles(prisma: PrismaClient) {
   const rolePermissionMap: Record<string, string[]> = {
     'WAREHOUSE_STAFF': ['inventory:read', 'tasks:read', 'tasks:update', 'mobile:sync:pull', 'mobile:sync:push', 'pack-station:scan'],
     'DRIVER': ['trips:read', 'mobile:sync:pull', 'mobile:sync:push', 'mobile:uploads', 'mobile:gps:batch', 'mobile:sos'],
-    'CUSTOMER_CLIENT': ['orders:read', 'orders:create', 'inventory:read', 'notifications:read', 'returns:read', 'returns:create'],
+    'CUSTOMER_CLIENT': ['orders:read', 'orders:create', 'inventory:read', 'notifications:read', 'returns:read', 'returns:create', 'billing:read'],
     'TENANT_USER': ['inventory:read', 'orders:read', 'tasks:read', 'trips:read'],
   };
 

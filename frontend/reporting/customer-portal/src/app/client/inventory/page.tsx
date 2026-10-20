@@ -43,8 +43,8 @@ const fetchInventory = async () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white">Inventory</h1>
-          <p className="text-zinc-400 mt-1">Real-time visibility into your stock levels</p>
+          <h1 className="text-3xl font-bold text-ink">Inventory</h1>
+          <p className="text-ink-soft mt-1">Real-time visibility into your stock levels</p>
         </div>
       </div>
 
@@ -55,8 +55,8 @@ const fetchInventory = async () => {
             <Box className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm text-zinc-400">Total SKUs</p>
-            <p className="text-2xl font-bold text-white">{totalSKUs || '—'}</p>
+            <p className="text-sm text-ink-soft">Total SKUs</p>
+            <p className="text-2xl font-bold text-ink">{totalSKUs || '—'}</p>
           </div>
         </div>
         <div className="bg-white border border-slate-200 p-6 rounded-2xl flex items-center gap-4">
@@ -65,8 +65,8 @@ const fetchInventory = async () => {
             <Box className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm text-zinc-400">In Stock</p>
-            <p className="text-2xl font-bold text-white">{inStock || '—'}</p>
+            <p className="text-sm text-ink-soft">In Stock</p>
+            <p className="text-2xl font-bold text-ink">{inStock || '—'}</p>
           </div>
         </div>
         <div className="bg-white border border-slate-200 p-6 rounded-2xl flex items-center gap-4">
@@ -75,8 +75,8 @@ const fetchInventory = async () => {
             <Box className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm text-zinc-400">Reserved for Orders</p>
-            <p className="text-2xl font-bold text-white">{reserved || '—'}</p>
+            <p className="text-sm text-ink-soft">Reserved for Orders</p>
+            <p className="text-2xl font-bold text-ink">{reserved || '—'}</p>
           </div>
         </div>
       </div>
@@ -84,19 +84,19 @@ const fetchInventory = async () => {
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="p-4 border-b border-slate-200 flex justify-between items-center">
           <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-soft" />
             <input 
               type="text" 
               placeholder="Search by SKU or name..." 
-              className="w-full bg-white border border-slate-200 rounded-lg py-2 pl-9 pr-4 text-sm text-white focus:outline-none focus:border-primary/50"
+              className="w-full bg-white border border-slate-200 rounded-lg py-2 pl-9 pr-4 text-sm text-ink focus:outline-none focus:border-primary/50"
             />
           </div>
         </div>
 
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg text-sm flex items-center justify-between">
+          <div className="p-4 bg-red-500/10 border border-red-500/20 text-red-600 rounded-lg text-sm flex items-center justify-between">
             <span>{error}</span>
-            <button onClick={fetchInventory} className="text-xs text-red-400 hover:text-red-300 underline ml-2">
+            <button onClick={fetchInventory} className="text-xs text-red-600 hover:text-red-300 underline ml-2">
               Try again
             </button>
           </div>
@@ -107,12 +107,12 @@ const fetchInventory = async () => {
           </div>
         ) : inventory.length === 0 && !error ? (
           <div className="p-12 text-center">
-            <Box className="w-8 h-8 text-zinc-600 mx-auto mb-3" />
-            <p className="text-zinc-500">No inventory data found</p>
+            <Box className="w-8 h-8 text-ink-soft mx-auto mb-3" />
+            <p className="text-ink-soft">No inventory data found</p>
           </div>
         ) : (
-          <table className="w-full text-left text-sm text-zinc-400">
-            <thead className="bg-white text-xs uppercase text-zinc-500">
+          <table className="w-full text-left text-sm text-ink-soft">
+            <thead className="bg-white text-xs uppercase text-ink-soft">
               <tr>
                 <th className="px-6 py-4 font-medium">SKU</th>
                 <th className="px-6 py-4 font-medium">Product Name</th>
@@ -121,18 +121,18 @@ const fetchInventory = async () => {
                 <th className="px-6 py-4 font-medium">Warehouse Location</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-border">
               {inventory.map((item, i) => (
                 <tr 
                   key={item.id}
-                  className="hover:bg-white transition-colors group cursor-pointer"
+                  className="hover:bg-surface-alt transition-colors group cursor-pointer"
                 >
-                  <td className="px-6 py-4 font-mono text-white group-hover:text-primary transition-colors">
+                  <td className="px-6 py-4 font-mono text-ink group-hover:text-primary transition-colors">
                     {item.sku}
                   </td>
-                  <td className="px-6 py-4 font-medium text-white">{item.name}</td>
+                  <td className="px-6 py-4 font-medium text-ink">{item.name}</td>
                   <td className="px-6 py-4 text-right">
-                    <span className={item.quantity < 10 ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
+                    <span className={item.quantity < 10 ? "text-red-600 font-bold" : "text-emerald-600 font-bold"}>
                       {item.quantity}
                     </span>
                   </td>

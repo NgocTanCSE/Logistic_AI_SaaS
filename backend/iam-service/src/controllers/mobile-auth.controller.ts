@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Headers } from "@nestjs/common";
+import { Body, Controller, Post, Headers, UnauthorizedException, BadRequestException, HttpException } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { LoginResponse } from "../shared-types";
 import { LoginRequestDto } from "../dtos/login.dto";
@@ -18,17 +18,20 @@ export class MobileAuthController {
     @Headers("x-tenant-slug") tenantSlug: string
   ): Promise<LoginResponse> {
     if (!tenantSlug) {
-      return { ok: false, message: "Missing x-tenant-slug header" };
+      throw new BadRequestException("Missing x-tenant-slug header");
     }
 
     try {
-      const result = await this.authService.loginTenantUser(tenantSlug, body.email, body.password);
+      const result = await this.authService.loginTenantUser(tenantSlug, body.email, body.password, "mobile");
       return {
         ok: true,
         accessToken: result.access_token,
-      };
+        refreshToken: result.refresh_token,
+        role: result.role,
+      } as any;
     } catch (error: any) {
-      return { ok: false, message: error.message || "Invalid credentials" };
+      if (error instanceof HttpException) throw error;
+      throw new UnauthorizedException(error.message || "Invalid credentials");
     }
   }
 
@@ -38,18 +41,20 @@ export class MobileAuthController {
     @Headers("x-tenant-slug") tenantSlug: string
   ): Promise<any> {
     if (!tenantSlug) {
-      return { ok: false, message: "Missing x-tenant-slug header" };
+      throw new BadRequestException("Missing x-tenant-slug header");
     }
 
     try {
-      const result = await this.authService.verifyGoogleToken(tenantSlug, body.credential);
+      const result = await this.authService.loginTenantUserWithGoogle(tenantSlug, body.credential, "mobile");
       return {
         ok: true,
         accessToken: result.access_token,
         refreshToken: result.refresh_token,
+        role: result.role,
       };
     } catch (error: any) {
-      return { ok: false, message: error.message || "Google authentication failed" };
+      if (error instanceof HttpException) throw error;
+      throw new UnauthorizedException(error.message || "Google authentication failed");
     }
   }
 

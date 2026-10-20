@@ -13,7 +13,7 @@ export class BranchesController {
   @Get()
   @RequirePermissions(Permissions.WarehousesManage)
   async list() {
-    return this.prisma.tenantClient.branch.findMany({
+    return this.prisma.getTenantDb().branch.findMany({
       orderBy: { name: 'asc' },
     });
   }
@@ -21,7 +21,7 @@ export class BranchesController {
   @Get(":id")
   @RequirePermissions(Permissions.WarehousesManage)
   async detail(@Param("id") id: string) {
-    return this.prisma.tenantClient.branch.findUnique({
+    return this.prisma.getTenantDb().branch.findUnique({
       where: { id },
       include: { manager: true },
     });
@@ -40,7 +40,7 @@ export class BranchesController {
     managerId?: string,
     status?: string
   }) {
-    return this.prisma.tenantClient.branch.create({
+    return this.prisma.getTenantDb().branch.create({
       data: {
         type: body.type,
         code: body.code,
@@ -59,7 +59,7 @@ export class BranchesController {
   @RequirePermissions(Permissions.WarehousesManage)
   async update(@Param("id") id: string, @Body() body: any) {
     try {
-      return await this.prisma.tenantClient.branch.update({
+      return await this.prisma.getTenantDb().branch.update({
         where: { id },
         data: body,
       });
@@ -75,7 +75,7 @@ export class BranchesController {
   @RequirePermissions(Permissions.WarehousesManage)
   async remove(@Param("id") id: string) {
     try {
-      return await this.prisma.tenantClient.branch.update({
+      return await this.prisma.getTenantDb().branch.update({
         where: { id },
         data: { status: "DELETED" },
       });

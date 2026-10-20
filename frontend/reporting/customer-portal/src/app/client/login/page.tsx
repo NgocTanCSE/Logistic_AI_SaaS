@@ -30,7 +30,7 @@ export default function B2BLogin() {
     setError('');
     try {
       const res = await api.post('/client/auth/login', { email, password }, {
-        headers: { 'x-tenant-slug': slug },
+        headers: { 'x-tenant-slug': slug, 'x-portal': 'customer' },
       });
       if (res.data?.accessToken) {
         login(res.data.accessToken);
@@ -108,17 +108,25 @@ export default function B2BLogin() {
           </button>
         </form>
 
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-200"></div>
+        <div className="space-y-3">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-slate-200"></div>
+            </div>
+            <div className="relative flex justify-center text-xs text-slate-400">
+              <span className="bg-white px-2">Or continue with Google</span>
+            </div>
           </div>
-          <div className="relative flex justify-center text-xs text-slate-400">
-            <span className="bg-white px-2">Or continue with Google</span>
+
+          <div className={slug.trim() ? '' : 'pointer-events-none opacity-50'}>
+            <GoogleLoginButton tenantSlug={slug.trim()} onError={setError} />
           </div>
+          {!slug.trim() && (
+            <p className="text-center text-xs text-slate-400">
+              Enter your workspace slug first to enable Google sign-in.
+            </p>
+          )}
         </div>
-        {slug && (
-          <GoogleLoginButton tenantSlug={slug} />
-        )}
 
         <div className="text-center text-sm text-slate-500">
           <Link href="/client/forgot-password" className="text-slate-600 hover:text-primary transition-colors">

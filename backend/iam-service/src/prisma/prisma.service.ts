@@ -54,8 +54,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const store = schemaContext.getStore();
     return store?.schemaName || 'public';
   }
-
-  public get tenantClient(): any {
+  /**
+   * Returns a Prisma client scoped to the current tenant schema.
+   *
+   * Keep this as a METHOD. Prisma Client wraps the instance in a proxy and
+   * intercepts prototype getters (the old "tenantClient" getter returned an
+   * extended client without model delegates, so every query failed).
+   */
+  public getTenantDb(): any {
     if (PrismaService.isSqlite) {
       this.logger.log(`tenantClient: returning extended self (SQLite mode)`);
       return (this as any).$extends({});

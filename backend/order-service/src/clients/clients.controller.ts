@@ -14,7 +14,7 @@ export class ClientsController {
   @RequirePermissions(Permissions.ClientsManage)
   async createClient(@Body() body: { name: string }) {
     try {
-      return await this.prisma.tenantClient.client.create({ data: { name: body.name } });
+      return await this.prisma.getTenantDb().client.create({ data: { name: body.name } });
     } catch (error) {
       throw new InternalServerErrorException("Failed to create client");
     }
@@ -24,7 +24,7 @@ export class ClientsController {
   @RequirePermissions(Permissions.ClientsManage)
   async createClientUser(@Param("id") id: string, @Body() body: { email: string, fullName: string }) {
     try {
-      return await this.prisma.tenantClient.clientUser.create({ data: { clientId: id, ...body } });
+      return await this.prisma.getTenantDb().clientUser.create({ data: { clientId: id, ...body } });
     } catch (error) {
       throw new InternalServerErrorException("Failed to create client user");
     }
@@ -34,7 +34,7 @@ export class ClientsController {
   @RequirePermissions(Permissions.ClientsManage)
   async listClients() {
     try {
-      return await this.prisma.tenantClient.client.findMany({ include: { users: true } });
+      return await this.prisma.getTenantDb().client.findMany({ include: { users: true } });
     } catch (error) {
       throw new InternalServerErrorException("Failed to fetch clients");
     }

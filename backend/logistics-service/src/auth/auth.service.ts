@@ -44,7 +44,7 @@ export class AuthService {
 
     if (!tenant) throw new UnauthorizedException('Tenant not found');
 
-    const tenantClient = this.prisma.tenantClient;
+    const tenantClient = this.prisma.getTenantDb();
 
     const user = await tenantClient.tenantUser.findUnique({
       where: { email },

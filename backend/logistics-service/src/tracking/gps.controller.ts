@@ -27,7 +27,7 @@ export class GpsController {
   @Get("active-fleet")
   @RequirePermissions(Permissions.TripsRead)
   async getActiveFleet(@Query("status") status: string) {
-    const drivers = await this.prisma.tenantClient.driver.findMany({
+    const drivers = await this.prisma.getTenantDb().driver.findMany({
       where: status ? { status } : { status: { not: "OFFLINE" } },
       include: {
         user: { select: { id: true, fullName: true } },
@@ -58,13 +58,13 @@ export class GpsController {
       throw new BadRequestException("logs array is required and cannot be empty");
     }
 
-    const driver = await this.prisma.tenantClient.driver.findUnique({ where: { userId } });
+    const driver = await this.prisma.getTenantDb().driver.findUnique({ where: { userId } });
     if (!driver) throw new BadRequestException("Driver not found for user");
 
     const driverId = driver.id;
 
     const inserts = body.logs.map(log => {
-      return this.prisma.tenantClient.gpsTrackingLog.create({
+      return this.prisma.getTenantDb().gpsTrackingLog.create({
         data: {
           driverId,
           lat: log.lat,
@@ -77,7 +77,7 @@ export class GpsController {
       });
     });
 
-    await this.prisma.tenantClient.$transaction(inserts);
+    await this.prisma.getTenantDb().$transaction(inserts);
 
     const latestLog = body.logs[body.logs.length - 1];
     if (latestLog) {

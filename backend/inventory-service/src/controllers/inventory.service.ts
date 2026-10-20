@@ -1,9 +1,33 @@
-﻿import { Injectable, ConflictException } from "@nestjs/common";
+﻿import { Injectable, ConflictException, BadRequestException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 
 @Injectable()
 export class InventoryService {
   constructor(private readonly prisma: PrismaService) {}
+
+  async getSummary() {
+    const db = this.prisma.getTenantDb();
+
+    const [totalSkus, inventoryRecords, warehouses, inStockGroups] = await Promise.all([
+      db.product.count({ where: { deletedAt: null } }),
+      db.inventory.count(),
+      db.warehouse.count({ where: { deletedAt: null } }),
+      db.inventory.findMany({
+        where: { quantityOnHand: { gt: 0 } },
+        select: { productId: true },
+        distinct: ['productId'],
+      }),
+    ]);
+
+    const inStockSkus = new Set(inStockGroups.map((row: any) => row.productId)).size;
+
+    return {
+      totalSkus,
+      outOfStockSkus: Math.max(0, totalSkus - inStockSkus),
+      inventoryRecords,
+      warehouses,
+    };
+  }
 
   async getLedger(params: { warehouseId?: string, productId?: string, page?: number, limit?: number }) {
     const skip = (Number(params.page || 1) - 1) * Number(params.limit || 20);
@@ -16,7 +40,7 @@ export class InventoryService {
     }
 
     const [data, total] = await Promise.all([
-      this.prisma.tenantClient.stockMovement.findMany({
+      this.prisma.getTenantDb().stockMovement.findMany({
         where,
         skip,
         take,
@@ -26,7 +50,7 @@ export class InventoryService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.tenantClient.stockMovement.count({ where }),
+      this.prisma.getTenantDb().stockMovement.count({ where }),
     ]);
 
     return {
@@ -41,7 +65,7 @@ export class InventoryService {
   }
 
   async adjustStock(inventoryId: string, qtyChange: number, reason: string, actorId: string) {
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       // 1. Get current inventory
       const inv = await tx.inventory.findUnique({ where: { id: inventoryId } });
       if (!inv) throw new ConflictException("Inventory not found");
@@ -94,7 +118,7 @@ export class InventoryService {
   async receiveStock(data: { warehouseId: string, binId: string, productId: string, batchNumber?: string, lpn?: string, quantity: number, reason: string }, actorId: string) {
     if (data.quantity <= 0) throw new ConflictException("Receive quantity must be > 0");
 
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       // Find existing inventory
       let inv = await tx.inventory.findFirst({
         where: {
@@ -153,7 +177,7 @@ export class InventoryService {
   async transferStock(data: { sourceInventoryId: string, targetBinId: string, quantity: number, reason: string }, actorId: string) {
     if (data.quantity <= 0) throw new ConflictException("Transfer quantity must be > 0");
 
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       // 1. Source Inventory
       const sourceInv = await tx.inventory.findUnique({ where: { id: data.sourceInventoryId } });
       if (!sourceInv) throw new Error("Source inventory not found");
@@ -244,13 +268,13 @@ export class InventoryService {
     const take = Number(params.limit || 20);
 
     const [data, total] = await Promise.all([
-      this.prisma.tenantClient.adjustment.findMany({
+      this.prisma.getTenantDb().adjustment.findMany({
         skip,
         take,
         include: { inventory: { include: { product: true } }, creator: true },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.tenantClient.adjustment.count(),
+      this.prisma.getTenantDb().adjustment.count(),
     ]);
 
     return {
@@ -267,7 +291,7 @@ export class InventoryService {
   // --- Cycle Count Methods ---
 
   async createCycleCount(data: { warehouseId: string, scheduledAt?: Date, actorId: string }) {
-    return this.prisma.tenantClient.cycleCount.create({
+    return this.prisma.getTenantDb().cycleCount.create({
       data: {
         warehouseId: data.warehouseId,
         scheduledAt: data.scheduledAt,
@@ -282,14 +306,14 @@ export class InventoryService {
     const take = Number(params.limit || 20);
 
     const [data, total] = await Promise.all([
-      this.prisma.tenantClient.cycleCount.findMany({
+      this.prisma.getTenantDb().cycleCount.findMany({
         where: { warehouseId },
         skip,
         take,
         include: { creator: true },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.tenantClient.cycleCount.count({ where: { warehouseId } }),
+      this.prisma.getTenantDb().cycleCount.count({ where: { warehouseId } }),
     ]);
 
     return {
@@ -304,7 +328,7 @@ export class InventoryService {
   }
 
   async updateCycleCountStatus(id: string, status: string) {
-    return this.prisma.tenantClient.cycleCount.update({
+    return this.prisma.getTenantDb().cycleCount.update({
       where: { id },
       data: { status }
     });
@@ -314,11 +338,11 @@ export class InventoryService {
 
   async startShift(warehouseId: string, staffId: string) {
     if (!warehouseId) {
-      const wh = await this.prisma.tenantClient.warehouse.findFirst();
+      const wh = await this.prisma.getTenantDb().warehouse.findFirst();
       if (!wh) throw new Error("No warehouse available");
       warehouseId = wh.id;
     }
-    return this.prisma.tenantClient.staffShift.create({
+    return this.prisma.getTenantDb().staffShift.create({
       data: {
         warehouseId,
         staffId,
@@ -329,7 +353,7 @@ export class InventoryService {
   }
 
   async endShift(shiftId: string) {
-    return this.prisma.tenantClient.staffShift.update({
+    return this.prisma.getTenantDb().staffShift.update({
       where: { id: shiftId },
       data: {
         shiftEnd: new Date(),
@@ -340,11 +364,11 @@ export class InventoryService {
 
   async checkoutEquipment(warehouseId: string, equipmentCode: string, staffId: string) {
     if (!warehouseId) {
-      const wh = await this.prisma.tenantClient.warehouse.findFirst();
+      const wh = await this.prisma.getTenantDb().warehouse.findFirst();
       if (!wh) throw new Error("No warehouse available");
       warehouseId = wh.id;
     }
-    return this.prisma.tenantClient.equipmentCheckout.create({
+    return this.prisma.getTenantDb().equipmentCheckout.create({
       data: {
         warehouseId,
         equipmentCode,
@@ -356,7 +380,7 @@ export class InventoryService {
   }
 
   async returnEquipment(checkoutId: string) {
-    return this.prisma.tenantClient.equipmentCheckout.update({
+    return this.prisma.getTenantDb().equipmentCheckout.update({
       where: { id: checkoutId },
       data: {
         returnedAt: new Date(),
@@ -366,28 +390,83 @@ export class InventoryService {
   }
 
   async getEquipmentLogs() {
-    return this.prisma.tenantClient.equipmentCheckout.findMany({
+    return this.prisma.getTenantDb().equipmentCheckout.findMany({
       orderBy: { checkedOutAt: 'desc' },
       take: 50
     });
   }
 
-  async createPackLog(data: { warehouseId: string, orderId?: string, weightGrams?: number, dimensionCm?: string, deviceId?: string }) {
-    return this.prisma.tenantClient.packStationLog.create({
+  async createPackLog(data: {
+    barcode?: string;
+    warehouseId?: string;
+    orderId?: string;
+    weightGrams?: number;
+    dimensionCm?: string;
+    deviceId?: string;
+  }) {
+    const db = this.prisma.getTenantDb();
+
+    // The pack station scans an order/tracking barcode, so resolve it to an
+    // order when the caller did not pass an explicit orderId.
+    let orderId = data.orderId;
+    if (!orderId && data.barcode) {
+      const order = await db.order.findFirst({
+        where: {
+          OR: [
+            { trackingCode: data.barcode },
+            { clientOrderRef: data.barcode },
+          ],
+        },
+        select: { id: true },
+      });
+      orderId = order?.id;
+    }
+
+    let warehouseId = data.warehouseId;
+    if (!warehouseId) {
+      const warehouse = await db.warehouse.findFirst({
+        where: { status: "ACTIVE" },
+        select: { id: true },
+      });
+      warehouseId = warehouse?.id;
+    }
+
+    if (!warehouseId) {
+      throw new BadRequestException(
+        "No active warehouse available for pack logging",
+      );
+    }
+
+    return db.packStationLog.create({
       data: {
-        warehouseId: data.warehouseId,
-        orderId: data.orderId,
+        warehouseId,
+        orderId,
         weightGrams: data.weightGrams,
         dimensionCm: data.dimensionCm,
-        deviceId: data.deviceId
-      }
+        deviceId: data.deviceId,
+      },
+      include: {
+        order: { select: { trackingCode: true, status: true } },
+        warehouse: { select: { name: true, code: true } },
+      },
+    });
+  }
+
+  async getPackLogs(limit = 100) {
+    return this.prisma.getTenantDb().packStationLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: Math.min(Number(limit) || 100, 200),
+      include: {
+        order: { select: { trackingCode: true, status: true } },
+        warehouse: { select: { name: true, code: true } },
+      },
     });
   }
 
   async reserveStock(inventoryId: string, quantity: number) {
     if (quantity <= 0) throw new ConflictException("Reservation quantity must be > 0");
 
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const inv = await tx.inventory.findUnique({ where: { id: inventoryId } });
       if (!inv) throw new ConflictException("Inventory not found");
 
@@ -415,7 +494,7 @@ export class InventoryService {
   async releaseReservation(inventoryId: string, quantity: number) {
     if (quantity <= 0) throw new ConflictException("Release quantity must be > 0");
 
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const inv = await tx.inventory.findUnique({ where: { id: inventoryId } });
       if (!inv) throw new ConflictException("Inventory not found");
 
@@ -440,7 +519,7 @@ export class InventoryService {
   }
 
   async getLowStockAlerts(warehouseId: string, threshold: number = 10) {
-    const lowStockItems = await this.prisma.tenantClient.inventory.findMany({
+    const lowStockItems = await this.prisma.getTenantDb().inventory.findMany({
       where: {
         warehouseId,
         quantityOnHand: { lte: threshold },
@@ -466,7 +545,7 @@ export class InventoryService {
   }
 
   async getStockSummary(warehouseId: string) {
-    const summary = await this.prisma.tenantClient.inventory.groupBy({
+    const summary = await this.prisma.getTenantDb().inventory.groupBy({
       by: ['productId'],
       where: { warehouseId },
       _sum: {
@@ -476,7 +555,7 @@ export class InventoryService {
       _count: true,
     });
 
-    const products = await this.prisma.tenantClient.product.findMany({
+    const products = await this.prisma.getTenantDb().product.findMany({
       where: { id: { in: summary.map((s: any) => s.productId) } },
     });
 

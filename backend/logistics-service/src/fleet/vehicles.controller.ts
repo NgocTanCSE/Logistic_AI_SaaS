@@ -28,13 +28,13 @@ export class VehiclesController {
     } : {};
 
     const [data, total] = await Promise.all([
-      this.prisma.tenantClient.vehicle.findMany({
+      this.prisma.getTenantDb().vehicle.findMany({
         where,
         skip,
         take,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.tenantClient.vehicle.count({ where }),
+      this.prisma.getTenantDb().vehicle.count({ where }),
     ]);
 
     return {
@@ -51,7 +51,7 @@ export class VehiclesController {
   @Get(":id")
   @RequirePermissions(Permissions.VehiclesRead)
   async detail(@Param("id") id: string) {
-    return this.prisma.tenantClient.vehicle.findUnique({
+    return this.prisma.getTenantDb().vehicle.findUnique({
       where: { id },
       include: { trips: { take: 10, orderBy: { tripCode: 'desc' } } },
     });
@@ -61,7 +61,7 @@ export class VehiclesController {
   @RequirePermissions(Permissions.VehiclesManage)
   async create(@Body() body: { plateNumber: string, type: string, capacityKg?: number, capacityCbm?: number }) {
     try {
-      return await this.prisma.tenantClient.vehicle.create({
+      return await this.prisma.getTenantDb().vehicle.create({
         data: {
           plateNumber: body.plateNumber,
           type: body.type,
@@ -79,7 +79,7 @@ export class VehiclesController {
   @RequirePermissions(Permissions.VehiclesManage)
   async update(@Param("id") id: string, @Body() body: any) {
     try {
-      return await this.prisma.tenantClient.vehicle.update({
+      return await this.prisma.getTenantDb().vehicle.update({
         where: { id },
         data: body,
       });
@@ -95,7 +95,7 @@ export class VehiclesController {
   @RequirePermissions(Permissions.VehiclesManage)
   async remove(@Param("id") id: string) {
     try {
-      return await this.prisma.tenantClient.vehicle.update({
+      return await this.prisma.getTenantDb().vehicle.update({
         where: { id },
         data: { status: "INACTIVE" },
       });
@@ -111,10 +111,10 @@ export class VehiclesController {
   @RequirePermissions(Permissions.VehiclesRead)
   async fleetUtilization() {
     const [totalVehicles, activeVehicles] = await Promise.all([
-      this.prisma.tenantClient.vehicle.count(),
-      this.prisma.tenantClient.vehicle.count({ where: { status: "ACTIVE" } }),
+      this.prisma.getTenantDb().vehicle.count(),
+      this.prisma.getTenantDb().vehicle.count({ where: { status: "ACTIVE" } }),
     ]);
-    const activeTrips = await this.prisma.tenantClient.trip.count({ where: { status: "IN_TRANSIT" } });
+    const activeTrips = await this.prisma.getTenantDb().trip.count({ where: { status: "IN_TRANSIT" } });
     const utilization = totalVehicles > 0 ? activeTrips / totalVehicles : 0;
     return { data: { totalVehicles, activeVehicles, utilization } };
   }

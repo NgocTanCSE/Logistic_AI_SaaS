@@ -21,7 +21,7 @@ export class MobileTripsController {
   @Get()
   @RequirePermissions(Permissions.TripsRead)
   async listDriverTrips(@Request() req: any, @Query('sinceVersion') sinceVersion?: string) {
-    const driver = await this.prisma.tenantClient.driver.findUnique({
+    const driver = await this.prisma.getTenantDb().driver.findUnique({
       where: { userId: req.user?.sub },
     });
     if (!driver) return [];
@@ -32,7 +32,7 @@ export class MobileTripsController {
         whereClause.syncVersion = { gt: versionNum };
       }
     }
-    return this.prisma.tenantClient.trip.findMany({
+    return this.prisma.getTenantDb().trip.findMany({
       where: whereClause,
       include: { stops: true, driver: true, vehicle: true },
     });
@@ -45,7 +45,7 @@ export class MobileTripsController {
   @Get(":id/stops")
   @RequirePermissions(Permissions.TripsRead)
   async getTripStops(@Param("id") id: string) {
-    return this.prisma.tenantClient.tripStop.findMany({
+    return this.prisma.getTenantDb().tripStop.findMany({
       where: { tripId: id },
       orderBy: { sequence: "asc" },
     });

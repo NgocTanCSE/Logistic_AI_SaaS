@@ -26,7 +26,7 @@ export class FeatureFlagsController {
   @RequirePermissions(Permissions.FeatureFlagsManage)
   async list(@Request() req: any) {
     const tenantId = req.tenantId ?? req.user?.tenant_id;
-    const flags = await this.prisma.tenantClient.featureFlag.findMany({
+    const flags = await this.prisma.getTenantDb().featureFlag.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
     });
@@ -38,7 +38,7 @@ export class FeatureFlagsController {
     const tenantId = req.tenantId ?? req.user?.tenant_id;
     const userId = req.user?.sub;
 
-    const flag = await this.prisma.tenantClient.featureFlag.findFirst({
+    const flag = await this.prisma.getTenantDb().featureFlag.findFirst({
       where: { tenantId, key },
     });
 
@@ -72,7 +72,7 @@ export class FeatureFlagsController {
       throw new BadRequestException('Key must be alphanumeric with hyphens or underscores');
     }
 
-    const existing = await this.prisma.tenantClient.featureFlag.findFirst({
+    const existing = await this.prisma.getTenantDb().featureFlag.findFirst({
       where: { tenantId, key: body.key },
     });
 
@@ -86,7 +86,7 @@ export class FeatureFlagsController {
       allowedRoles: body.allowedRoles ?? [],
     };
 
-    const flag = await this.prisma.tenantClient.featureFlag.create({
+    const flag = await this.prisma.getTenantDb().featureFlag.create({
       data: {
         tenantId,
         key: body.key,
@@ -112,14 +112,14 @@ export class FeatureFlagsController {
     },
   ) {
     const tenantId = req.tenantId ?? req.user?.tenant_id;
-    const existing = await this.prisma.tenantClient.featureFlag.findUnique({
+    const existing = await this.prisma.getTenantDb().featureFlag.findUnique({
       where: { id },
     });
     if (!existing || existing.tenantId !== tenantId) {
       throw new NotFoundException('Feature flag not found');
     }
 
-    const updated = await this.prisma.tenantClient.featureFlag.update({
+    const updated = await this.prisma.getTenantDb().featureFlag.update({
       where: { id },
       data: {
         enabled: body.enabled,
@@ -134,13 +134,13 @@ export class FeatureFlagsController {
   @RequirePermissions(Permissions.FeatureFlagsManage)
   async delete(@Request() req: any, @Param('id') id: string) {
     const tenantId = req.tenantId ?? req.user?.tenant_id;
-    const existing = await this.prisma.tenantClient.featureFlag.findUnique({
+    const existing = await this.prisma.getTenantDb().featureFlag.findUnique({
       where: { id },
     });
     if (!existing || existing.tenantId !== tenantId) {
       throw new NotFoundException('Feature flag not found');
     }
-    await this.prisma.tenantClient.featureFlag.delete({ where: { id } });
+    await this.prisma.getTenantDb().featureFlag.delete({ where: { id } });
     return { ok: true };
   }
 
@@ -154,7 +154,7 @@ export class FeatureFlagsController {
 
     const results = await Promise.all(
       body.flags.map(async (flagUpdate) => {
-        const existing = await this.prisma.tenantClient.featureFlag.findFirst({
+        const existing = await this.prisma.getTenantDb().featureFlag.findFirst({
           where: { tenantId, key: flagUpdate.key },
         });
 
@@ -162,7 +162,7 @@ export class FeatureFlagsController {
           return { key: flagUpdate.key, status: 'not_found' };
         }
 
-        await this.prisma.tenantClient.featureFlag.update({
+        await this.prisma.getTenantDb().featureFlag.update({
           where: { id: existing.id },
           data: { enabled: flagUpdate.enabled },
         });

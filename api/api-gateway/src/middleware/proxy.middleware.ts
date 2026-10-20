@@ -58,6 +58,11 @@ export class ProxyMiddleware implements NestMiddleware {
     if (req.headers['x-tenant-slug']) {
       headers['x-tenant-slug'] = req.headers['x-tenant-slug'] as string;
     }
+    // Portal identity is used by iam-service to enforce the correct role for
+    // each frontend (tenant / pack-station / customer / mobile).
+    if (req.headers['x-portal']) {
+      headers['x-portal'] = req.headers['x-portal'] as string;
+    }
 
     const fetchOptions: RequestInit = {
       method: req.method,

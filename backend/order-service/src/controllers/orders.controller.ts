@@ -73,7 +73,7 @@ export class OrdersController {
     const trackingCode = `SLG-${dateStr}-${randomSuffix}`;
 
     try {
-      const createdOrder = await this.prisma.tenantClient.$transaction(async (tx: any) => {
+      const createdOrder = await this.prisma.getTenantDb().$transaction(async (tx: any) => {
         const order = await tx.order.create({
           data: {
             trackingCode,
@@ -139,14 +139,14 @@ export class OrdersController {
       }
 
       const [data, total] = await Promise.all([
-        this.prisma.tenantClient.order.findMany({
+        this.prisma.getTenantDb().order.findMany({
           where,
           skip,
           take,
           include: { items: true },
           orderBy: { createdAt: "desc" },
         }),
-        this.prisma.tenantClient.order.count({ where }),
+        this.prisma.getTenantDb().order.count({ where }),
       ]);
 
       return {
@@ -168,7 +168,7 @@ export class OrdersController {
   @RequirePermissions(Permissions.OrdersRead)
   async getOrder(@Param("id") id: string) {
     try {
-      const order = await this.prisma.tenantClient.order.findUnique({
+      const order = await this.prisma.getTenantDb().order.findUnique({
         where: { id },
         include: { items: true, events: { orderBy: { timestamp: "desc" } } },
       });
@@ -187,9 +187,9 @@ export class OrdersController {
     @Body() body: { recipientName?: string; recipientPhone?: string; recipientAddress?: string; codAmount?: number; shippingFee?: number; notes?: string },
   ) {
     try {
-      const order = await this.prisma.tenantClient.order.findUnique({ where: { id } });
+      const order = await this.prisma.getTenantDb().order.findUnique({ where: { id } });
       if (!order) throw new NotFoundException(`Order ${id} not found`);
-      const updated = await this.prisma.tenantClient.order.update({
+      const updated = await this.prisma.getTenantDb().order.update({
         where: { id },
         data: body,
       });
@@ -205,9 +205,9 @@ export class OrdersController {
   @RequirePermissions(Permissions.OrdersCreate)
   async cancelOrder(@Param("id") id: string) {
     try {
-      const order = await this.prisma.tenantClient.order.findUnique({ where: { id } });
+      const order = await this.prisma.getTenantDb().order.findUnique({ where: { id } });
       if (!order) throw new NotFoundException(`Order ${id} not found`);
-      const cancelled = await this.prisma.tenantClient.order.update({
+      const cancelled = await this.prisma.getTenantDb().order.update({
         where: { id },
         data: { status: 'CANCELLED' }
       });
@@ -223,7 +223,7 @@ export class OrdersController {
   @RequirePermissions(Permissions.OrdersRead)
   async getTracking(@Param("id") id: string) {
     try {
-      const order = await this.prisma.tenantClient.order.findUnique({
+      const order = await this.prisma.getTenantDb().order.findUnique({
         where: { id },
         select: { id: true }
       });
@@ -232,7 +232,7 @@ export class OrdersController {
         throw new NotFoundException(`Order with ID ${id} not found.`);
       }
 
-      return this.prisma.tenantClient.orderTrackingEvent.findMany({ 
+      return this.prisma.getTenantDb().orderTrackingEvent.findMany({ 
         where: { orderId: id }, 
         orderBy: { timestamp: 'desc' } 
       });

@@ -136,6 +136,11 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:8081/api/v1/admin/auth/google/callback}
       - PORT=8081
+      # Google login policy:
+      #  - auto-provisioning is opt-in and only for the tenant portal (TENANT_USER)
+      #  - the admin portal only accepts pre-provisioned super admins or this allow-list
+      - GOOGLE_AUTO_PROVISION=${GOOGLE_AUTO_PROVISION:-false}
+      - SUPER_ADMIN_GOOGLE_EMAILS=${SUPER_ADMIN_GOOGLE_EMAILS:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -144,7 +149,7 @@ services:
     networks:
       - smartlogi-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8081/api/v1/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -161,6 +166,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - PORT=8082
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
     depends_on:
       postgres:
         condition: service_healthy
@@ -169,7 +175,7 @@ services:
     networks:
       - smartlogi-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8082/api/v1/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -187,6 +193,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - PORT=8083
       - KAFKA_BROKERS=kafka:29092
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
     restart: on-failure
     depends_on:
       postgres:
@@ -198,7 +205,7 @@ services:
     networks:
       - smartlogi-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8083/api/v1/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -215,6 +222,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - PORT=8084
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - AI_WORKER_URL=${AI_WORKER_URL:-http://host.docker.internal:8787}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -236,7 +244,7 @@ services:
     networks:
       - smartlogi-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8084/health"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8084/api/v1/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -253,6 +261,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - PORT=8085
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
     depends_on:
       postgres:
         condition: service_healthy
@@ -261,7 +270,7 @@ services:
     networks:
       - smartlogi-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8085/api/v1/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -297,7 +306,7 @@ services:
     networks:
       - smartlogi-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8086/health"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8086/api/v1/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -324,7 +333,7 @@ services:
     networks:
       - smartlogi-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8090/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -353,7 +362,7 @@ services:
       db-migrator:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8092/health"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8092/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -402,7 +411,7 @@ services:
     networks:
       - smartlogi-net
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/health >/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -417,11 +426,15 @@ services:
     build:
       context: .
       dockerfile: frontend/reporting/tenant-portal/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
     ports:
       - "4002:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://api-gateway:3000/api/v1
+      - NEXT_PUBLIC_API_URL=/api/v1
       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+      - API_INTERNAL_URL=http://api-gateway:3000/api/v1
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -432,11 +445,15 @@ services:
     build:
       context: .
       dockerfile: frontend/feature-test/admin-portal/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
     ports:
       - "4001:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://api-gateway:3000/api/v1
+      - NEXT_PUBLIC_API_URL=/api/v1
       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+      - API_INTERNAL_URL=http://api-gateway:3000/api/v1
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -447,11 +464,15 @@ services:
     build:
       context: .
       dockerfile: frontend/reporting/customer-portal/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
     ports:
       - "4003:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://api-gateway:3000/api/v1
+      - NEXT_PUBLIC_API_URL=/api/v1
       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+      - API_INTERNAL_URL=http://api-gateway:3000/api/v1
     depends_on:
       api-gateway:
         condition: service_healthy
@@ -462,14 +483,33 @@ services:
     build:
       context: .
       dockerfile: frontend/reporting/pack-station-web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
     ports:
       - "4004:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://api-gateway:3000/api/v1
+      - NEXT_PUBLIC_API_URL=/api/v1
       - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+      - API_INTERNAL_URL=http://api-gateway:3000/api/v1
     depends_on:
       api-gateway:
         condition: service_healthy
+    networks:
+      - smartlogi-net
+
+  # --- Portal reverse proxy: one host per frontend (no more port juggling) ---
+  portals-proxy:
+    build:
+      context: ./infra/nginx
+      dockerfile: Dockerfile
+    ports:
+      - "${PORTALS_PROXY_PORT:-8080}:80"
+    depends_on:
+      - admin-portal
+      - tenant-portal
+      - customer-portal
+      - pack-station-web
     networks:
       - smartlogi-net
 

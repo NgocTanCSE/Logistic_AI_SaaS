@@ -13,7 +13,7 @@ export class TenantRolesController {
   @Get()
   @RequirePermissions(Permissions.RolesManage)
   async list() {
-    return this.prisma.tenantClient.customRole.findMany({
+    return this.prisma.getTenantDb().customRole.findMany({
       include: {
         permissions: true,
         _count: { select: { users: true } },
@@ -25,7 +25,7 @@ export class TenantRolesController {
   @Get(":id")
   @RequirePermissions(Permissions.RolesManage)
   async detail(@Param("id") id: string) {
-    return this.prisma.tenantClient.customRole.findUnique({
+    return this.prisma.getTenantDb().customRole.findUnique({
       where: { id },
       include: {
         permissions: true,
@@ -43,7 +43,7 @@ export class TenantRolesController {
   @Post()
   @RequirePermissions(Permissions.RolesManage)
   async create(@Body() body: { name: string, permissions: { resource: string, action: string }[] }) {
-    return this.prisma.tenantClient.customRole.create({
+    return this.prisma.getTenantDb().customRole.create({
       data: {
         name: body.name,
         permissions: {
@@ -60,11 +60,11 @@ export class TenantRolesController {
     try {
       // If permissions are provided, replace all of them
       if (body.permissions) {
-        await this.prisma.tenantClient.rolePermission.deleteMany({
+        await this.prisma.getTenantDb().rolePermission.deleteMany({
           where: { roleId: id },
         });
 
-        await this.prisma.tenantClient.rolePermission.createMany({
+        await this.prisma.getTenantDb().rolePermission.createMany({
           data: body.permissions.map(p => ({
             roleId: id,
             resource: p.resource,
@@ -74,13 +74,13 @@ export class TenantRolesController {
       }
 
       if (body.name) {
-        await this.prisma.tenantClient.customRole.update({
+        await this.prisma.getTenantDb().customRole.update({
           where: { id },
           data: { name: body.name },
         });
       }
 
-      return await this.prisma.tenantClient.customRole.findUnique({
+      return await this.prisma.getTenantDb().customRole.findUnique({
         where: { id },
         include: { permissions: true },
       });
@@ -96,13 +96,13 @@ export class TenantRolesController {
   @RequirePermissions(Permissions.RolesManage)
   async remove(@Param("id") id: string) {
     // Prevent deleting system default roles
-    const role = await this.prisma.tenantClient.customRole.findUnique({ where: { id } });
+    const role = await this.prisma.getTenantDb().customRole.findUnique({ where: { id } });
     if (role?.isSystemDefault) {
       return { ok: false, message: "Cannot delete system default role" };
     }
 
     // Cascade delete will remove role_permissions and user_roles
-    await this.prisma.tenantClient.customRole.delete({ where: { id } });
+    await this.prisma.getTenantDb().customRole.delete({ where: { id } });
     return { ok: true };
   }
 }

@@ -13,7 +13,7 @@ export class BranchesController {
   @Get()
   @RequirePermissions(Permissions.SettingsManage)
   async list() {
-    return this.prisma.tenantClient.branch.findMany({
+    return this.prisma.getTenantDb().branch.findMany({
       orderBy: { name: 'asc' },
     });
   }
@@ -21,7 +21,7 @@ export class BranchesController {
   @Get(":id")
   @RequirePermissions(Permissions.SettingsManage)
   async detail(@Param("id") id: string) {
-    const branch = await this.prisma.tenantClient.branch.findUnique({
+    const branch = await this.prisma.getTenantDb().branch.findUnique({
       where: { id },
       include: { manager: { select: { id: true, fullName: true, email: true } } }
     });
@@ -35,7 +35,7 @@ export class BranchesController {
   @RequirePermissions(Permissions.SettingsManage)
   async create(@Body() body: { type: string, code: string, name: string, address: string, lat?: number, lng?: number, capacityCbm?: number, managerId?: string }) {
     try {
-      return await this.prisma.tenantClient.branch.create({
+      return await this.prisma.getTenantDb().branch.create({
         data: {
           type: body.type,
           code: body.code,
@@ -59,7 +59,7 @@ export class BranchesController {
   @RequirePermissions(Permissions.SettingsManage)
   async update(@Param("id") id: string, @Body() body: { type?: string, code?: string, name?: string, address?: string, lat?: number, lng?: number, capacityCbm?: number, managerId?: string, status?: string }) {
     try {
-      return await this.prisma.tenantClient.branch.update({
+      return await this.prisma.getTenantDb().branch.update({
         where: { id },
         data: body
       });
@@ -78,7 +78,7 @@ export class BranchesController {
   @RequirePermissions(Permissions.SettingsManage)
   async remove(@Param("id") id: string) {
     try {
-      return await this.prisma.tenantClient.branch.update({
+      return await this.prisma.getTenantDb().branch.update({
         where: { id },
         data: { status: 'INACTIVE' }
       });

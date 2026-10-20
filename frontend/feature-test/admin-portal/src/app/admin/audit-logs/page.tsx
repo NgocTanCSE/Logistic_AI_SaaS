@@ -42,6 +42,21 @@ export default function AuditLogsPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const start = (page - 1) * PAGE_SIZE;
 
+  // The API returns `createdAt`/`actorEmail`/`resourceType`, while the table
+  // was originally written against a flattened mock shape.
+  const formatTimestamp = (log: any) => {
+    const raw = log.timestamp ?? log.createdAt ?? log.created_at;
+    if (!raw) return { date: '—', time: '' };
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) {
+      return { date: String(raw), time: '' };
+    }
+    return {
+      date: parsed.toLocaleDateString(),
+      time: parsed.toLocaleTimeString(),
+    };
+  };
+
   const getActionStyle = (action: string) => {
     switch(action) {
       case 'CREATE': return 'bg-moss/10 text-moss border-moss/30';
@@ -116,39 +131,46 @@ export default function AuditLogsPage() {
                   <td colSpan={5} className="px-6 py-12 text-center text-inkSoft">No logs found.</td>
                 </tr>
               ) : (
-                logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-surface/30 transition-colors font-mono">
-                    <td className="px-6 py-4">
-                      <div className="text-ink">{log.timestamp.split(' ')[0]}</div>
-                      <div className="text-xs text-inkSoft mt-0.5">{log.timestamp.split(' ')[1]}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-ink">{log.actor}</div>
-                      <div className="text-xs text-inkSoft mt-0.5 flex items-center gap-1">
-                        <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                        </svg>
-                        {log.ip}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-widest border ${getActionStyle(log.action)}`}>
-                        {log.action}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-inkSoft">
-                      <div className="flex items-center gap-2">
-                        <svg className="w-4 h-4 text-inkSoft/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                        </svg>
-                        {log.resource}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-ink truncate max-w-[200px]" title={log.target}>{log.target}</div>
-                    </td>
-                  </tr>
-                ))
+                logs.map((log) => {
+                  const when = formatTimestamp(log);
+                  const actor = log.actor ?? log.actorEmail ?? 'System';
+                  const ip = log.ip ?? log.ipAddress ?? '—';
+                  const resource = log.resource ?? log.resourceType ?? '—';
+                  const target = log.target ?? log.resourceId ?? '—';
+                  return (
+                    <tr key={log.id} className="hover:bg-surface/30 transition-colors font-mono">
+                      <td className="px-6 py-4">
+                        <div className="text-ink">{when.date}</div>
+                        <div className="text-xs text-inkSoft mt-0.5">{when.time}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-ink">{actor}</div>
+                        <div className="text-xs text-inkSoft mt-0.5 flex items-center gap-1">
+                          <svg className="w-3 h-3 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                          </svg>
+                          {ip}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold tracking-widest border ${getActionStyle(log.action)}`}>
+                          {log.action ?? 'UNKNOWN'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-inkSoft">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4 text-inkSoft/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                          </svg>
+                          {resource}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-ink truncate max-w-[200px]" title={target}>{target}</div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

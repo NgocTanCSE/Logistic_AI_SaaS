@@ -84,14 +84,11 @@ export default function AIChatButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-floating hover:scale-105 transition-transform focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 outline-none"
-        aria-label="Tro ly AI phan tich"
-        title="Tro ly AI phan tich logistics"
+        className="fixed bottom-5 right-5 z-50 h-10 rounded-md border border-accent/30 bg-surface px-3 text-[12px] font-semibold text-accent shadow-floating transition-colors hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+        aria-label="Mở trợ lý AI phân tích"
+        title="Trợ lý AI phân tích logistics"
       >
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8 12.25c0 .414.156.816.42 1.126l2.5 2.75a.75.75 0 0 1-1.08.96l-.5-.45C8.62 16.25 8 15.18 8 14v-.75c0-.97.78-1.75 1.75-1.75h.5c.414 0 .75-.336.75-.75v-1c0-.138-.112-.25-.25-.25h-2.5A2.25 2.25 0 0 0 6 10.75V14a3 3 0 0 0 3 2.75v2.25a.75.75 0 0 0 1.5 0v-1.694a1.5 1.5 0 0 1 1.06-1.428l3-1A1.5 1.5 0 0 1 22 16.25V18a.75.75 0 0 0 1.5 0v-1.75a3 3 0 0 0-3-2.75h-1.75a.75.75 0 0 1 0-1.5h2.5a2.25 2.25 0 0 0 2.25-2.25V8a1.5 1.5 0 0 0-1.5-1.5h-2.5a.75.75 0 0 1 0-1.5v1.694a1.5 1.5 0 0 1-1.06 1.428l-3 1A1.5 1.5 0 0 1 8 8.75z" />
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v6" />
-        </svg>
+        Hỏi AI
       </button>
     );
   }

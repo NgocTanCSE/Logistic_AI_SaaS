@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import {formatDate} from '@/lib/date-utils';
+import {formatVnd} from '@/lib/format';
 import api from '@/lib/api';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { Button } from '@/components/ui/Button';
@@ -36,8 +37,10 @@ export default function CodRemittancePage() {
     setError('');
     try {
       const res = await api.get('/logistics/finance/remittances', { params: { page, limit } });
-      setRemittances((res.data?.data || res.data || []));
-      setTotal(res.data?.meta?.total || 0);
+      // Logistics service responses are wrapped as { success, data: { data, meta } }.
+      const payload = res.data?.data?.data ?? res.data?.data ?? res.data;
+      setRemittances(Array.isArray(payload) ? payload : []);
+      setTotal(res.data?.data?.meta?.total ?? res.data?.meta?.total ?? 0);
     } catch (err) {
       console.error("Failed to fetch remittances", err);
       setError('Failed to fetch remittances');
@@ -101,9 +104,13 @@ export default function CodRemittancePage() {
                       <div className="font-bold text-ink">{rem.driver?.user?.fullName}</div>
                       <div className="text-[10px] font-semibold text-slate-400 mt-1 uppercase">{formatDate(rem.createdAt)}</div>
                     </td>
-                    <td className="px-8 py-6 font-bold text-ink">${Number(rem.totalCodCollected).toLocaleString()}</td>
-                    <td className="px-8 py-6 font-bold text-rose-500">-${Number(rem.totalExpensesDeducted).toLocaleString()}</td>
-                    <td className="px-8 py-6 font-extrabold text-emerald-600">${Number(rem.amountRemitted).toLocaleString()}</td>
+                    <td className="px-8 py-6 font-bold text-ink">{formatVnd(rem.totalCodCollected)}</td>
+                    <td className="px-8 py-6 font-bold text-rose-500">
+                      {Number(rem.totalExpensesDeducted) > 0
+                        ? `-${formatVnd(rem.totalExpensesDeducted)}`
+                        : formatVnd(0)}
+                    </td>
+                    <td className="px-8 py-6 font-extrabold text-emerald-600">{formatVnd(rem.amountRemitted)}</td>
                     <td className="px-8 py-6"><Badge variant={getStatusVariant(rem.status)}>{rem.status}</Badge></td>
                     <td className="px-8 py-6 text-right">
                       {rem.status === 'PENDING' && (

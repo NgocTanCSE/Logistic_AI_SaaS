@@ -17,17 +17,17 @@ export const StatCard = memo(function StatCard({ title, value, trend, icon }: St
     <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-card transition-shadow duration-200 hover:shadow-cardHover">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</h3>
-        <div className="rounded-lg bg-slate-50 p-2 text-primary">
+        <div className="shrink-0 rounded-lg bg-slate-50 p-2 text-primary">
           {icon}
         </div>
       </div>
 
-      <div className="flex items-end gap-3">
-        <div className="text-3xl font-bold text-ink">{value}</div>
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
+        <div className="min-w-0 text-3xl font-bold leading-tight text-ink">{value}</div>
         {trend && (
-          <div className={`flex items-center gap-1 text-sm font-medium ${trend.isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+          <div className={`flex min-w-0 items-center gap-1 text-sm font-medium leading-tight ${trend.isPositive ? 'text-success' : 'text-danger'}`}>
             <svg
-              className={`h-4 w-4 ${trend.isPositive ? '' : 'rotate-180'}`}
+              className={`h-4 w-4 shrink-0 ${trend.isPositive ? '' : 'rotate-180'}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

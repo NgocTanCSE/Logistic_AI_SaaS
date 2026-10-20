@@ -13,7 +13,7 @@ export class LocationsController {
   @Get("zones")
   @RequirePermissions(Permissions.WarehousesManage)
   async listZones(@Query("warehouseId") warehouseId?: string) {
-    return this.prisma.tenantClient.zone.findMany({
+    return this.prisma.getTenantDb().zone.findMany({
       where: warehouseId ? { warehouseId } : {},
       include: { warehouse: true },
     });
@@ -22,13 +22,13 @@ export class LocationsController {
   @Post("zones")
   @RequirePermissions(Permissions.WarehousesManage)
   async createZone(@Body() body: any) {
-    return this.prisma.tenantClient.zone.create({ data: body });
+    return this.prisma.getTenantDb().zone.create({ data: body });
   }
 
   @Get("racks")
   @RequirePermissions(Permissions.WarehousesManage)
   async listRacks(@Query("zoneId") zoneId?: string) {
-    return this.prisma.tenantClient.rack.findMany({
+    return this.prisma.getTenantDb().rack.findMany({
       where: zoneId ? { zoneId } : {},
       include: { zone: true },
     });
@@ -38,11 +38,11 @@ export class LocationsController {
   @RequirePermissions(Permissions.WarehousesManage)
   async createRack(@Body() body: any) {
     if (!body.zoneId) {
-      const zone = await this.prisma.tenantClient.zone.findFirst();
+      const zone = await this.prisma.getTenantDb().zone.findFirst();
       if (!zone) throw new NotFoundException("No zone available to assign rack");
       body.zoneId = zone.id;
     }
-    return this.prisma.tenantClient.rack.create({ data: body });
+    return this.prisma.getTenantDb().rack.create({ data: body });
   }
 
   @Get("bins")
@@ -52,7 +52,7 @@ export class LocationsController {
     if (warehouseId) where.warehouseId = warehouseId;
     if (rackId) where.rackId = rackId;
     
-    return this.prisma.tenantClient.bin.findMany({ 
+    return this.prisma.getTenantDb().bin.findMany({ 
       where,
       include: { rack: true, warehouse: true } 
     });
@@ -67,20 +67,20 @@ export class LocationsController {
     }
 
     if (!body.rackId) {
-      const rack = await this.prisma.tenantClient.rack.findFirst();
+      const rack = await this.prisma.getTenantDb().rack.findFirst();
       if (!rack) throw new NotFoundException("No rack available to assign bin");
       body.rackId = rack.id;
       if (!body.warehouseId) {
-         const zone = await this.prisma.tenantClient.zone.findUnique({ where: { id: rack.zoneId }});
+         const zone = await this.prisma.getTenantDb().zone.findUnique({ where: { id: rack.zoneId }});
          body.warehouseId = zone?.warehouseId;
       }
     }
 
     if (!body.warehouseId) {
-      const warehouse = await this.prisma.tenantClient.warehouse.findFirst();
+      const warehouse = await this.prisma.getTenantDb().warehouse.findFirst();
       body.warehouseId = warehouse?.id;
     }
 
-    return this.prisma.tenantClient.bin.create({ data: body });
+    return this.prisma.getTenantDb().bin.create({ data: body });
   }
 }

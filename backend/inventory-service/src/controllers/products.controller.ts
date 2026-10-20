@@ -56,13 +56,13 @@ export class ProductsController {
       } : {};
 
       const [data, total] = await Promise.all([
-        this.prisma.tenantClient.product.findMany({
+        this.prisma.getTenantDb().product.findMany({
           where,
           skip,
           take,
           orderBy: { name: 'asc' },
         }),
-        this.prisma.tenantClient.product.count({ where }),
+        this.prisma.getTenantDb().product.count({ where }),
       ]);
 
       return {
@@ -83,7 +83,7 @@ export class ProductsController {
   @RequirePermissions(Permissions.InventoryRead)
   async detail(@Param("id") id: string) {
     try {
-      const product = await this.prisma.tenantClient.product.findUnique({ where: { id } });
+      const product = await this.prisma.getTenantDb().product.findUnique({ where: { id } });
       if (!product) {
         throw new NotFoundException(`Product with ID ${id} not found`);
       }
@@ -98,7 +98,7 @@ export class ProductsController {
   @RequirePermissions(Permissions.InventoryAdjust)
   async create(@Body() body: CreateProductDto) {
     try {
-      return await this.prisma.tenantClient.product.create({ data: body });
+      return await this.prisma.getTenantDb().product.create({ data: body });
     } catch (error) {
       throw new BadRequestException("Failed to create product");
     }
@@ -114,11 +114,11 @@ export class ProductsController {
   @RequirePermissions(Permissions.InventoryAdjust)
   async update(@Param("id") id: string, @Body() body: Partial<CreateProductDto>) {
     try {
-      const product = await this.prisma.tenantClient.product.findUnique({ where: { id } });
+      const product = await this.prisma.getTenantDb().product.findUnique({ where: { id } });
       if (!product) {
         throw new NotFoundException(`Product with ID ${id} not found`);
       }
-      return await this.prisma.tenantClient.product.update({
+      return await this.prisma.getTenantDb().product.update({
         where: { id },
         data: body,
       });
@@ -132,11 +132,11 @@ export class ProductsController {
   @RequirePermissions(Permissions.InventoryAdjust)
   async softDelete(@Param("id") id: string) {
     try {
-      const product = await this.prisma.tenantClient.product.findUnique({ where: { id } });
+      const product = await this.prisma.getTenantDb().product.findUnique({ where: { id } });
       if (!product) {
         throw new NotFoundException(`Product with ID ${id} not found`);
       }
-      return await this.prisma.tenantClient.product.update({
+      return await this.prisma.getTenantDb().product.update({
         where: { id },
         data: { deletedAt: new Date() },
       });

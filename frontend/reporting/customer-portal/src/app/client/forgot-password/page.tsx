@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { ArrowLeft, Mail } from '@/components/icons';
+import { ArrowLeft, Building2, Mail } from '@/components/icons';
 
 export default function B2BForgotPassword() {
   const [slug, setSlug] = useState('');
@@ -38,9 +38,9 @@ export default function B2BForgotPassword() {
           <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-emerald-500">
             <Mail className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Check Your Email</h1>
-          <p className="text-zinc-400 mb-6">
-            If an account with <strong className="text-white">{email}</strong> exists, we've sent a reset link.
+          <h1 className="text-2xl font-bold text-ink mb-2">Check Your Email</h1>
+          <p className="text-ink-soft mb-6">
+            If an account with <strong className="text-ink">{email}</strong> exists, we've sent a reset link.
           </p>
           <Link href="/client/login" className="inline-flex items-center gap-2 text-primary hover:text-primary/80 transition-colors font-medium">
             <ArrowLeft className="w-4 h-4" />
@@ -61,26 +61,26 @@ export default function B2BForgotPassword() {
           <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary">
             <Building2 className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Reset Password</h1>
-          <p className="text-zinc-400 mt-2">Enter your workspace slug and email.</p>
+          <h1 className="text-2xl font-bold text-ink">Reset Password</h1>
+          <p className="text-ink-soft mt-2">Enter your workspace slug and email.</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-sm text-rose-400 text-center">
+          <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-sm text-rose-600 text-center">
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-zinc-400 mb-1">Workspace Slug</label>
+            <label className="block text-sm font-medium text-ink-soft mb-1">Workspace Slug</label>
             <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
               <input
                 type="text"
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-primary/50 transition-colors"
+                className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
                 placeholder="e.g. acme-corp"
                 required
               />
@@ -88,14 +88,14 @@ export default function B2BForgotPassword() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-400 mb-1">Work Email</label>
+            <label className="block text-sm font-medium text-ink-soft mb-1">Work Email</label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-white focus:outline-none focus:border-primary/50 transition-colors"
+                className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
                 placeholder="you@company.com"
                 required
               />
@@ -112,7 +112,7 @@ export default function B2BForgotPassword() {
         </form>
 
         <div className="mt-6 text-center">
-          <Link href="/client/login" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors text-sm">
+          <Link href="/client/login" className="inline-flex items-center gap-2 text-ink-soft hover:text-ink transition-colors text-sm">
             <ArrowLeft className="w-4 h-4" />
             Back to Login
           </Link>

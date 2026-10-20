@@ -54,11 +54,11 @@ export default function BulkUploadPage() {
 
   return (
     <div className=" max-w-4xl">
-      <h2 className="text-3xl font-bold text-white">Bulk Order Upload</h2>
-      <p className="text-gray-400 mt-1">Upload your Excel file (max 5000 rows) to create multiple orders.</p>
+      <h2 className="text-3xl font-bold text-ink">Bulk Order Upload</h2>
+      <p className="text-ink-soft mt-1">Upload your Excel file (max 5000 rows) to create multiple orders.</p>
 
       {error && (
-        <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
+        <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-600 text-sm">
           {error}
         </div>
       )}
@@ -81,11 +81,11 @@ export default function BulkUploadPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
         </div>
-        <h3 className="text-xl font-bold text-white">Drag & Drop Excel File</h3>
-        <p className="text-gray-400 mt-2">or click to browse from your computer (.xlsx, .csv)</p>
+        <h3 className="text-xl font-bold text-ink">Drag & Drop Excel File</h3>
+        <p className="text-ink-soft mt-2">or click to browse from your computer (.xlsx, .csv)</p>
         {file && (
           <div className="mt-4 p-3 bg-white rounded-lg">
-            <p className="text-white text-sm">{file.name} ({(file.size / 1024).toFixed(1)} KB)</p>
+            <p className="text-ink text-sm">{file.name} ({(file.size / 1024).toFixed(1)} KB)</p>
           </div>
         )}
       </div>
@@ -104,8 +104,8 @@ export default function BulkUploadPage() {
 
       {uploadResult && (
         <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-          <p className="text-emerald-400 font-medium">Upload completed!</p>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-emerald-600 font-medium">Upload completed!</p>
+          <p className="text-sm text-ink-soft mt-1">
             {uploadResult.success || 0} orders created successfully.
             {uploadResult.failed > 0 && ` ${uploadResult.failed} orders failed.`}
           </p>
@@ -113,20 +113,20 @@ export default function BulkUploadPage() {
       )}
 
       <div className="mt-8">
-        <h3 className="font-bold text-white mb-4">Upload History</h3>
+        <h3 className="font-bold text-ink mb-4">Upload History</h3>
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-white border-b border-slate-200">
-                <th className="p-4 text-sm text-gray-400">Filename</th>
-                <th className="p-4 text-sm text-gray-400">Status</th>
-                <th className="p-4 text-sm text-gray-400">Success</th>
-                <th className="p-4 text-sm text-gray-400">Errors</th>
+                <th className="p-4 text-sm text-ink-soft">Filename</th>
+                <th className="p-4 text-sm text-ink-soft">Status</th>
+                <th className="p-4 text-sm text-ink-soft">Success</th>
+                <th className="p-4 text-sm text-ink-soft">Errors</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5">
+            <tbody className="divide-y divide-border">
               <tr>
-                <td colSpan={4} className="p-4 text-center text-gray-500">
+                <td colSpan={4} className="p-4 text-center text-ink-soft">
                   No upload history yet.
                 </td>
               </tr>

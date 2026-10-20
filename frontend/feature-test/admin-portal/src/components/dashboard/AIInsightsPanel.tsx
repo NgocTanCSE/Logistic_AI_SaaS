@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import api from '@/lib/api';
-import { Card } from '@/components/ui-new/Card';
+import {
+  EditorialSection,
+  EmptyNote,
+  StatusLabel,
+} from '../../../../../../packages/ui-kit/editorial';
 
 type AIAnalysis = {
   ok: boolean;
@@ -25,131 +29,147 @@ export function AIInsightsPanel({ token }: { token: string | null }) {
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [models, setModels] = useState<AIModel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) return;
-    fetchData();
-  }, [token]);
+    let active = true;
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      // AI analysis — fall back to mock if unavailable
-      try {
-        const res = await api.post('/ai/v1/analyze', {
-          payload: {
-            totalOrders: 1248,
-            activeShipments: 34,
-            delayedShipments: 3,
-            activeDrivers: 38,
-            inventoryAlerts: 7,
-            onTimeDelivery: '87.3%',
-          },
-        });
-        setAnalysis(res.data || null);
-      } catch {
-        // Try mock data fallback
-        const res = await api.get('/ai/v1/analyze');
-        setAnalysis(res.data || null);
+    const fetchData = async () => {
+      setLoading(true);
+      setLoadError(null);
+
+      const [analysisResult, modelsResult] = await Promise.allSettled([
+        api.get('/ai/v1/analyze'),
+        api.get('/ai/v1/models'),
+      ]);
+
+      if (!active) return;
+
+      if (analysisResult.status === 'fulfilled') {
+        setAnalysis(analysisResult.value.data || null);
+      } else {
+        setAnalysis(null);
+        setLoadError('AI analysis is not available in this environment.');
       }
 
-      // AI models list
-      try {
-        const res = await api.get('/ai/v1/models');
-        const data = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+      if (modelsResult.status === 'fulfilled') {
+        const response = modelsResult.value;
+        const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
         setModels(data);
-      } catch {
+      } else {
         setModels([]);
       }
-    } catch {
-      // Both failed — leave null/empty
-    } finally {
+
       setLoading(false);
-    }
-  };
+    };
+
+    void fetchData();
+    return () => {
+      active = false;
+    };
+  }, [token]);
 
   const handleTrain = async (type: string) => {
     try {
-      await api.post(`/ai/v1/train/${type}`, { tenant_id: '__system__', schema_name: 'tenant' });
-      alert(`Training job started for ${type}`);
-    } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to start training');
+      await api.post(`/ai/v1/train/${type}`, {
+        tenant_id: '__system__',
+        schema_name: 'tenant',
+      });
+      setLoadError(null);
+    } catch (error: any) {
+      setLoadError(error?.response?.data?.message || 'Failed to start training.');
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* AI Model cards */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-ink mb-1">AI Model Hub</h3>
-        <p className="text-sm text-inkSoft mb-4">Active models powering SmartLogi AI Core</p>
-        <div className="space-y-3">
-          {loading ? (
-            <div className="text-center text-slate-400 py-6">Loading models…</div>
-          ) : models.length === 0 ? (
-            <div className="text-center text-slate-400 py-6">No AI models found.</div>
-          ) : (
-            models.map((model) => (
-              <div key={model.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
-                <div>
-                  <div className="font-medium text-ink">{model.name}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">
+    <div className="space-y-5">
+      <EditorialSection
+        eyebrow="AI core"
+        title="Model hub"
+        action={
+          <StatusLabel tone={models.length > 0 ? 'success' : 'neutral'}>
+            {models.length > 0 ? `${models.length} models` : 'Unavailable'}
+          </StatusLabel>
+        }
+      >
+        {loading ? (
+          <p className="text-[12px] text-ink-faint">Loading models…</p>
+        ) : models.length === 0 ? (
+          <EmptyNote>No AI models found. The AI worker is not connected in this environment.</EmptyNote>
+        ) : (
+          <div>
+            {models.map((model) => (
+              <div
+                key={model.id}
+                className="flex items-center justify-between gap-3 border-b border-line/80 py-2.5 last:border-0"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-[13px] font-medium text-ink">{model.name}</div>
+                  <div className="mt-0.5 text-[11px] text-ink-faint">
                     v{model.version} · <span className="capitalize">{model.type}</span>
-                    {model.is_current && ' (active)'}
+                    {model.is_current ? ' · active' : ''}
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-bold text-ink">{model.accuracy != null ? `${(model.accuracy * 100).toFixed(1)}%` : 'N/A'}</span>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="text-[12px] font-semibold tabular-nums text-ink">
+                    {model.accuracy != null ? `${(model.accuracy * 100).toFixed(1)}%` : 'N/A'}
+                  </span>
                   <button
+                    type="button"
                     onClick={() => handleTrain(model.type)}
-                    className="text-xs px-3 py-1 rounded border border-slate-200 hover:bg-slate-50 transition-colors"
+                    className="h-8 rounded-md border border-line px-3 text-[11px] font-medium text-ink-soft transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
                   >
                     Retrain
                   </button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </Card>
-
-      {/* AI Analysis */}
-      {analysis && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-ink mb-1">AI Executive Summary</h3>
-          <p className="text-sm text-inkSoft mb-4">Generated by SmartLogi AI Core from live operational data.</p>
-
-          <div className="prose prose-sm max-w-none text-inkSoft">
-            <p>{analysis.summary}</p>
+            ))}
           </div>
+        )}
+      </EditorialSection>
 
-          {analysis.risks && analysis.risks.length > 0 && (
-            <div className="mt-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-rose-600 mb-2">Risks</p>
-              <ul className="space-y-1">
-                {analysis.risks.map((risk, i) => (
-                  <li key={i} className="text-sm text-inkSoft flex items-start gap-2">
-                    <span className="text-rose-500 mt-0.5">⚠</span> {risk}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+      <EditorialSection eyebrow="Analysis" title="Executive summary">
+        {loading ? (
+          <p className="text-[12px] text-ink-faint">Loading analysis…</p>
+        ) : !analysis ? (
+          <EmptyNote>{loadError || 'No AI analysis available yet.'}</EmptyNote>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-[12px] leading-5 text-ink-soft">{analysis.summary}</p>
 
-          {analysis.recommendations && analysis.recommendations.length > 0 && (
-            <div className="mt-4">
-              <p className="text-xs font-bold uppercase tracking-wider text-primary mb-2">Recommendations</p>
-              <ul className="space-y-1">
-                {analysis.recommendations.map((rec, i) => (
-                  <li key={i} className="text-sm text-inkSoft flex items-start gap-2">
-                    <span className="text-primary mt-0.5">✓</span> {rec}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </Card>
-      )}
+            {analysis.risks?.length > 0 ? (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-danger">
+                  Risks
+                </p>
+                <ul className="mt-2 space-y-1.5 border-l-2 border-danger/40 pl-3">
+                  {analysis.risks.map((risk, index) => (
+                    <li key={index} className="text-[12px] leading-5 text-ink-soft">
+                      {risk}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {analysis.recommendations?.length > 0 ? (
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">
+                  Recommendations
+                </p>
+                <ul className="mt-2 space-y-1.5 border-l-2 border-accent/40 pl-3">
+                  {analysis.recommendations.map((recommendation, index) => (
+                    <li key={index} className="text-[12px] leading-5 text-ink-soft">
+                      {recommendation}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </EditorialSection>
     </div>
   );
 }

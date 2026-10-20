@@ -16,7 +16,7 @@ export class ClientOrdersController {
      const email = req.user?.email;
      if (!email) throw new NotFoundException("User email not found in token");
 
-     const clientUser = await this.prisma.tenantClient.clientUser.findFirst({
+     const clientUser = await this.prisma.getTenantDb().clientUser.findFirst({
        where: { email },
      });
 
@@ -32,7 +32,7 @@ export class ClientOrdersController {
   async list(@Request() req: any) {
     const clientId = await this.getClientId(req);
 
-    return this.prisma.tenantClient.order.findMany({
+    return this.prisma.getTenantDb().order.findMany({
       where: { clientId },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -44,7 +44,7 @@ export class ClientOrdersController {
   async detail(@Param("id") id: string, @Request() req: any) {
     const clientId = await this.getClientId(req);
 
-    const order = await this.prisma.tenantClient.order.findFirst({
+    const order = await this.prisma.getTenantDb().order.findFirst({
       where: { id, clientId },
       include: { items: true, events: { orderBy: { timestamp: 'desc' } } },
     });
@@ -58,14 +58,14 @@ export class ClientOrdersController {
   async update(@Param("id") id: string, @Body() body: { recipientName?: string; recipientPhone?: string; recipientAddress?: string; notes?: string }, @Request() req: any) {
     const clientId = await this.getClientId(req);
 
-    const order = await this.prisma.tenantClient.order.findFirst({
+    const order = await this.prisma.getTenantDb().order.findFirst({
       where: { id, clientId },
     });
 
     if (!order) throw new NotFoundException("Order not found");
     if (order.status !== "NEW") throw new BadRequestException("Cannot update order after it has been processed");
 
-    return this.prisma.tenantClient.order.update({
+    return this.prisma.getTenantDb().order.update({
       where: { id },
       data: body,
     });
@@ -81,7 +81,7 @@ export class ClientOrdersController {
     }
 
     // Phase 2.1: Use Prisma $transaction to ensure Order and initial Tracking Event are created atomically
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const newOrder = await tx.order.create({
         data: {
           trackingCode: `TRK-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -119,7 +119,7 @@ export class ClientOrdersController {
     }
 
     // DĂ¹ng transaction Ä‘á»ƒ bulk create, Ä‘áº£m báº£o khĂ´ng lÆ°u 1 ná»­a dá»¯ liá»‡u náº¿u cĂ³ lá»—i
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const createdOrders: any[] = [];
       let successCount = 0;
 

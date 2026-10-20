@@ -15,7 +15,7 @@ export class ClientInvoicesController {
     const email = req.user?.email;
     if (!email) throw new NotFoundException("User email not found in token");
     
-    const clientUser = await this.prisma.tenantClient.clientUser.findFirst({
+    const clientUser = await this.prisma.getTenantDb().clientUser.findFirst({
       where: { email },
     });
 
@@ -30,7 +30,7 @@ export class ClientInvoicesController {
   @RequirePermissions(Permissions.BillingRead)
   async list(@Request() req: any) {
     const clientId = await this.getClientId(req);
-    return this.prisma.tenantClient.invoice.findMany({
+    return this.prisma.getTenantDb().invoice.findMany({
       where: { clientId },
       include: { items: true, payments: true },
       orderBy: { issuedAt: 'desc' },
@@ -43,7 +43,7 @@ export class ClientInvoicesController {
   async pay(@Param("id") id: string, @Body() body: InvoicePayDto, @Request() req: any) {
     const clientId = await this.getClientId(req);
 
-    const invoice = await this.prisma.tenantClient.invoice.findFirst({
+    const invoice = await this.prisma.getTenantDb().invoice.findFirst({
       where: { id, clientId },
     });
 
@@ -55,7 +55,7 @@ export class ClientInvoicesController {
       throw new BadRequestException("Invoice is already paid");
     }
 
-    return this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const payment = await tx.paymentTransaction.create({
         data: {
           tenantId: invoice.tenantId,

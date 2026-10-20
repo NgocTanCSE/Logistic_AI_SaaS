@@ -55,7 +55,7 @@ export class TenantBillingController {
       planName = planRec?.name ?? null;
     }
 
-    const invoices = await this.prisma.tenantClient.invoice.findMany({
+    const invoices = await this.prisma.getTenantDb().invoice.findMany({
       where: { tenantId: req.tenantId },
       orderBy: { issuedAt: "desc" },
     });
@@ -74,12 +74,12 @@ export class TenantBillingController {
     async payInvoice(@Request() req: any, @Body() body: any) {
         const { invoiceId, amount, method, transactionId } = body;
         const tenantId = req.tenantId;
-        const payment = await this.prisma.tenantClient.paymentTransaction.create({
+        const payment = await this.prisma.getTenantDb().paymentTransaction.create({
             data: { tenantId, invoiceId, amount, method, transactionId, status: "INITIATED" },
         });
-        const invoice = await this.prisma.tenantClient.invoice.findUnique({ where: { id: invoiceId } });
+        const invoice = await this.prisma.getTenantDb().invoice.findUnique({ where: { id: invoiceId } });
         if (invoice && Number(amount) >= Number(invoice.totalAmount)) {
-            await this.prisma.tenantClient.invoice.update({
+            await this.prisma.getTenantDb().invoice.update({
                 where: { id: invoiceId },
                 data: { status: "PAID", paidAt: new Date() },
             });
@@ -90,7 +90,7 @@ export class TenantBillingController {
     @RequirePermissions(Permissions.BillingRead)
     async createPaymentIntent(@Request() req: any, @Body() body: any) {
         const { invoiceId } = body;
-        const invoice = await this.prisma.tenantClient.invoice.findUnique({ where: { id: invoiceId } });
+        const invoice = await this.prisma.getTenantDb().invoice.findUnique({ where: { id: invoiceId } });
         if (!invoice) {
             throw new NotFoundException('Invoice not found');
         }

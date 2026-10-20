@@ -9,8 +9,29 @@ import api from '@/lib/api';
 export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const router = useRouter();
   const { login } = useAuth();
+
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.post('/admin/auth/login', { email, password });
+      if (!res.data?.accessToken) {
+        setError(res.data?.message || 'Invalid credentials.');
+        return;
+      }
+      login(res.data.accessToken);
+      router.push('/admin/dashboard');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Unable to sign in. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGoogleSuccess = async (credential: string) => {
     setLoading(true);
@@ -20,6 +41,8 @@ export default function AdminLogin() {
       if (res.data.accessToken) {
         login(res.data.accessToken);
         router.push('/admin/dashboard');
+      } else {
+        setError(res.data?.message || 'This Google account is not allowed to access the Admin Portal.');
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Google authentication failed. Please try again.');
@@ -43,7 +66,7 @@ export default function AdminLogin() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-ink">Admin Portal</h1>
-          <p className="mt-2 text-sm text-inkSoft">Sign in to manage SmartLogi tenants and billing</p>
+          <p className="mt-2 text-sm text-ink-soft">Sign in to manage SmartLogi tenants and billing</p>
         </div>
 
         {error && (
@@ -51,6 +74,55 @@ export default function AdminLogin() {
             {error}
           </div>
         )}
+
+        <form onSubmit={handlePasswordLogin} className="space-y-4">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-ink mb-1">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@smartlogi.vn"
+              className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20"
+              required
+            />
+          </div>
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-ink mb-1">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20"
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 transition-colors"
+          >
+            {loading ? 'Signing in…' : 'Sign In'}
+          </button>
+        </form>
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-border"></div>
+          </div>
+          <div className="relative flex justify-center text-xs text-ink-soft">
+            <span className="bg-surface-alt px-2">Or continue with Google</span>
+          </div>
+        </div>
 
         <div className="space-y-4">
           <GoogleLoginButton
@@ -60,7 +132,7 @@ export default function AdminLogin() {
           />
         </div>
 
-        <div className="text-center text-xs text-inkSoft">
+        <div className="text-center text-xs text-ink-soft">
           By signing in, you agree to the SmartLogi Terms of Service.
         </div>
       </div>

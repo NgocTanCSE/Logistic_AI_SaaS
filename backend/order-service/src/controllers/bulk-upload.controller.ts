@@ -92,7 +92,7 @@ export class BulkUploadController {
           const qty = mapRow('Qty');
           
           try {
-            await this.prisma.tenantClient.$transaction(async (tx: any) => {
+            await this.prisma.getTenantDb().$transaction(async (tx: any) => {
               if (!name || !phone || !address) {
                 throw new Error(`Missing mandatory info (Name, Phone, or Address)`);
               }

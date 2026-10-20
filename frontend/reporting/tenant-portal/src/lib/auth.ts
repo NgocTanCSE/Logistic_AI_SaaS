@@ -44,6 +44,7 @@ export const setSession = (token: string) => {
     email: payload.email || "",
     role: payload.role || "TENANT_USER",
     tenantId: payload.tenant_id || payload.tenantId,
+    slug: payload.tenant_slug || "",
   };
   window.localStorage.setItem(TOKEN_KEY, token);
   window.localStorage.setItem(USER_KEY, JSON.stringify(user));

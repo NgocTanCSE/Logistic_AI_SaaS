@@ -19,7 +19,7 @@ export class WarehouseOpsController {
   async startShift(@Body() body: { warehouseId: string }, @Request() req: any) {
     let staffId = req.user?.sub;
     if (!staffId) {
-      const user = await this.prisma.tenantClient.tenantUser.findFirst();
+      const user = await this.prisma.getTenantDb().tenantUser.findFirst();
       staffId = user?.id;
     }
     return this.inventoryService.startShift(body.warehouseId, staffId)
@@ -36,7 +36,7 @@ export class WarehouseOpsController {
   async checkoutEquipment(@Body() body: { warehouseId: string, equipmentCode: string }, @Request() req: any) {
     let staffId = req.user?.sub;
     if (!staffId) {
-      const user = await this.prisma.tenantClient.tenantUser.findFirst();
+      const user = await this.prisma.getTenantDb().tenantUser.findFirst();
       staffId = user?.id;
     }
     return this.inventoryService.checkoutEquipment(body.warehouseId, body.equipmentCode, staffId)
@@ -56,7 +56,20 @@ export class WarehouseOpsController {
 
   @Post("pack-log")
   @RequirePermissions(Permissions.InventoryRead)
-  async createPackLog(@Body() body: { warehouseId: string, orderId?: string, weightGrams?: number, dimensionCm?: string, deviceId?: string }) {
+  async createPackLog(@Body() body: {
+    barcode?: string;
+    warehouseId?: string;
+    orderId?: string;
+    weightGrams?: number;
+    dimensionCm?: string;
+    deviceId?: string;
+  }) {
     return this.inventoryService.createPackLog(body)
+  }
+
+  @Get("pack-log")
+  @RequirePermissions(Permissions.InventoryRead)
+  async getPackLogs() {
+    return this.inventoryService.getPackLogs()
   }
 }

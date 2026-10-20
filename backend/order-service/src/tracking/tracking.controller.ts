@@ -20,7 +20,7 @@ export class TrackingController {
   @Post("events")
   @RequirePermissions(Permissions.OrdersCreate)
   async addEvent(@Body() body: { orderId: string, status: string, location: string, description: string }) {
-    return await this.prisma.tenantClient.$transaction(async (tx: any) => {
+    return await this.prisma.getTenantDb().$transaction(async (tx: any) => {
       // 1. Táº¡o sá»± kiá»‡n tracking
       const event = await tx.orderTrackingEvent.create({ data: body });
       
@@ -41,7 +41,7 @@ export class TrackingController {
     if (!clientId) return;
 
     // TĂ¬m cĂ¡c webhook Ä‘Äƒng kĂ½ cho client nĂ y
-    const webhooks = await this.prisma.tenantClient.clientWebhook.findMany({
+    const webhooks = await this.prisma.getTenantDb().clientWebhook.findMany({
       where: { clientId, isActive: true }
     });
 

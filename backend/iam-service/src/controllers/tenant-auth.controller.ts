@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Get, Patch, UseGuards, Req, Headers, UnauthorizedException } from "@nestjs/common";
+import { Body, Controller, Post, Get, Patch, UseGuards, Req, Headers, UnauthorizedException, BadRequestException, HttpException } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
 import { LoginResponse } from "../shared-types";
 import { LoginRequestDto } from "../dtos/login.dto";
@@ -18,43 +18,50 @@ export class TenantAuthController {
   @Post("login")
   async login(
     @Body() body: LoginRequestDto,
-    @Headers("x-tenant-slug") tenantSlug: string
+    @Headers("x-tenant-slug") tenantSlug: string,
+    @Headers("x-portal") portal: string
   ): Promise<LoginResponse> {
     if (!tenantSlug) {
-      return { ok: false, message: "Missing x-tenant-slug header" };
+      throw new BadRequestException("Missing x-tenant-slug header");
     }
 
     try {
-      const result = await this.authService.loginTenantUser(tenantSlug, body.email, body.password);
+      const result = await this.authService.loginTenantUser(tenantSlug, body.email, body.password, portal);
       return {
         ok: true,
         accessToken: result.access_token,
+        refreshToken: result.refresh_token,
+        role: result.role,
         slug: tenantSlug,
-      };
+      } as any;
     } catch (error: any) {
-      return { ok: false, message: error.message || "Invalid credentials" };
+      if (error instanceof HttpException) throw error;
+      throw new UnauthorizedException(error.message || "Invalid credentials");
     }
   }
 
   @Post("google")
   async googleLogin(
     @Body() body: { credential: string },
-    @Headers("x-tenant-slug") tenantSlug: string
+    @Headers("x-tenant-slug") tenantSlug: string,
+    @Headers("x-portal") portal: string
   ): Promise<any> {
     if (!tenantSlug) {
-      return { ok: false, message: "Missing x-tenant-slug header" };
+      throw new BadRequestException("Missing x-tenant-slug header");
     }
 
     try {
-      const result = await this.authService.verifyGoogleToken(tenantSlug, body.credential);
+      const result = await this.authService.loginTenantUserWithGoogle(tenantSlug, body.credential, portal);
       return {
         ok: true,
         accessToken: result.access_token,
         refreshToken: result.refresh_token,
+        role: result.role,
         slug: tenantSlug,
       };
     } catch (error: any) {
-      return { ok: false, message: error.message || "Google authentication failed" };
+      if (error instanceof HttpException) throw error;
+      throw new UnauthorizedException(error.message || "Google authentication failed");
     }
   }
 

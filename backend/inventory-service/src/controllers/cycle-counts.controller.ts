@@ -19,13 +19,13 @@ export class CycleCountsController {
   async createCycleCount(@Body() body: { warehouseId: string, scheduledAt?: Date }, @Request() req: any) {
     let actorId = req.user?.sub;
     if (!actorId) {
-      const user = await this.prisma.tenantClient.tenantUser.findFirst();
+      const user = await this.prisma.getTenantDb().tenantUser.findFirst();
       actorId = user?.id;
     }
     
     let warehouseId = body.warehouseId;
     if (!warehouseId) {
-      const wh = await this.prisma.tenantClient.warehouse.findFirst();
+      const wh = await this.prisma.getTenantDb().warehouse.findFirst();
       if (!wh) throw new NotFoundException("No warehouse available");
       warehouseId = wh.id;
     }

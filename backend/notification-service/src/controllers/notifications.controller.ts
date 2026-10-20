@@ -66,7 +66,7 @@ export class NotificationsController {
     }
 
     try {
-      const notifications = await this.prisma.tenantClient.notification.findMany({
+      const notifications = await this.prisma.getTenantDb().notification.findMany({
         where: { userId },
         orderBy: { createdAt: 'desc' },
         take: 50
@@ -86,7 +86,7 @@ export class NotificationsController {
     }
 
     try {
-      const count = await this.prisma.tenantClient.notification.count({
+      const count = await this.prisma.getTenantDb().notification.count({
         where: { userId, isRead: false }
       });
 
@@ -108,7 +108,7 @@ export class NotificationsController {
     }
 
     try {
-      const result = await this.prisma.tenantClient.notification.updateMany({
+      const result = await this.prisma.getTenantDb().notification.updateMany({
         where: {
           id: { in: body.notificationIds },
           userId: userId
@@ -133,7 +133,7 @@ export class NotificationsController {
     }
 
     try {
-      const result = await this.prisma.tenantClient.notification.updateMany({
+      const result = await this.prisma.getTenantDb().notification.updateMany({
         where: { userId, isRead: false },
         data: {
           isRead: true,

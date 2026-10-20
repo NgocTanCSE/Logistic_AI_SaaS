@@ -8,11 +8,13 @@
     "dev": "echo 'shared-types ready'",
     "build": "tsc"
   },
-  "dependencies": {
+  "peerDependencies": {
     "@nestjs/common": "10.3.10",
     "@nestjs/core": "10.3.10"
   },
   "devDependencies": {
+    "@nestjs/common": "10.3.10",
+    "@nestjs/core": "10.3.10",
     "typescript": "^5.5.3"
   }
 }

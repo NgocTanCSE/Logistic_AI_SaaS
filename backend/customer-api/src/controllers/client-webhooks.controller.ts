@@ -15,7 +15,7 @@ export class ClientWebhooksController {
     const email = req.user?.email;
     if (!email) throw new NotFoundException("User email not found in token");
     
-    const clientUser = await this.prisma.tenantClient.clientUser.findFirst({
+    const clientUser = await this.prisma.getTenantDb().clientUser.findFirst({
       where: { email },
     });
 
@@ -30,7 +30,7 @@ export class ClientWebhooksController {
   @RequirePermissions(Permissions.OrdersRead)
   async list(@Request() req: any) {
     const clientId = await this.getClientId(req);
-    return this.prisma.tenantClient.clientWebhook.findMany({
+    return this.prisma.getTenantDb().clientWebhook.findMany({
       where: { clientId },
       orderBy: { createdAt: 'desc' }
     });
@@ -50,12 +50,12 @@ export class ClientWebhooksController {
     }
 
     // Kiá»ƒm tra giá»›i háº¡n sá»‘ lÆ°á»£ng webhook (VD: max 10 webhooks per client)
-    const count = await this.prisma.tenantClient.clientWebhook.count({ where: { clientId } });
+    const count = await this.prisma.getTenantDb().clientWebhook.count({ where: { clientId } });
     if (count >= 10) {
       throw new BadRequestException("Maximum webhook limit reached (10)");
     }
 
-    return this.prisma.tenantClient.clientWebhook.create({
+    return this.prisma.getTenantDb().clientWebhook.create({
       data: {
         clientId,
         url: body.url,
@@ -71,7 +71,7 @@ export class ClientWebhooksController {
   async remove(@Param("id") id: string, @Request() req: any) {
     const clientId = await this.getClientId(req);
 
-    const webhook = await this.prisma.tenantClient.clientWebhook.findFirst({
+    const webhook = await this.prisma.getTenantDb().clientWebhook.findFirst({
       where: { id, clientId }
     });
 
@@ -79,7 +79,7 @@ export class ClientWebhooksController {
       throw new NotFoundException("Webhook not found");
     }
 
-    await this.prisma.tenantClient.clientWebhook.delete({
+    await this.prisma.getTenantDb().clientWebhook.delete({
       where: { id }
     });
 

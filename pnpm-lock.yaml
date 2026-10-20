@@ -850,6 +850,9 @@ importers:
       '@types/react-dom':
         specifier: 19.0.0
         version: 19.0.0
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.5.0(postcss@8.4.39)
       eslint-config-next:
         specifier: 15.2.0
         version: 15.2.0(eslint@8.57.1)(typescript@5.5.3)
@@ -902,6 +905,9 @@ importers:
       '@types/react-dom':
         specifier: 19.0.0
         version: 19.0.0
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.5.0(postcss@8.4.39)
       eslint-config-next:
         specifier: 15.2.0
         version: 15.2.0(eslint@8.57.1)(typescript@5.5.3)
@@ -1055,14 +1061,13 @@ importers:
         version: 5.5.3
 
   packages/shared-types:
-    dependencies:
+    devDependencies:
       '@nestjs/common':
         specifier: 10.3.10
         version: 10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
       '@nestjs/core':
         specifier: 10.3.10
         version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-    devDependencies:
       typescript:
         specifier: ^5.5.3
         version: 5.5.3
@@ -4084,6 +4089,7 @@ packages:
   cron-parser@4.9.0:
     resolution: {integrity: sha512-p0SaNjrHOnQeR8/VnfGbmg9te2kfyYSQ7Sc/j/6DtPL3JQvKxmjO9TSjNFpujqV3vEYYBvNNvXSxzyksBWAx1Q==}
     engines: {node: '>=12.0.0'}
+    deprecated: v4 is no longer maintained, upgrade to v5
 
   cron@3.2.1:
     resolution: {integrity: sha512-w2n5l49GMmmkBFEsH9FIDhjZ1n1QgTMOCMGuQtOXs5veNiosZmso6bQGuqOJSYAXXrG84WQFVneNk+Yt0Ua9iw==}

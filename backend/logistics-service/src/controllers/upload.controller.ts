@@ -53,7 +53,7 @@ export class UploadController {
     // á» Ä‘Ă¢y ta giáº£ Ä‘á»‹nh nháº­n Ä‘Æ°á»£c áº£nh lĂ  coi nhÆ° thĂ nh cĂ´ng bÆ°á»›c Ä‘áº§u
     updateData.status = 'DELIVERED';
 
-    await this.prisma.tenantClient.delivery.update({
+    await this.prisma.getTenantDb().delivery.update({
       where: { id: deliveryId },
       data: updateData,
     });
