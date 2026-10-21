@@ -29,7 +29,7 @@ const getInitials = (name: string): string => {
 
 const getColorFromName = (name: string): string => {
   const colors = [
-    'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-red-500',
+    'bg-primary/100', 'bg-success', 'bg-yellow-500', 'bg-danger',
     'bg-purple-500', 'bg-pink-500', 'bg-indigo-500', 'bg-teal-500',
   ];
   let hash = 0;
@@ -70,7 +70,7 @@ export const Avatar: React.FC<AvatarProps> = ({
     <div
       className={`rounded-full bg-gray-300 flex items-center justify-center ${sizeClasses[size]} ${className}`}
     >
-      <svg className="w-1/2 h-1/2 text-gray-500" fill="currentColor" viewBox="0 0 24 24">
+      <svg className="w-1/2 h-1/2 text-ink-faint" fill="currentColor" viewBox="0 0 24 24">
         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
       </svg>
     </div>

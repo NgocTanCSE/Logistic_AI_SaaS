@@ -1,10 +1,10 @@
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = "file:./dev.db";
-  console.log(`[Seeder] No DATABASE_URL found. Defaulting to: ${process.env.DATABASE_URL}`);
-  console.log(`[Seeder] No DATABASE_URL found. Defaulting to: ${process.env.DATABASE_URL}`);
+  console.error('[Seeder] DATABASE_URL is required. Refusing to guess a database.');
+  process.exit(1);
 }
 
 import { PrismaClient } from '@prisma/client';
+import { ensureTenant } from './00-tenant';
 import { seedRoles } from './01-roles';
 import { seedUsers } from './02-users';
 import { seedWarehouses } from './03-warehouses';
@@ -112,14 +112,25 @@ async function main() {
 
   try {
     const forceReseed = process.env.FORCE_RESEED === 'true';
-    
+
     if (forceReseed) {
       console.log('⚠️  FORCE_RESEED=true — wiping existing data before seeding.');
       await clearDatabase();
     } else {
-      console.log('🔒 FORCE_RESEED not set — skipping database wipe for idempotent seeding.');
+      // Idempotent by default: only seed an empty database. Re-running the
+      // container must never wipe or duplicate data.
+      const existing = await prisma.tenant.count();
+      if (existing > 0) {
+        console.log('🔒 Database already seeded — skipping (set FORCE_RESEED=true to wipe and reseed).');
+        return;
+      }
+      console.log('🌱 Empty database detected — seeding.');
     }
     
+    // 0. Tenant - must exist before any business row is written, because the
+    //    `tenant_id` default resolves the tenant from the current schema.
+    await ensureTenant(prisma);
+
     // 1. Roles
     const roleIds = await seedRoles(prisma);
 

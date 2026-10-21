@@ -22,9 +22,9 @@ export const Spinner: React.FC<SpinnerProps> = ({
   return (
     <div className={`flex items-center gap-2 ${className}`} role="status">
       <div
-        className={`animate-spin rounded-full ${sizeClasses[size]} border-gray-200 ${color}`}
+        className={`animate-spin rounded-full ${sizeClasses[size]} border-line ${color}`}
       />
-      {label && <span className="text-sm text-gray-500">{label}</span>}
+      {label && <span className="text-sm text-ink-faint">{label}</span>}
       <span className="sr-only">Loading...</span>
     </div>
   );
@@ -33,6 +33,6 @@ export const Spinner: React.FC<SpinnerProps> = ({
 export const FullPageSpinner: React.FC<{ message?: string }> = ({ message = 'Loading...' }) => (
   <div className="flex flex-col items-center justify-center min-h-[400px]">
     <Spinner size="lg" />
-    <p className="mt-4 text-sm text-gray-500">{message}</p>
+    <p className="mt-4 text-sm text-ink-faint">{message}</p>
   </div>
 );

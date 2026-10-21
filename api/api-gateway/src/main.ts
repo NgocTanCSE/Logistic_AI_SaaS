@@ -64,8 +64,8 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
-  app.use(json({ limit: '10mb' }));
-  app.use(urlencoded({ limit: '10mb', extended: true }));
+  app.use(json({ limit: '10mb', verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
+  app.use(urlencoded({ limit: '10mb', extended: true, verify: (req: any, _res, buf) => { req.rawBody = buf; } }));
   Sentry.setupExpressErrorHandler(app);
 
   const port = process.env.PORT || 3000;

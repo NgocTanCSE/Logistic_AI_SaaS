@@ -19,17 +19,17 @@ export const Radio: React.FC<RadioProps> = ({
       <input
         type="radio"
         id={radioId}
-        className={`mt-0.5 h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500 ${
+        className={`mt-0.5 h-4 w-4 border-line-strong text-primary focus:ring-primary ${
           error ? 'border-red-500' : ''
         } ${className}`}
         {...props}
       />
       {label && (
-        <label htmlFor={radioId} className="text-sm text-gray-700 cursor-pointer">
+        <label htmlFor={radioId} className="text-sm text-ink cursor-pointer">
           {label}
         </label>
       )}
-      {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
+      {error && <p className="text-xs text-danger mt-0.5">{error}</p>}
     </div>
   );
 };

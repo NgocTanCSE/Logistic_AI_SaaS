@@ -5,7 +5,7 @@
   "types": "dist/index.d.ts",
   "private": true,
   "scripts": {
-    "dev": "echo 'ui-components ready'",
+    "dev": "tsc",
     "build": "tsc"
   },
   "peerDependencies": {
@@ -13,8 +13,8 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
+    "@types/react": "19.0.0",
+    "@types/react-dom": "19.0.0",
     "typescript": "^5.5.3"
   }
 }

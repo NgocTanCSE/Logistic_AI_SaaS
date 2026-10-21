@@ -11,10 +11,80 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ---------------------------------------------------------------------------
+// Tenant context (row-level security)
+//
+// Bảng nghiệp vụ đã bật RLS: một connection chỉ được đọc/ghi dòng của tenant
+// đang nằm trong GUC `app.tenant_id`. Service này vừa là hệ thống nội bộ
+// (đọc driver để xác định tenant) vừa là đường ghi dữ liệu, nên:
+//   - đọc `drivers` để tra tenant: tạm nâng RLS trong transaction riêng;
+//   - mọi lệnh ghi thật sự: chạy trong transaction có `app.tenant_id`.
+// ---------------------------------------------------------------------------
+
+var tenantCacheMu sync.RWMutex
+var tenantCache = map[string]string{}
+
+// tenantForDriver trả về tenant_id của driver (cache lại vì mỗi tài xế luôn
+// thuộc một tenant).
+func tenantForDriver(ctx context.Context, driverID string) (string, error) {
+	tenantCacheMu.RLock()
+	cached, ok := tenantCache[driverID]
+	tenantCacheMu.RUnlock()
+	if ok {
+		return cached, nil
+	}
+
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+
+	// Chưa có tenant context nên tạm nâng RLS chỉ cho transaction này.
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.bypass_rls', 'on', true)`); err != nil {
+		return "", err
+	}
+
+	var tenantID string
+	if err := tx.QueryRow(ctx,
+		`SELECT tenant_id::text FROM `+schemaName+`.drivers WHERE id = $1::uuid`,
+		driverID,
+	).Scan(&tenantID); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", err
+	}
+
+	tenantCacheMu.Lock()
+	tenantCache[driverID] = tenantID
+	tenantCacheMu.Unlock()
+	return tenantID, nil
+}
+
+// withTenant chạy fn trong transaction có GUC `app.tenant_id` (RLS áp dụng).
+func withTenant(ctx context.Context, tenantID string, fn func(tx pgx.Tx) error) error {
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantID); err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
 
 func generateUUID() string {
 	b := make([]byte, 16)
@@ -46,7 +116,11 @@ var gpsAuthToken string
 func initDB() {
 	schemaName = os.Getenv("DB_SCHEMA")
 	if schemaName == "" {
-		schemaName = "tenant"
+		// The shared `public` schema is owned by the demo tenant. The previous
+		// default (`tenant`) pointed at a schema that does not exist, so every
+		// GPS insert failed. Multi-tenant deployments must set DB_SCHEMA to
+		// the schema of the tenant that owns the device.
+		schemaName = "public"
 	}
 
 	gpsAuthToken = os.Getenv("GPS_AUTH_TOKEN")
@@ -159,45 +233,64 @@ func processUDPPacket(data []byte) {
 	}
 
 	ctx := context.Background()
-	_, err := dbPool.Exec(ctx, `
-		INSERT INTO `+schemaName+`.gps_tracking_logs 
-		(id, driver_id, trip_id, lat, lng, speed, heading, is_offline_cached, timestamp)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, generateUUID(), pt.DriverID, pt.TripID, pt.Lat, pt.Lng, pt.Speed, pt.Heading, pt.IsOfflineCached, pt.Timestamp)
+	tenantID, err := tenantForDriver(ctx, pt.DriverID)
+	if err != nil {
+		log.Printf("⚠️  Cannot resolve tenant for driver %s: %v\n", pt.DriverID, err)
+		return
+	}
 
+	err = withTenant(ctx, tenantID, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO `+schemaName+`.gps_tracking_logs 
+			(id, driver_id, trip_id, lat, lng, speed, heading, is_offline_cached, timestamp)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		`, generateUUID(), pt.DriverID, pt.TripID, pt.Lat, pt.Lng, pt.Speed, pt.Heading, pt.IsOfflineCached, pt.Timestamp); err != nil {
+			return err
+		}
+
+		_, err := tx.Exec(ctx, `
+			UPDATE `+schemaName+`.drivers
+			SET last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
+				location_updated_at = NOW()
+			WHERE id = $3::uuid
+		`, pt.Lng, pt.Lat, pt.DriverID)
+		return err
+	})
 	if err != nil {
 		return
 	}
 
-	_, _ = dbPool.Exec(ctx, `
-		UPDATE `+schemaName+`.drivers
-		SET last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
-			location_updated_at = NOW()
-		WHERE id = $3::uuid
-	`, pt.Lng, pt.Lat, pt.DriverID)
-
 	// Geofence check asynchronously
-	go checkGeofence(context.Background(), pt.DriverID, pt.TripID, pt.Lng, pt.Lat)
+	go checkGeofence(context.Background(), pt.DriverID, pt.TripID, pt.Lng, pt.Lat, tenantID)
 }
 
-func checkGeofence(ctx context.Context, driverId string, tripId string, lng, lat float64) {
+func checkGeofence(ctx context.Context, driverId string, tripId string, lng, lat float64, tenantID string) {
 	var fenceName, zoneType string
-	err := dbPool.QueryRow(ctx, `
-		SELECT name, zone_type FROM `+schemaName+`.geofences 
-		WHERE is_active = true 
-		  AND ST_Contains(polygon, ST_SetSRID(ST_MakePoint($1, $2), 4326)) = true
-		LIMIT 1
-	`, lng, lat).Scan(&fenceName, &zoneType)
-
-	if err == nil {
-		log.Printf("Driver %s entered Geofence [%s]: %s\n", driverId, zoneType, fenceName)
-		if zoneType == "RESTRICTED" {
-			_, _ = dbPool.Exec(ctx, `
-				INSERT INTO `+schemaName+`.sos_alerts (id, driver_id, trip_id, message, status, created_at, updated_at)
-				VALUES ($1, $2, $3, $4, 'OPEN', NOW(), NOW())
-			`, generateUUID(), driverId, tripId, "GEOFENCE BREACH: Entered Restricted Zone - "+fenceName)
-			log.Printf("SOS Alert generated for Driver %s\n", driverId)
+	err := withTenant(ctx, tenantID, func(tx pgx.Tx) error {
+		if err := tx.QueryRow(ctx, `
+			SELECT name, zone_type FROM `+schemaName+`.geofences 
+			WHERE is_active = true 
+			  AND ST_Contains(polygon, ST_SetSRID(ST_MakePoint($1, $2), 4326)) = true
+			LIMIT 1
+		`, lng, lat).Scan(&fenceName, &zoneType); err != nil {
+			return err
 		}
+
+		if zoneType != "RESTRICTED" {
+			return nil
+		}
+		_, err := tx.Exec(ctx, `
+			INSERT INTO `+schemaName+`.sos_alerts (id, driver_id, trip_id, message, status, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, 'OPEN', NOW(), NOW())
+		`, generateUUID(), driverId, tripId, "GEOFENCE BREACH: Entered Restricted Zone - "+fenceName)
+		return err
+	})
+	if err != nil {
+		return
+	}
+	log.Printf("Driver %s entered Geofence [%s]: %s\n", driverId, zoneType, fenceName)
+	if zoneType == "RESTRICTED" {
+		log.Printf("SOS Alert generated for Driver %s\n", driverId)
 	}
 }
 
@@ -220,49 +313,64 @@ func handleGPSBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	tx, err := dbPool.Begin(ctx)
-	if err != nil {
-		http.Error(w, "Internal error", http.StatusInternalServerError)
-		return
-	}
-	defer tx.Rollback(ctx)
 
+	// Gom điểm theo tài xế: mỗi tài xế thuộc đúng một tenant, nên mỗi nhóm
+	// được ghi trong transaction có GUC `app.tenant_id` tương ứng (RLS áp dụng).
+	byDriver := map[string][]GPSPoint{}
+	var driverOrder []string
 	for _, pt := range body.Points {
 		if pt.Lat < -90 || pt.Lat > 90 || pt.Lng < -180 || pt.Lng > 180 || pt.Speed > 150 {
 			continue
 		}
+		if _, seen := byDriver[pt.DriverID]; !seen {
+			driverOrder = append(driverOrder, pt.DriverID)
+		}
+		byDriver[pt.DriverID] = append(byDriver[pt.DriverID], pt)
+	}
 
-		_, err := tx.Exec(ctx, `
-			INSERT INTO `+schemaName+`.gps_tracking_logs 
-			(id, driver_id, trip_id, lat, lng, speed, heading, is_offline_cached, timestamp)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		`, generateUUID(), pt.DriverID, pt.TripID, pt.Lat, pt.Lng, pt.Speed, pt.Heading, pt.IsOfflineCached, pt.Timestamp)
-		
+	received := 0
+	for _, driverID := range driverOrder {
+		points := byDriver[driverID]
+		tenantID, err := tenantForDriver(ctx, driverID)
 		if err != nil {
-			log.Printf("❌ Error inserting GPS point: %v\n", err)
+			log.Printf("⚠️  Cannot resolve tenant for driver %s: %v\n", driverID, err)
 			continue
 		}
+
+		err = withTenant(ctx, tenantID, func(tx pgx.Tx) error {
+			for _, pt := range points {
+				if _, err := tx.Exec(ctx, `
+					INSERT INTO `+schemaName+`.gps_tracking_logs 
+					(id, driver_id, trip_id, lat, lng, speed, heading, is_offline_cached, timestamp)
+					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+				`, generateUUID(), pt.DriverID, pt.TripID, pt.Lat, pt.Lng, pt.Speed, pt.Heading, pt.IsOfflineCached, pt.Timestamp); err != nil {
+					return err
+				}
+			}
+
+			lastPt := points[len(points)-1]
+			_, err := tx.Exec(ctx, `
+				UPDATE `+schemaName+`.drivers
+				SET last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
+					location_updated_at = NOW()
+				WHERE id = $3::uuid
+			`, lastPt.Lng, lastPt.Lat, driverID)
+			return err
+		})
+		if err != nil {
+			log.Printf("❌ Error inserting GPS batch for driver %s: %v\n", driverID, err)
+			continue
+		}
+		received += len(points)
+
+		// Async geofence check cho điểm cuối của nhóm
+		lastPt := points[len(points)-1]
+		go checkGeofence(context.Background(), driverID, lastPt.TripID, lastPt.Lng, lastPt.Lat, tenantID)
 	}
-
-	lastPt := body.Points[len(body.Points)-1]
-	_, _ = tx.Exec(ctx, `
-		UPDATE `+schemaName+`.drivers
-		SET last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
-			location_updated_at = NOW()
-		WHERE id = $3::uuid
-	`, lastPt.Lng, lastPt.Lat, lastPt.DriverID)
-
-	if err := tx.Commit(ctx); err != nil {
-		http.Error(w, "Commit failed", http.StatusInternalServerError)
-		return
-	}
-
-	// Async geofence check for the last point
-	go checkGeofence(context.Background(), lastPt.DriverID, lastPt.TripID, lastPt.Lng, lastPt.Lat)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"ok":       true,
-		"received": len(body.Points),
+		"received": received,
 	})
 }

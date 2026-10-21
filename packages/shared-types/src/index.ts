@@ -10,3 +10,4 @@ export * from "./permissions";
 export * from "./role-permission-map";
 export * from "./guards/permissions.guard";
 export * from "./decorators/require-permissions.decorator";
+export * from "./config";

@@ -93,7 +93,7 @@ export function Table<T extends { id?: string }>({
 
   if (data.length === 0) {
     return (
-      <div className="text-center p-8 text-gray-500">
+      <div className="text-center p-8 text-ink-faint">
         {emptyMessage}
       </div>
     );
@@ -102,7 +102,7 @@ export function Table<T extends { id?: string }>({
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+        <thead className="bg-surface-alt/60">
           <tr>
             {selectable && (
               <th className="px-6 py-3 text-left">
@@ -110,15 +110,15 @@ export function Table<T extends { id?: string }>({
                   type="checkbox"
                   checked={selectedIds.size === data.length && data.length > 0}
                   onChange={handleSelectAll}
-                  className="rounded border-gray-300"
+                  className="rounded border-line-strong"
                 />
               </th>
             )}
             {columns.map((column) => (
               <th
                 key={column.key}
-                className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                  column.sortable ? 'cursor-pointer hover:bg-gray-100' : ''
+                className={`px-6 py-3 text-left text-xs font-medium text-ink-faint uppercase tracking-wider ${
+                  column.sortable ? 'cursor-pointer hover:bg-surface-alt' : ''
                 }`}
                 style={column.width ? { width: column.width } : undefined}
                 onClick={() => column.sortable && handleSort(column.key)}
@@ -137,8 +137,8 @@ export function Table<T extends { id?: string }>({
           {sortedData.map((item, index) => (
             <tr
               key={item.id || index}
-              className={`${striped && index % 2 === 0 ? 'bg-gray-50' : ''} ${
-                onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''
+              className={`${striped && index % 2 === 0 ? 'bg-surface-alt/60' : ''} ${
+                onRowClick ? 'cursor-pointer hover:bg-surface-alt/60' : ''
               }`}
               onClick={() => onRowClick?.(item)}
             >
@@ -149,7 +149,7 @@ export function Table<T extends { id?: string }>({
                     checked={selectedIds.has(item.id)}
                     onChange={() => handleSelectRow(item.id!)}
                     onClick={(e) => e.stopPropagation()}
-                    className="rounded border-gray-300"
+                    className="rounded border-line-strong"
                   />
                 </td>
               )}

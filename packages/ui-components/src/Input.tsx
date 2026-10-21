@@ -1,37 +1,45 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
-  helperText?: string;
+  icon?: React.ReactNode;
 }
 
-export const Input: React.FC<InputProps> = ({
-  label,
-  error,
-  helperText,
-  className = '',
-  id,
-  ...props
-}) => {
-  const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ label, error, icon, className = '', ...props }, ref) => {
+    return (
+      <div className="flex flex-col gap-1.5 w-full">
+        {label && (
+          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1">
+            {label}
+          </label>
+        )}
+        <div className="relative flex items-center">
+          {icon && (
+            <div className="absolute left-4 text-slate-400">
+              {icon}
+            </div>
+          )}
+          <input
+            ref={ref}
+            className={`
+              w-full bg-white  border border-slate-200 text-ink text-sm rounded-xl 
+              focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary 
+              transition-all duration-200 placeholder:text-slate-400
+              ${icon ? 'pl-11 pr-4 py-3' : 'px-4 py-3'}
+              ${error ? 'border-red-300 focus:ring-red-200 focus:border-red-400' : ''}
+              ${className}
+            `}
+            {...props}
+          />
+        </div>
+        {error && (
+          <span className="text-xs text-red-500 font-medium ml-1 ">{error}</span>
+        )}
+      </div>
+    );
+  }
+);
 
-  return (
-    <div className="w-full">
-      {label && (
-        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">
-          {label}
-        </label>
-      )}
-      <input
-        id={inputId}
-        className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-          error ? 'border-red-500' : 'border-gray-300'
-        } ${className}`}
-        {...props}
-      />
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-      {helperText && !error && <p className="mt-1 text-sm text-gray-500">{helperText}</p>}
-    </div>
-  );
-};
+Input.displayName = 'Input';

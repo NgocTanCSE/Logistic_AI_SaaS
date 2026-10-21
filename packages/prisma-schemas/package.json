@@ -10,7 +10,8 @@
     "migrate:deploy": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
     "db:push": "prisma db push",
-    "db:push:force": "prisma db push --accept-data-loss"
+    "db:push:force": "prisma db push --accept-data-loss",
+    "test:tenant-isolation": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f prisma/tests/tenant-isolation.sql"
   },
   "devDependencies": {
     "@faker-js/faker": "^8.4.1",

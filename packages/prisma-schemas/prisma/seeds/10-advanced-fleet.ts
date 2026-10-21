@@ -70,7 +70,19 @@ export async function seedAdvancedFleet(prisma: PrismaClient) {
   }
 
   await prisma.gpsTrackingLog.createMany({ data: gpsLogs });
-  await prisma.geofence.createMany({ data: geofences });
+  // `polygon` is a PostGIS geometry column: the Prisma client cannot write
+  // it, so the rows are inserted with a raw statement.
+  for (const fence of geofences) {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO "geofences" (id, name, polygon, zone_type, is_active)
+       VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326), $4, $5)`,
+      fence.id,
+      fence.name,
+      fence.polygon,
+      fence.zoneType,
+      fence.isActive,
+    );
+  }
   await prisma.driverExpense.createMany({ data: expenses });
   await prisma.codRemittance.createMany({ data: cods });
 

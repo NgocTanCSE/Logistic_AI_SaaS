@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	pgx "github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -64,6 +65,94 @@ type DeliveryStatus struct {
 	CreatedAt       time.Time `json:"created_at"`
 	LastAttemptedAt time.Time `json:"last_attempted_at"`
 	CompletedAt     *time.Time `json:"completed_at,omitempty"`
+}
+
+// ---------------------------------------------------------------------------
+// Tenant context (row-level security)
+//
+// `client_webhooks` là bảng nghiệp vụ đã bật RLS nên chỉ đọc/ghi được dòng
+// của tenant trong GUC `app.tenant_id`:
+//   - tra tenant từ client (hoặc từ chính webhook) bằng transaction bypass;
+//   - mọi lệnh ghi thật sự chạy trong transaction có `app.tenant_id`.
+//   - các thao tác xuyên tenant (danh sách toàn bộ) dùng bypass có kiểm soát.
+// ---------------------------------------------------------------------------
+
+// tenantForClient trả về tenant_id sở hữu client.
+func tenantForClient(ctx context.Context, clientID string) (string, error) {
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.bypass_rls', 'on', true)`); err != nil {
+		return "", err
+	}
+
+	var tenantID string
+	if err := tx.QueryRow(ctx, `SELECT tenant_id::text FROM clients WHERE id = $1`, clientID).Scan(&tenantID); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", err
+	}
+	return tenantID, nil
+}
+
+// tenantForWebhook trả về tenant_id sở hữu webhook.
+func tenantForWebhook(ctx context.Context, webhookID string) (string, error) {
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.bypass_rls', 'on', true)`); err != nil {
+		return "", err
+	}
+
+	var tenantID string
+	if err := tx.QueryRow(ctx, `SELECT tenant_id::text FROM client_webhooks WHERE id = $1`, webhookID).Scan(&tenantID); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", err
+	}
+	return tenantID, nil
+}
+
+// withTenant chạy fn trong transaction có GUC `app.tenant_id`.
+func withTenant(ctx context.Context, tenantID string, fn func(tx pgx.Tx) error) error {
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, tenantID); err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// withPlatform chạy fn trong transaction nâng RLS (thao tác xuyên tenant).
+func withPlatform(ctx context.Context, fn func(tx pgx.Tx) error) error {
+	tx, err := dbPool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.bypass_rls', 'on', true)`); err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func initAuth() {
@@ -139,8 +228,9 @@ func initDB() {
 	CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_created_at ON webhook_deliveries(created_at DESC);
 
 	CREATE TABLE IF NOT EXISTS client_webhooks (
-		id UUID PRIMARY KEY,
-		client_id UUID NOT NULL,
+		id TEXT PRIMARY KEY,
+		client_id TEXT NOT NULL,
+		tenant_id TEXT,
 		url TEXT NOT NULL,
 		events TEXT NOT NULL DEFAULT '[]',
 		secret_token TEXT,
@@ -486,24 +576,31 @@ func setupRoutes() *http.ServeMux {
 				http.Error(w, "DB not available", http.StatusServiceUnavailable)
 				return
 			}
-			rows, err := dbPool.Query(ctx, `SELECT id, client_id, url, events, secret_token, created_at, updated_at FROM client_webhooks`)
+			// Danh sách xuyên tenant: chạy trong transaction bypass RLS.
+			var list []Webhook
+			err := withPlatform(ctx, func(tx pgx.Tx) error {
+				rows, err := tx.Query(ctx, `SELECT id, client_id, url, events, secret_token, created_at, updated_at FROM client_webhooks`)
+				if err != nil {
+					return err
+				}
+				defer rows.Close()
+				for rows.Next() {
+					var wb Webhook
+					var events string
+					var created, updated time.Time
+					if err := rows.Scan(&wb.Id, &wb.ClientId, &wb.Url, &events, &wb.SecretToken, &created, &updated); err != nil {
+						continue
+					}
+					_ = json.Unmarshal([]byte(events), &wb.Events)
+					wb.CreatedAt = created
+					wb.UpdatedAt = updated
+					list = append(list, wb)
+				}
+				return rows.Err()
+			})
 			if err != nil {
 				http.Error(w, "DB query failed", http.StatusInternalServerError)
 				return
-			}
-			defer rows.Close()
-			var list []Webhook
-			for rows.Next() {
-				var wb Webhook
-				var events string
-				var created, updated time.Time
-				if err := rows.Scan(&wb.Id, &wb.ClientId, &wb.Url, &events, &wb.SecretToken, &created, &updated); err != nil {
-					continue
-				}
-				_ = json.Unmarshal([]byte(events), &wb.Events)
-				wb.CreatedAt = created
-				wb.UpdatedAt = updated
-				list = append(list, wb)
 			}
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(list)
@@ -528,10 +625,19 @@ func setupRoutes() *http.ServeMux {
 			wb.UpdatedAt = now
 
 			if dbPool != nil {
-				_, err := dbPool.Exec(ctx, `
-					INSERT INTO client_webhooks (id, client_id, url, events, secret_token, created_at, updated_at)
-					VALUES ($1, $2, $3, $4, $5, $6, $7)
-				`, wb.Id, wb.ClientId, wb.Url, string(eventsJSON), wb.SecretToken, wb.CreatedAt, wb.UpdatedAt)
+				tenantID, terr := tenantForClient(ctx, wb.ClientId)
+				if terr != nil {
+					log.Printf("ERROR resolving tenant for client %s: %v", wb.ClientId, terr)
+					http.Error(w, "Client not found", http.StatusNotFound)
+					return
+				}
+				err := withTenant(ctx, tenantID, func(tx pgx.Tx) error {
+					_, err := tx.Exec(ctx, `
+						INSERT INTO client_webhooks (id, client_id, url, events, secret_token, created_at, updated_at, tenant_id)
+						VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+					`, wb.Id, wb.ClientId, wb.Url, string(eventsJSON), wb.SecretToken, wb.CreatedAt, wb.UpdatedAt, tenantID)
+					return err
+				})
 				if err != nil {
 					log.Printf("ERROR creating webhook: %v", err)
 					http.Error(w, "Failed to create webhook in database", http.StatusInternalServerError)
@@ -574,8 +680,15 @@ func setupRoutes() *http.ServeMux {
 			var wb Webhook
 			var events string
 			var created, updated time.Time
-			err := dbPool.QueryRow(ctx, `SELECT id, client_id, url, events, secret_token, created_at, updated_at FROM client_webhooks WHERE id=$1`, id).
-				Scan(&wb.Id, &wb.ClientId, &wb.Url, &events, &wb.SecretToken, &created, &updated)
+			tenantID, terr := tenantForWebhook(ctx, id)
+			if terr != nil {
+				http.Error(w, "Webhook not found", http.StatusNotFound)
+				return
+			}
+			err := withTenant(ctx, tenantID, func(tx pgx.Tx) error {
+				return tx.QueryRow(ctx, `SELECT id, client_id, url, events, secret_token, created_at, updated_at FROM client_webhooks WHERE id=$1`, id).
+					Scan(&wb.Id, &wb.ClientId, &wb.Url, &events, &wb.SecretToken, &created, &updated)
+			})
 			if err != nil {
 				http.Error(w, "Webhook not found", http.StatusNotFound)
 				return
@@ -597,9 +710,17 @@ func setupRoutes() *http.ServeMux {
 			eventsJSON, _ := json.Marshal(body.Events)
 
 			if dbPool != nil {
-				_, err := dbPool.Exec(ctx, `
-					UPDATE client_webhooks SET url=$1, events=$2, secret_token=$3, updated_at=$4 WHERE id=$5
-				`, body.Url, string(eventsJSON), body.SecretToken, now, id)
+				tenantID, terr := tenantForWebhook(ctx, id)
+				if terr != nil {
+					http.Error(w, "Webhook not found", http.StatusNotFound)
+					return
+				}
+				err := withTenant(ctx, tenantID, func(tx pgx.Tx) error {
+					_, err := tx.Exec(ctx, `
+						UPDATE client_webhooks SET url=$1, events=$2, secret_token=$3, updated_at=$4 WHERE id=$5
+					`, body.Url, string(eventsJSON), body.SecretToken, now, id)
+					return err
+				})
 				if err != nil {
 					http.Error(w, "Failed to update webhook in database", http.StatusInternalServerError)
 					return
@@ -617,7 +738,15 @@ func setupRoutes() *http.ServeMux {
 		case http.MethodDelete:
 			// Delete webhook
 			if dbPool != nil {
-				_, err := dbPool.Exec(ctx, `DELETE FROM client_webhooks WHERE id=$1`, id)
+				tenantID, terr := tenantForWebhook(ctx, id)
+				if terr != nil {
+					http.Error(w, "Webhook not found", http.StatusNotFound)
+					return
+				}
+				err := withTenant(ctx, tenantID, func(tx pgx.Tx) error {
+					_, err := tx.Exec(ctx, `DELETE FROM client_webhooks WHERE id=$1`, id)
+					return err
+				})
 				if err != nil {
 					http.Error(w, "Failed to delete webhook from database", http.StatusInternalServerError)
 					return

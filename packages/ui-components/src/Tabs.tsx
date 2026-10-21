@@ -32,7 +32,7 @@ export function Tabs({ tabs, defaultTab, onChange, className = '' }: TabsProps) 
 
   return (
     <div className={className}>
-      <div className="border-b border-gray-200 dark:border-gray-700">
+      <div className="border-b border-line dark:border-gray-700">
         <nav className="flex gap-1 -mb-px" aria-label="Tabs">
           {tabs.map(tab => (
             <button
@@ -42,8 +42,8 @@ export function Tabs({ tabs, defaultTab, onChange, className = '' }: TabsProps) 
               className={`
                 flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors
                 ${activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                  ? 'border-blue-500 text-primary dark:text-primary/70'
+                  : 'border-transparent text-ink-faint hover:text-ink hover:border-line-strong dark:text-ink-faint dark:hover:text-ink-faint'
                 }
                 ${tab.disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
               `}

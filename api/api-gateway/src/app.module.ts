@@ -10,9 +10,10 @@ import { CacheHeadersMiddleware } from './middleware/cache-headers.middleware';
 import { JwtGatewayGuard } from './guards/jwt.gateway.guard';
 import { HttpModule } from '@nestjs/axios';
 import { GatewayHealthController } from './controllers/gateway-health.controller';
+import { BffModule } from './bff/bff.module';
 
 @Module({
-  imports: [HttpModule],
+  imports: [HttpModule, BffModule],
   controllers: [HealthController, RoutesController, GatewayHealthController, MetricsController],
   providers: [
     {

@@ -7,6 +7,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Outbox pattern: sự kiện nghiệp vụ được ghi cùng transaction với thay đổi
+/// dữ liệu, sau đó một worker gửi đi (Kafka / webhook). Nhờ vậy không còn
+/// trường hợp "đơn hàng đã tạo nhưng event chưa phát" hoặc ngược lại.
+///
+/// Bảng này thuộc lớp platform (đọc/ghi xuyên tenant) nên không bật RLS.
+model OutboxEvent {
+  id          String    @id @default(uuid())
+  tenantId    String?   @map("tenant_id")
+  /// Kênh gửi: KAFKA | WEBHOOK
+  channel     String
+  /// Tên topic/event, ví dụ `order.created`
+  topic       String
+  payload     Json
+  /// PENDING | PROCESSING | SENT | FAILED
+  status      String    @default("PENDING")
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+  /// Thời điểm sớm nhất được gửi lại (backoff khi thất bại)
+  availableAt DateTime  @default(now()) @map("available_at")
+  processedAt DateTime? @map("processed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, availableAt])
+  @@index([tenantId])
+  @@index([topic])
+  @@map("outbox_events")
+}
+
 model Tenant {
   id                String            @id @default(uuid())
   name              String
@@ -91,7 +120,8 @@ model SystemAdmin {
 
 model TenantUser {
   id               String    @id @default(uuid())
-  email            String    @unique
+  tenantId         String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
+  email            String
   passwordHash     String    @map("password_hash")
   fullName         String    @map("full_name")
   phone            String?
@@ -117,14 +147,17 @@ model TenantUser {
   StaffShift        StaffShift[]
   EquipmentCheckout EquipmentCheckout[]
 
+  @@unique([tenantId, email])
   @@index([status])
   @@index([createdAt])
   @@index([phone])
+  @@index([tenantId])
   @@map("tenant_users")
 }
 
 model CustomRole {
   id              String    @id @default(uuid())
+  tenantId        String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   name            String
   isSystemDefault Boolean   @default(false) @map("is_system_default")
   createdAt       DateTime  @default(now()) @map("created_at")
@@ -134,10 +167,12 @@ model CustomRole {
   permissions RolePermission[]
   users       UserRole[]
 
+  @@index([tenantId])
   @@map("custom_roles")
 }
 
 model RolePermission {
+  tenantId String @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   roleId   String @map("role_id")
   resource String
   action   String
@@ -145,24 +180,28 @@ model RolePermission {
   role CustomRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([roleId, resource, action])
+  @@index([tenantId])
   @@map("role_permissions")
 }
 
 model UserRole {
-  userId String @map("user_id")
-  roleId String @map("role_id")
+  tenantId String @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
+  userId   String @map("user_id")
+  roleId   String @map("role_id")
 
   user TenantUser @relation(fields: [userId], references: [id], onDelete: Cascade)
   role CustomRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
+  @@index([tenantId])
   @@map("user_roles")
 }
 
 model Branch {
   id          String    @id @default(uuid())
+  tenantId    String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   type        String
-  code        String    @unique
+  code        String
   name        String
   address     String
   lat         Decimal?
@@ -176,13 +215,16 @@ model Branch {
 
   manager TenantUser? @relation(fields: [managerId], references: [id])
 
+  @@unique([tenantId, code])
+  @@index([tenantId])
   @@map("branches")
 }
 
 model Warehouse {
   id        String    @id @default(uuid())
+  tenantId  String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   name      String
-  code      String    @unique
+  code      String
   address   String
   status    String    @default("ACTIVE")
   managerId String?   @map("manager_id")
@@ -204,13 +246,16 @@ model Warehouse {
   StaffShift        StaffShift[]
   EquipmentCheckout EquipmentCheckout[]
 
+  @@unique([tenantId, code])
   @@index([status])
   @@index([managerId])
+  @@index([tenantId])
   @@map("warehouses")
 }
 
 model Zone {
   id          String   @id @default(uuid())
+  tenantId    String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   warehouseId String   @map("warehouse_id")
   code        String
   type        String
@@ -221,11 +266,13 @@ model Zone {
   racks     Rack[]
 
   @@unique([warehouseId, code])
+  @@index([tenantId])
   @@map("zones")
 }
 
 model Rack {
   id        String   @id @default(uuid())
+  tenantId  String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   zoneId    String   @map("zone_id")
   code      String
   aisle     String
@@ -238,14 +285,16 @@ model Rack {
   bins Bin[]
 
   @@unique([zoneId, code])
+  @@index([tenantId])
   @@map("racks")
 }
 
 model Bin {
   id           String   @id @default(uuid())
+  tenantId     String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   rackId       String   @map("rack_id")
   warehouseId  String   @map("warehouse_id")
-  barcode      String   @unique
+  barcode      String
   rowIndex     Int      @map("row_index")
   levelIndex   Int      @map("level_index")
   maxWeightKg  Decimal  @default(1000) @map("max_weight_kg")
@@ -260,16 +309,19 @@ model Bin {
   warehouse Warehouse   @relation(fields: [warehouseId], references: [id])
   inventory Inventory[]
 
+  @@unique([tenantId, barcode])
   @@index([rackId])
   @@index([warehouseId])
+  @@index([tenantId])
   @@map("bins")
 }
 
 model Category {
   id        String   @id @default(uuid())
+  tenantId  String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   name      String
   parentId  String?  @map("parent_id")
-  slug      String   @unique
+  slug      String
   icon      String?
   sortOrder Int      @default(0) @map("sort_order")
   isActive  Boolean  @default(true) @map("is_active")
@@ -280,14 +332,17 @@ model Category {
   children Category[] @relation("CategoryTree")
   products Product[]
 
+  @@unique([tenantId, slug])
+  @@index([tenantId])
   @@map("categories")
 }
 
 model Product {
   id          String    @id @default(uuid())
-  sku         String    @unique
+  tenantId    String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
+  sku         String
   name        String
-  barcode     String?   @unique
+  barcode     String?
   categoryId  String?   @map("category_id")
   weightKg    Decimal   @default(0) @map("weight_kg")
   volumeCbm   Decimal   @default(0) @map("volume_cbm")
@@ -305,13 +360,17 @@ model Product {
   TaskItem        TaskItem[]
   demandForecasts DemandForecast[]
 
+  @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
   @@index([categoryId])
   @@index([status])
+  @@index([tenantId])
   @@map("products")
 }
 
 model Inventory {
   id                String    @id @default(uuid())
+  tenantId          String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   warehouseId       String    @map("warehouse_id")
   binId             String    @map("bin_id")
   productId         String    @map("product_id")
@@ -335,11 +394,13 @@ model Inventory {
   @@index([warehouseId])
   @@index([productId])
   @@index([warehouseId, productId])
+  @@index([tenantId])
   @@map("inventory")
 }
 
 model StockMovement {
   id                String   @id @default(uuid())
+  tenantId          String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   inventoryId       String   @map("inventory_id")
   warehouseId       String   @map("warehouse_id")
   transactionType   String   @map("transaction_type")
@@ -359,13 +420,15 @@ model StockMovement {
   @@index([inventoryId])
   @@index([createdAt])
   @@index([inventoryId, createdAt])
+  @@index([tenantId])
   @@map("stock_movements")
 }
 
 model WavePicking {
   id          String    @id @default(uuid())
+  tenantId    String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   warehouseId String    @map("warehouse_id")
-  waveNumber  String    @unique @map("wave_number")
+  waveNumber  String @map("wave_number")
   status      String    @default("NEW")
   totalOrders Int       @default(0) @map("total_orders")
   totalItems  Int       @default(0) @map("total_items")
@@ -377,13 +440,16 @@ model WavePicking {
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
   tasks     Task[]
 
+  @@unique([tenantId, waveNumber])
   @@index([warehouseId])
   @@index([status])
+  @@index([tenantId])
   @@map("wave_picking")
 }
 
 model Task {
   id                String    @id @default(uuid())
+  tenantId          String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   warehouseId       String    @map("warehouse_id")
   taskType          String    @map("task_type")
   status            String    @default("PENDING")
@@ -410,11 +476,13 @@ model Task {
   @@index([assigneeId])
   @@index([status])
   @@index([productId])
+  @@index([tenantId])
   @@map("tasks")
 }
 
 model Client {
   id        String    @id @default(uuid())
+  tenantId  String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   name      String
   status    String    @default("ACTIVE")
   createdAt DateTime  @default(now()) @map("created_at")
@@ -429,11 +497,13 @@ model Client {
 
   @@index([status])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("clients")
 }
 
 model ClientUser {
   id        String   @id @default(uuid())
+  tenantId  String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   clientId  String   @map("client_id")
   email     String
   fullName  String   @map("full_name")
@@ -446,11 +516,13 @@ model ClientUser {
 
   @@index([clientId])
   @@index([email])
+  @@index([tenantId])
   @@map("client_users")
 }
 
 model Order {
   id                    String    @id @default(uuid())
+  tenantId              String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   trackingCode          String    @unique @map("tracking_code")
   clientId              String?   @map("client_id")
   clientOrderRef        String?   @map("client_order_ref")
@@ -491,11 +563,13 @@ model Order {
   @@index([trackingCode])
   @@index([recipientPhone])
   @@index([clientId, status])
+  @@index([tenantId])
   @@map("orders")
 }
 
 model OrderItem {
   id               String   @id @default(uuid())
+  tenantId         String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   orderId          String   @map("order_id")
   productId        String   @map("product_id")
   quantity         Int
@@ -507,11 +581,13 @@ model OrderItem {
   returns ReturnItem[]
 
   @@index([orderId])
+  @@index([tenantId])
   @@map("order_items")
 }
 
 model OrderTrackingEvent {
   id          String   @default(uuid())
+  tenantId    String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   orderId     String   @map("order_id")
   status      String
   location    String?
@@ -525,11 +601,13 @@ model OrderTrackingEvent {
   @@id([id, timestamp])
   @@index([orderId])
   @@index([status])
+  @@index([tenantId])
   @@map("order_tracking_events")
 }
 
 model AiModel {
   id        String    @id @default(uuid())
+  tenantId  String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   name      String
   version   String
   type      String
@@ -544,11 +622,13 @@ model AiModel {
 
   @@index([type])
   @@index([isCurrent])
+  @@index([tenantId])
   @@map("ai_models")
 }
 
 model AiFeedback {
   id             String   @id @default(uuid())
+  tenantId       String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   modelId        String   @map("model_id")
   resourceType   String   @map("resource_type")
   resourceId     String   @map("resource_id")
@@ -564,11 +644,13 @@ model AiFeedback {
   @@index([modelId])
   @@index([resourceType, resourceId])
   @@index([isUsedForTrain])
+  @@index([tenantId])
   @@map("ai_feedbacks")
 }
 
 model DemandForecast {
   id             String   @id @default(uuid())
+  tenantId       String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   productId      String   @map("product_id")
   forecastDate   DateTime @map("forecast_date")
   demandQuantity Int      @map("demand_quantity")
@@ -581,11 +663,13 @@ model DemandForecast {
   @@index([productId])
   @@index([forecastDate])
   @@index([productId, forecastDate])
+  @@index([tenantId])
   @@map("demand_forecasts")
 }
 
 model ClientWebhook {
   id          String    @id @default(uuid())
+  tenantId    String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   clientId    String    @map("client_id")
   url         String
   events      String
@@ -599,12 +683,14 @@ model ClientWebhook {
 
   @@index([clientId])
   @@index([isActive])
+  @@index([tenantId])
   @@map("client_webhooks")
 }
 
 model Vehicle {
   id          String    @id @default(uuid())
-  plateNumber String    @unique @map("plate_number")
+  tenantId    String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
+  plateNumber String @map("plate_number")
   type        String
   capacityKg  Decimal   @default(0) @map("capacity_kg")
   capacityCbm Decimal   @default(0) @map("capacity_cbm")
@@ -615,22 +701,25 @@ model Vehicle {
 
   trips Trip[]
 
+  @@unique([tenantId, plateNumber])
   @@index([status])
   @@index([plateNumber])
+  @@index([tenantId])
   @@map("vehicles")
 }
 
 model Driver {
-  id                String    @id @default(uuid())
-  userId            String    @unique @map("user_id")
-  licenseClass      String    @map("license_class")
-  licenseExpiry     DateTime  @map("license_expiry")
-  status            String    @default("OFFLINE")
-  lastKnownLocation String?   @map("last_known_location")
-  locationUpdatedAt DateTime? @map("location_updated_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  deletedAt         DateTime? @map("deleted_at")
+  id                String                                @id @default(uuid())
+  tenantId          String                                @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
+  userId            String                                @unique @map("user_id")
+  licenseClass      String                                @map("license_class")
+  licenseExpiry     DateTime                              @map("license_expiry")
+  status            String                                @default("OFFLINE")
+  lastKnownLocation Unsupported("geometry(Point, 4326)")? @map("last_known_location")
+  locationUpdatedAt DateTime?                             @map("location_updated_at")
+  createdAt         DateTime                              @default(now()) @map("created_at")
+  updatedAt         DateTime                              @updatedAt @map("updated_at")
+  deletedAt         DateTime?                             @map("deleted_at")
 
   user           TenantUser       @relation(fields: [userId], references: [id])
   trips          Trip[]
@@ -645,12 +734,15 @@ model Driver {
   @@index([status])
   @@index([userId])
   @@index([createdAt])
+  @@index([tenantId])
+  @@index([lastKnownLocation], type: Gist)
   @@map("drivers")
 }
 
 model Trip {
   id                   String    @id @default(uuid())
-  tripCode             String    @unique @map("trip_code")
+  tenantId             String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
+  tripCode             String @map("trip_code")
   vehicleId            String?   @map("vehicle_id")
   driverId             String?   @map("driver_id")
   status               String    @default("DRAFT")
@@ -678,16 +770,19 @@ model Trip {
   GpsTrackingLog   GpsTrackingLog[]
   returnRequests   ReturnRequest[]  @relation("PickupTrip")
 
+  @@unique([tenantId, tripCode])
   @@index([driverId])
   @@index([status])
   @@index([createdAt])
   @@index([driverId, status])
   @@index([status, createdAt])
+  @@index([tenantId])
   @@map("trips")
 }
 
 model TripStop {
   id                String    @id @default(uuid())
+  tenantId          String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   tripId            String    @map("trip_id")
   orderId           String?   @map("order_id")
   stopType          String    @map("stop_type")
@@ -704,11 +799,13 @@ model TripStop {
   order Order? @relation(fields: [orderId], references: [id])
 
   @@unique([tripId, sequence])
+  @@index([tenantId])
   @@map("trip_stops")
 }
 
 model Delivery {
   id                 String    @id @default(uuid())
+  tenantId           String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   tripId             String    @map("trip_id")
   orderId            String    @map("order_id")
   stopSequence       Int       @map("stop_sequence")
@@ -743,11 +840,13 @@ model Delivery {
   @@index([status])
   @@index([orderId, status])
   @@index([driverId, status])
+  @@index([tenantId])
   @@map("deliveries")
 }
 
 model DriverExpense {
   id              String   @id @default(uuid())
+  tenantId        String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   driverId        String   @map("driver_id")
   tripId          String?  @map("trip_id")
   amount          Decimal
@@ -766,11 +865,13 @@ model DriverExpense {
   @@index([driverId])
   @@index([tripId])
   @@index([status])
+  @@index([tenantId])
   @@map("driver_expenses")
 }
 
 model CodRemittance {
   id                    String   @id @default(uuid())
+  tenantId              String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   driverId              String   @map("driver_id")
   totalCodCollected     Decimal  @map("total_cod_collected")
   totalExpensesDeducted Decimal  @default(0) @map("total_expenses_deducted")
@@ -784,11 +885,13 @@ model CodRemittance {
 
   @@index([driverId])
   @@index([status])
+  @@index([tenantId])
   @@map("cod_remittances")
 }
 
 model SosAlert {
   id        String   @id @default(uuid())
+  tenantId  String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   driverId  String   @map("driver_id")
   tripId    String?  @map("trip_id")
   message   String?
@@ -801,11 +904,13 @@ model SosAlert {
 
   @@index([driverId])
   @@index([status])
+  @@index([tenantId])
   @@map("sos_alerts")
 }
 
 model RouteOptimizationJob {
   id          String    @id @default(uuid())
+  tenantId    String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   status      String    @default("PENDING")
   payload     String
   result      String?
@@ -816,26 +921,31 @@ model RouteOptimizationJob {
 
   @@index([status])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("route_optimization_jobs")
 }
 
 model Geofence {
-  id        String    @id @default(uuid())
+  id        String                                  @id @default(uuid())
+  tenantId  String                                  @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   name      String
-  polygon   String?   @map("polygon")
-  zoneType  String    @map("zone_type")
-  isActive  Boolean   @default(true) @map("is_active")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  polygon   Unsupported("geometry(Polygon, 4326)")? @map("polygon")
+  zoneType  String                                  @map("zone_type")
+  isActive  Boolean                                 @default(true) @map("is_active")
+  createdAt DateTime                                @default(now()) @map("created_at")
+  updatedAt DateTime                                @updatedAt @map("updated_at")
+  deletedAt DateTime?                               @map("deleted_at")
 
   @@index([isActive])
   @@index([zoneType])
+  @@index([tenantId])
+  @@index([polygon], type: Gist)
   @@map("geofences")
 }
 
 model GpsTrackingLog {
   id              String   @id @default(uuid())
+  tenantId        String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   driverId        String   @map("driver_id")
   tripId          String?  @map("trip_id")
   lat             Decimal
@@ -852,11 +962,13 @@ model GpsTrackingLog {
   @@index([tripId])
   @@index([timestamp])
   @@index([driverId, timestamp])
+  @@index([tenantId])
   @@map("gps_tracking_logs")
 }
 
 model TaskItem {
   id        String   @id @default(uuid())
+  tenantId  String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   taskId    String   @map("task_id")
   productId String   @map("product_id")
   quantity  Int
@@ -866,11 +978,13 @@ model TaskItem {
   task    Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
 
+  @@index([tenantId])
   @@map("task_items")
 }
 
 model CycleCount {
   id          String    @id @default(uuid())
+  tenantId    String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   warehouseId String    @map("warehouse_id")
   status      String    @default("PENDING")
   scheduledAt DateTime? @map("scheduled_at")
@@ -884,11 +998,13 @@ model CycleCount {
 
   @@index([warehouseId])
   @@index([status])
+  @@index([tenantId])
   @@map("cycle_counts")
 }
 
 model Adjustment {
   id             String   @id @default(uuid())
+  tenantId       String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   inventoryId    String   @map("inventory_id")
   warehouseId    String   @map("warehouse_id")
   reasonCode     String?  @map("reason_code")
@@ -904,11 +1020,13 @@ model Adjustment {
   @@index([warehouseId])
   @@index([inventoryId])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("adjustments")
 }
 
 model ScanLog {
   id          String   @id @default(uuid())
+  tenantId    String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   warehouseId String   @map("warehouse_id")
   taskId      String?  @map("task_id")
   barcode     String
@@ -925,11 +1043,13 @@ model ScanLog {
   @@index([taskId])
   @@index([barcode])
   @@index([createdAt])
+  @@index([tenantId])
   @@map("scan_logs")
 }
 
 model PackStationLog {
   id          String   @id @default(uuid())
+  tenantId    String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   warehouseId String   @map("warehouse_id")
   orderId     String?  @map("order_id")
   weightGrams Int?     @map("weight_grams")
@@ -940,11 +1060,13 @@ model PackStationLog {
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
   order     Order?    @relation(fields: [orderId], references: [id])
 
+  @@index([tenantId])
   @@map("pack_station_logs")
 }
 
 model StaffShift {
   id          String    @id @default(uuid())
+  tenantId    String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   warehouseId String    @map("warehouse_id")
   staffId     String    @map("staff_id")
   shiftStart  DateTime  @map("shift_start")
@@ -959,11 +1081,13 @@ model StaffShift {
   @@index([warehouseId])
   @@index([staffId])
   @@index([status])
+  @@index([tenantId])
   @@map("staff_shifts")
 }
 
 model EquipmentCheckout {
   id            String    @id @default(uuid())
+  tenantId      String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   warehouseId   String    @map("warehouse_id")
   equipmentCode String    @map("equipment_code")
   staffId       String    @map("staff_id")
@@ -979,13 +1103,15 @@ model EquipmentCheckout {
   @@index([warehouseId])
   @@index([staffId])
   @@index([status])
+  @@index([tenantId])
   @@map("equipment_checkout")
 }
 
 // ----------------------- Return Management (RMA) -----------------------
 model ReturnReason {
   id          String    @id @default(uuid())
-  code        String    @unique
+  tenantId    String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
+  code        String
   name        String
   description String?
   isActive    Boolean   @default(true) @map("is_active")
@@ -995,12 +1121,15 @@ model ReturnReason {
 
   requests ReturnRequest[]
 
+  @@unique([tenantId, code])
+  @@index([tenantId])
   @@map("return_reasons")
 }
 
 model ReturnRequest {
   id                String    @id @default(uuid())
-  returnCode        String    @unique @map("return_code")
+  tenantId          String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
+  returnCode        String @map("return_code")
   orderId           String    @map("order_id")
   clientId          String?   @map("client_id")
   requestedById     String?   @map("requested_by_id")
@@ -1030,15 +1159,18 @@ model ReturnRequest {
   inspections  ReturnInspection[]
   refunds      Refund[]
 
+  @@unique([tenantId, returnCode])
   @@index([orderId])
   @@index([status])
   @@index([returnCode])
   @@index([clientId])
+  @@index([tenantId])
   @@map("return_requests")
 }
 
 model ReturnItem {
   id                String   @id @default(uuid())
+  tenantId          String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   returnRequestId   String   @map("return_request_id")
   orderItemId       String?  @map("order_item_id")
   productId         String   @map("product_id")
@@ -1054,11 +1186,13 @@ model ReturnItem {
   orderItem     OrderItem?    @relation(fields: [orderItemId], references: [id])
 
   @@index([returnRequestId])
+  @@index([tenantId])
   @@map("return_items")
 }
 
 model ReturnInspection {
   id              String   @id @default(uuid())
+  tenantId        String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   returnRequestId String   @map("return_request_id")
   inspectorId     String?  @map("inspector_id")
   condition       String
@@ -1072,11 +1206,13 @@ model ReturnInspection {
   returnRequest ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
 
   @@index([returnRequestId])
+  @@index([tenantId])
   @@map("return_inspections")
 }
 
 model Refund {
   id              String    @id @default(uuid())
+  tenantId        String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   returnRequestId String    @map("return_request_id")
   invoiceId       String?   @map("invoice_id")
   amount          Decimal
@@ -1093,6 +1229,7 @@ model Refund {
 
   @@index([returnRequestId])
   @@index([invoiceId])
+  @@index([tenantId])
   @@map("refunds")
 }
 
@@ -1101,7 +1238,7 @@ model Invoice {
   id            String    @id @default(uuid())
   tenantId      String    @map("tenant_id")
   clientId      String?   @map("client_id")
-  invoiceNumber String    @unique @map("invoice_number")
+  invoiceNumber String @map("invoice_number")
   totalAmount   Decimal   @map("total_amount")
   status        String    @default("PENDING")
   issuedAt      DateTime  @default(now()) @map("issued_at")
@@ -1115,6 +1252,7 @@ model Invoice {
   items    InvoiceLineItem[]
   payments PaymentTransaction[]
 
+  @@unique([tenantId, invoiceNumber])
   @@index([tenantId])
   @@index([clientId])
   @@index([status])
@@ -1123,6 +1261,7 @@ model Invoice {
 
 model InvoiceLineItem {
   id          String  @id @default(uuid())
+  tenantId    String  @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   invoiceId   String  @map("invoice_id")
   description String
   quantity    Int
@@ -1132,6 +1271,7 @@ model InvoiceLineItem {
   invoice Invoice @relation(fields: [invoiceId], references: [id])
 
   @@index([invoiceId])
+  @@index([tenantId])
   @@map("invoice_line_items")
 }
 
@@ -1175,7 +1315,7 @@ model TenantApiKey {
   tenantId  String    @map("tenant_id")
   keyHash   String    @unique @map("key_hash")
   name      String?
-  scopes    String    @map("scopes")
+  scopes    String[]  @map("scopes")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   revokedAt DateTime? @map("revoked_at")
@@ -1192,7 +1332,7 @@ model ClientApiKey {
   clientId  String    @map("client_id")
   keyHash   String    @unique @map("key_hash")
   name      String?
-  scopes    String    @map("scopes")
+  scopes    String[]  @map("scopes")
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   revokedAt DateTime? @map("revoked_at")
@@ -1207,7 +1347,7 @@ model ClientApiKey {
 model FeatureFlag {
   id          String   @id @default(uuid())
   tenantId    String   @map("tenant_id")
-  key         String   @unique
+  key         String
   enabled     Boolean  @default(false)
   description String?
   createdAt   DateTime @default(now()) @map("created_at")
@@ -1215,6 +1355,7 @@ model FeatureFlag {
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 
+  @@unique([tenantId, key])
   @@index([tenantId])
   @@index([key])
   @@map("feature_flags")
@@ -1250,6 +1391,7 @@ model TenantSetting {
 // ---------- File Attachments ----------
 model FileAttachment {
   id         String   @id @default(uuid())
+  tenantId   String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   entityType String   @map("entity_type")
   entityId   String   @map("entity_id")
   fileUrl    String   @map("file_url")
@@ -1260,12 +1402,14 @@ model FileAttachment {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([entityType, entityId])
+  @@index([tenantId])
   @@map("file_attachments")
 }
 
 // ---------- Shipping Rates ----------
 model ShippingRate {
   id          String   @id @default(uuid())
+  tenantId    String   @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   name        String
   baseFee     Decimal  @map("base_fee")
   perKmRate   Decimal  @default(0) @map("per_km_rate")
@@ -1276,12 +1420,14 @@ model ShippingRate {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  @@index([tenantId])
   @@map("shipping_rates")
 }
 
 // ---------- Notifications ----------
 model Notification {
   id         String    @id @default(uuid())
+  tenantId   String    @default(dbgenerated("public.app_current_tenant_id()")) @map("tenant_id")
   userId     String    @map("user_id")
   type       String
   title      String
@@ -1299,6 +1445,7 @@ model Notification {
 
   @@index([userId, isRead])
   @@index([userId])
+  @@index([tenantId])
   @@map("notifications")
 }
 

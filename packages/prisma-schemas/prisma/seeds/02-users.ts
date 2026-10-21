@@ -18,11 +18,19 @@ export async function seedUsers(prisma: PrismaClient, roleIds: Record<string, st
     { email: 'user@smartlogi.vn', fullName: 'Basic User', role: 'TENANT_USER' },
   ];
 
+  // Email giờ unique theo tenant (`@@unique([tenantId, email])`) nên upsert
+  // phải kèm tenantId.
+  const tenant = await prisma.tenant.findFirst({ where: { dbSchemaName: 'public' } });
+  if (!tenant) {
+    throw new Error('Demo tenant chưa được tạo - hãy chạy seed 00-tenant trước');
+  }
+
   for (const userDef of demoUsers) {
     const tenantUser = await prisma.tenantUser.upsert({
-      where: { email: userDef.email },
+      where: { tenantId_email: { tenantId: tenant.id, email: userDef.email } },
       update: { passwordHash: tenantAdminPassword, status: 'ACTIVE', fullName: userDef.fullName },
       create: {
+        tenantId: tenant.id,
         email: userDef.email,
         fullName: userDef.fullName,
         status: 'ACTIVE',

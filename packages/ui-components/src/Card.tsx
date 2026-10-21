@@ -1,33 +1,20 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 export interface CardProps {
   children: React.ReactNode;
   className?: string;
-  header?: React.ReactNode;
-  footer?: React.ReactNode;
+  glass?: boolean;
+  style?: React.CSSProperties;
 }
 
-export const Card: React.FC<CardProps> = ({
-  children,
-  className = '',
-  header,
-  footer,
-}) => {
+export const Card = memo(({ children, className = '', glass = true, style }: CardProps) => {
   return (
-    <div className={`bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden ${className}`}>
-      {header && (
-        <div className="px-4 py-3 border-b border-gray-200 bg-gray-50">
-          {header}
-        </div>
-      )}
-      <div className="p-4">
-        {children}
-      </div>
-      {footer && (
-        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
-          {footer}
-        </div>
-      )}
+    <div className={`
+      ${glass ? 'bg-white  border-slate-200' : 'bg-white border-slate-200'}
+      rounded-3xl border shadow-glass overflow-hidden
+      ${className}
+    `} style={style}>
+      {children}
     </div>
   );
-};
+});

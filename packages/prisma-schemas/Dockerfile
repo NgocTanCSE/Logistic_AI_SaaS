@@ -16,7 +16,7 @@ RUN pnpm --filter prisma-schemas exec prisma generate
 # Runner stage
 FROM node:20-alpine AS runner
 ENV NODE_ENV=production
-RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@9.0.0 --activate
+RUN apk add --no-cache openssl postgresql-client && corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
@@ -26,4 +26,4 @@ COPY --from=builder /app/package.json ./
 COPY --from=builder /app/tsconfig.base.json ./
 
 WORKDIR /app/packages/prisma-schemas
-CMD sh -c "FORCE_RESEED=true pnpm exec prisma db push --schema prisma/schema.prisma && pnpm exec prisma db seed --schema prisma/schema.prisma && echo 'Database ready'"
+CMD ["sh", "./docker-entrypoint.sh"]

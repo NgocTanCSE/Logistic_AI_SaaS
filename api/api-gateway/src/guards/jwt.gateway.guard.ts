@@ -1,8 +1,8 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common';
 import { Request } from 'express';
-import * as jwt from 'jsonwebtoken';
-import { getJwtSecret, PUBLIC_PATHS } from '../config/services.config';
+import { getJwtSecret } from '../config/services.config';
 import { Permissions } from 'shared-types';
+import { isPublicPath, verifyBearerToken } from '../auth/token-verifier';
 
 const DEFAULT_ROLE_PERMISSIONS: Record<string, string[]> = {
   WAREHOUSE_MANAGER: [
@@ -118,30 +118,20 @@ export class JwtGatewayGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     const path = request.originalUrl;
 
-    if (this.isPublicPath(path)) {
+    if (isPublicPath(path)) {
       return true;
     }
 
-    const authHeader = request.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Missing or invalid authorization header');
+    const result = verifyBearerToken(request);
+    if (!result.ok) {
+      throw new UnauthorizedException(
+        result.reason === 'missing'
+          ? 'Missing or invalid authorization header'
+          : 'Invalid or expired token',
+      );
     }
 
-    const token = authHeader.substring(7);
-    try {
-      const decoded: any = jwt.verify(token, this.jwtSecret);
-      decoded.schemaName = decoded.schema_name || 'public';
-      (request as any).user = decoded;
-      return true;
-    } catch (error) {
-      throw new UnauthorizedException('Invalid or expired token');
-    }
-  }
-
-  private isPublicPath(path: string): boolean {
-    const cleanPath = path.split('?')[0];
-    return PUBLIC_PATHS.some((publicPath) => {
-      return cleanPath === publicPath || cleanPath.startsWith(publicPath + '/');
-    });
+    (request as any).user = result.user;
+    return true;
   }
 }

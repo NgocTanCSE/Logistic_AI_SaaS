@@ -158,253 +158,7 @@ importers:
         specifier: 5.5.3
         version: 5.5.3
 
-  backend/customer-api:
-    dependencies:
-      '@nestjs/cache-manager':
-        specifier: ^2.2.2
-        version: 2.3.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(cache-manager@5.7.6)(rxjs@7.8.1)
-      '@nestjs/common':
-        specifier: 10.3.10
-        version: 10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/core':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/jwt':
-        specifier: ^10.2.0
-        version: 10.2.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))
-      '@nestjs/passport':
-        specifier: ^10.0.3
-        version: 10.0.3(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(passport@0.7.0)
-      '@nestjs/platform-express':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10)
-      '@nestjs/swagger':
-        specifier: ^7.4.2
-        version: 7.4.2(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)
-      '@nestjs/throttler':
-        specifier: ^5.1.1
-        version: 5.2.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(reflect-metadata@0.2.2)
-      '@prisma/client':
-        specifier: 5.18.0
-        version: 5.18.0(prisma@5.18.0)
-      '@sentry/node':
-        specifier: ^8.30.0
-        version: 8.55.2
-      bcrypt:
-        specifier: ^5.1.1
-        version: 5.1.1
-      cache-manager:
-        specifier: ^5.7.0
-        version: 5.7.6
-      class-transformer:
-        specifier: 0.5.1
-        version: 0.5.1
-      class-validator:
-        specifier: 0.14.1
-        version: 0.14.1
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      passport:
-        specifier: ^0.7.0
-        version: 0.7.0
-      passport-jwt:
-        specifier: ^4.0.1
-        version: 4.0.1
-      prisma:
-        specifier: 5.18.0
-        version: 5.18.0
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.1
-        version: 7.8.1
-      shared-types:
-        specifier: workspace:*
-        version: link:../../packages/shared-types
-    devDependencies:
-      '@types/express':
-        specifier: ^4.17.21
-        version: 4.17.25
-      '@types/node':
-        specifier: ^20.12.7
-        version: 20.19.41
-      ts-node:
-        specifier: 10.9.2
-        version: 10.9.2(@types/node@20.19.41)(typescript@5.5.3)
-      typescript:
-        specifier: 5.5.3
-        version: 5.5.3
-
-  backend/iam-service:
-    dependencies:
-      '@nestjs/cache-manager':
-        specifier: ^2.2.2
-        version: 2.3.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(cache-manager@5.7.6)(rxjs@7.8.1)
-      '@nestjs/common':
-        specifier: 10.3.10
-        version: 10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/core':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/jwt':
-        specifier: ^10.2.0
-        version: 10.2.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))
-      '@nestjs/passport':
-        specifier: ^10.0.3
-        version: 10.0.3(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(passport@0.7.0)
-      '@nestjs/platform-express':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10)
-      '@nestjs/swagger':
-        specifier: ^7.4.2
-        version: 7.4.2(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)
-      '@nestjs/throttler':
-        specifier: ^5.1.1
-        version: 5.2.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(reflect-metadata@0.2.2)
-      '@prisma/client':
-        specifier: 5.18.0
-        version: 5.18.0(prisma@5.18.0)
-      '@sentry/node':
-        specifier: ^8.30.0
-        version: 8.55.2
-      bcrypt:
-        specifier: ^5.1.1
-        version: 5.1.1
-      cache-manager:
-        specifier: ^5.7.0
-        version: 5.7.6
-      class-transformer:
-        specifier: 0.5.1
-        version: 0.5.1
-      class-validator:
-        specifier: 0.14.1
-        version: 0.14.1
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      google-auth-library:
-        specifier: ^9.0.0
-        version: 9.15.1
-      passport:
-        specifier: ^0.7.0
-        version: 0.7.0
-      passport-google-oauth20:
-        specifier: ^2.0.0
-        version: 2.0.0
-      passport-jwt:
-        specifier: ^4.0.1
-        version: 4.0.1
-      prisma:
-        specifier: 5.18.0
-        version: 5.18.0
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.1
-        version: 7.8.1
-      shared-types:
-        specifier: workspace:*
-        version: link:../../packages/shared-types
-      speakeasy:
-        specifier: ^2.0.0
-        version: 2.0.0
-      stripe:
-        specifier: ^14.0.0
-        version: 14.25.0
-    devDependencies:
-      '@types/express':
-        specifier: ^4.17.21
-        version: 4.17.25
-      '@types/node':
-        specifier: ^20.12.7
-        version: 20.19.41
-      ts-node:
-        specifier: 10.9.2
-        version: 10.9.2(@types/node@20.19.41)(typescript@5.5.3)
-      typescript:
-        specifier: 5.5.3
-        version: 5.5.3
-
-  backend/inventory-service:
-    dependencies:
-      '@nestjs/common':
-        specifier: 10.3.10
-        version: 10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/core':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/jwt':
-        specifier: ^10.2.0
-        version: 10.2.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))
-      '@nestjs/passport':
-        specifier: ^10.0.3
-        version: 10.0.3(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(passport@0.7.0)
-      '@nestjs/platform-express':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10)
-      '@nestjs/swagger':
-        specifier: ^7.4.2
-        version: 7.4.2(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)
-      '@nestjs/throttler':
-        specifier: ^5.1.1
-        version: 5.2.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(reflect-metadata@0.2.2)
-      '@prisma/client':
-        specifier: 5.18.0
-        version: 5.18.0(prisma@5.18.0)
-      '@sentry/node':
-        specifier: ^8.30.0
-        version: 8.55.2
-      bcrypt:
-        specifier: ^5.1.1
-        version: 5.1.1
-      class-transformer:
-        specifier: 0.5.1
-        version: 0.5.1
-      class-validator:
-        specifier: 0.14.1
-        version: 0.14.1
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      passport:
-        specifier: ^0.7.0
-        version: 0.7.0
-      passport-jwt:
-        specifier: ^4.0.1
-        version: 4.0.1
-      prisma:
-        specifier: 5.18.0
-        version: 5.18.0
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.1
-        version: 7.8.1
-      shared-types:
-        specifier: workspace:*
-        version: link:../../packages/shared-types
-      wms-engine:
-        specifier: workspace:*
-        version: link:../../packages/wms-engine
-    devDependencies:
-      '@types/express':
-        specifier: ^4.17.21
-        version: 4.17.25
-      '@types/node':
-        specifier: ^20.12.7
-        version: 20.19.41
-      ts-node:
-        specifier: 10.9.2
-        version: 10.9.2(@types/node@20.19.41)(typescript@5.5.3)
-      typescript:
-        specifier: 5.5.3
-        version: 5.5.3
-
-  backend/logistics-service:
+  backend/core-api:
     dependencies:
       '@aws-sdk/client-s3':
         specifier: ^3.1057.0
@@ -418,88 +172,9 @@ importers:
       '@nestjs/bullmq':
         specifier: ^10.1.1
         version: 10.2.3(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(bullmq@5.77.6)
-      '@nestjs/common':
-        specifier: 10.3.10
-        version: 10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/core':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/jwt':
-        specifier: ^10.2.0
-        version: 10.2.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))
-      '@nestjs/passport':
-        specifier: ^10.0.3
-        version: 10.0.3(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(passport@0.7.0)
-      '@nestjs/platform-express':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10)
-      '@nestjs/swagger':
-        specifier: ^7.4.2
-        version: 7.4.2(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)
-      '@prisma/client':
-        specifier: 5.18.0
-        version: 5.18.0(prisma@5.18.0)
-      '@sentry/node':
-        specifier: ^8.30.0
-        version: 8.55.2
-      axios:
-        specifier: ^1.16.1
-        version: 1.16.1
-      bcrypt:
-        specifier: ^5.1.1
-        version: 5.1.1
-      bullmq:
-        specifier: ^5.8.5
-        version: 5.77.6
-      class-transformer:
-        specifier: 0.5.1
-        version: 0.5.1
-      class-validator:
-        specifier: 0.14.1
-        version: 0.14.1
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      passport:
-        specifier: ^0.7.0
-        version: 0.7.0
-      passport-jwt:
-        specifier: ^4.0.1
-        version: 4.0.1
-      prisma:
-        specifier: 5.18.0
-        version: 5.18.0
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.1
-        version: 7.8.1
-      shared-types:
-        specifier: workspace:*
-        version: link:../../packages/shared-types
-      xlsx:
-        specifier: ^0.18.5
-        version: 0.18.5
-    devDependencies:
-      '@types/express':
-        specifier: ^4.17.21
-        version: 4.17.25
-      '@types/node':
-        specifier: ^20.12.7
-        version: 20.19.41
-      ts-node:
-        specifier: 10.9.2
-        version: 10.9.2(@types/node@20.19.41)(typescript@5.5.3)
-      typescript:
-        specifier: 5.5.3
-        version: 5.5.3
-
-  backend/notification-service:
-    dependencies:
-      '@nestjs/axios':
-        specifier: ^3.0.0
-        version: 3.1.3(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(axios@1.16.1)(rxjs@7.8.1)
+      '@nestjs/cache-manager':
+        specifier: ^2.2.2
+        version: 2.3.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(cache-manager@5.7.6)(rxjs@7.8.1)
       '@nestjs/common':
         specifier: 10.3.10
         version: 10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
@@ -527,6 +202,9 @@ importers:
       '@nestjs/swagger':
         specifier: ^7.4.2
         version: 7.4.2(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)
+      '@nestjs/throttler':
+        specifier: ^5.1.1
+        version: 5.2.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(reflect-metadata@0.2.2)
       '@nestjs/websockets':
         specifier: ^10.3.10
         version: 10.4.22(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10)(@nestjs/platform-socket.io@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1)
@@ -536,6 +214,21 @@ importers:
       '@sentry/node':
         specifier: ^8.30.0
         version: 8.55.2
+      '@types/multer':
+        specifier: ^2.1.0
+        version: 2.1.0
+      axios:
+        specifier: ^1.16.1
+        version: 1.16.1
+      bcrypt:
+        specifier: ^5.1.1
+        version: 5.1.1
+      bullmq:
+        specifier: ^5.8.5
+        version: 5.77.6
+      cache-manager:
+        specifier: ^5.7.0
+        version: 5.7.6
       class-transformer:
         specifier: 0.5.1
         version: 0.5.1
@@ -548,6 +241,15 @@ importers:
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
+      exceljs:
+        specifier: ^4.4.0
+        version: 4.4.0
+      google-auth-library:
+        specifier: ^9.0.0
+        version: 9.15.1
+      helmet:
+        specifier: ^8.2.0
+        version: 8.2.0
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.3
@@ -557,6 +259,9 @@ importers:
       passport:
         specifier: ^0.7.0
         version: 0.7.0
+      passport-google-oauth20:
+        specifier: ^2.0.0
+        version: 2.0.0
       passport-jwt:
         specifier: ^4.0.1
         version: 4.0.1
@@ -575,97 +280,15 @@ importers:
       socket.io:
         specifier: ^4.7.5
         version: 4.8.3
-    devDependencies:
-      '@types/express':
-        specifier: ^4.17.21
-        version: 4.17.25
-      '@types/node':
-        specifier: ^20.12.7
-        version: 20.19.41
-      ts-node:
-        specifier: 10.9.2
-        version: 10.9.2(@types/node@20.19.41)(typescript@5.5.3)
-      typescript:
-        specifier: 5.5.3
-        version: 5.5.3
-
-  backend/order-service:
-    dependencies:
-      '@nestjs/axios':
-        specifier: ^3.0.3
-        version: 3.1.3(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(axios@1.16.1)(rxjs@7.8.1)
-      '@nestjs/common':
-        specifier: 10.3.10
-        version: 10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/core':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/jwt':
-        specifier: ^10.2.0
-        version: 10.2.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))
-      '@nestjs/microservices':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10)(@nestjs/websockets@10.4.22)(cache-manager@5.7.6)(ioredis@5.10.1)(kafkajs@2.2.4)(reflect-metadata@0.2.2)(rxjs@7.8.1)
-      '@nestjs/passport':
-        specifier: ^10.0.3
-        version: 10.0.3(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(passport@0.7.0)
-      '@nestjs/platform-express':
-        specifier: 10.3.10
-        version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10)
-      '@nestjs/swagger':
-        specifier: ^7.4.2
-        version: 7.4.2(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)
-      '@nestjs/throttler':
-        specifier: ^5.1.1
-        version: 5.2.0(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/core@10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1))(reflect-metadata@0.2.2)
-      '@prisma/client':
-        specifier: 5.18.0
-        version: 5.18.0(prisma@5.18.0)
-      '@sentry/node':
-        specifier: ^8.30.0
-        version: 8.55.2
-      '@types/multer':
-        specifier: ^2.1.0
-        version: 2.1.0
-      axios:
-        specifier: ^1.7.7
-        version: 1.16.1
-      bcrypt:
-        specifier: ^5.1.1
-        version: 5.1.1
-      class-transformer:
-        specifier: 0.5.1
-        version: 0.5.1
-      class-validator:
-        specifier: 0.14.1
-        version: 0.14.1
-      dotenv:
-        specifier: ^17.4.2
-        version: 17.4.2
-      exceljs:
-        specifier: ^4.4.0
-        version: 4.4.0
-      kafkajs:
-        specifier: ^2.2.4
-        version: 2.2.4
-      passport:
-        specifier: ^0.7.0
-        version: 0.7.0
-      passport-jwt:
-        specifier: ^4.0.1
-        version: 4.0.1
-      prisma:
-        specifier: 5.18.0
-        version: 5.18.0
-      reflect-metadata:
-        specifier: 0.2.2
-        version: 0.2.2
-      rxjs:
-        specifier: 7.8.1
-        version: 7.8.1
-      shared-types:
+      speakeasy:
+        specifier: ^2.0.0
+        version: 2.0.0
+      stripe:
+        specifier: ^14.0.0
+        version: 14.25.0
+      wms-engine:
         specifier: workspace:*
-        version: link:../../packages/shared-types
+        version: link:../../packages/wms-engine
       xlsx:
         specifier: ^0.18.5
         version: 0.18.5
@@ -682,7 +305,6 @@ importers:
       typescript:
         specifier: 5.5.3
         version: 5.5.3
-
   frontend/feature-test/admin-portal:
     dependencies:
       '@react-oauth/google':
@@ -715,6 +337,9 @@ importers:
       tailwind-merge:
         specifier: ^2.1.1
         version: 2.6.1
+      ui-components:
+        specifier: workspace:*
+        version: link:../../../packages/ui-components
     devDependencies:
       '@types/node':
         specifier: '22'
@@ -840,6 +465,9 @@ importers:
       tailwind-merge:
         specifier: ^3.6.0
         version: 3.6.0
+      ui-components:
+        specifier: workspace:*
+        version: link:../../../packages/ui-components
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -895,6 +523,9 @@ importers:
       react-dom:
         specifier: 19.0.0
         version: 19.0.0(react@19.0.0)
+      ui-components:
+        specifier: workspace:*
+        version: link:../../../packages/ui-components
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -962,6 +593,9 @@ importers:
       tailwindcss:
         specifier: 3.4.7
         version: 3.4.7(ts-node@10.9.2(@types/node@22.20.5)(typescript@5.5.3))
+      ui-components:
+        specifier: workspace:*
+        version: link:../../../packages/ui-components
     devDependencies:
       '@types/node':
         specifier: '22'
@@ -1082,15 +716,14 @@ importers:
         version: 19.0.0(react@19.2.3)
     devDependencies:
       '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.15
+        specifier: 19.0.0
+        version: 19.0.0
       '@types/react-dom':
-        specifier: ^19.0.0
+        specifier: 19.0.0
         version: 19.0.0
       typescript:
         specifier: ^5.5.3
         version: 5.5.3
-
   packages/wms-engine:
     dependencies:
       lodash:

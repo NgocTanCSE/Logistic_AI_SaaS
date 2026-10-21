@@ -21,7 +21,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
       <input
         type="checkbox"
         id={checkboxId}
-        className={`mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
+        className={`mt-0.5 h-4 w-4 rounded border-line-strong text-primary focus:ring-primary ${
           error ? 'border-red-500' : ''
         } ${className}`}
         ref={(el) => {
@@ -30,11 +30,11 @@ export const Checkbox: React.FC<CheckboxProps> = ({
         {...props}
       />
       {label && (
-        <label htmlFor={checkboxId} className="text-sm text-gray-700 cursor-pointer">
+        <label htmlFor={checkboxId} className="text-sm text-ink cursor-pointer">
           {label}
         </label>
       )}
-      {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
+      {error && <p className="text-xs text-danger mt-0.5">{error}</p>}
     </div>
   );
 };

@@ -1,66 +1,109 @@
 ﻿import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
+import * as crypto from 'crypto';
 
-const API_KEY_PATHS = [
-  '/api/v1/public',
-  '/api/v1/client',
-  '/api/v1/webhooks',
-];
+const VERIFY_TIMEOUT_MS = 3000;
+const CACHE_TTL_MS = 60_000;
+const CACHE_MAX_ENTRIES = 1000;
+
+interface CacheEntry {
+  valid: boolean;
+  tenantId?: string;
+  expiresAt: number;
+}
 
 /**
- * Paths that must stay reachable WITHOUT an API key (and without a JWT),
- * otherwise users can never obtain a token in the first place.
- * Everything listed here is either a public endpoint or is protected
- * by its own guard inside the target service (e.g. JwtAuthGuard).
+ * Validates `X-API-Key` when a client presents one.
+ *
+ * API keys are an additional credential for server-to-server integrations, not
+ * a replacement for user authentication. Requests that use a Bearer token are
+ * authenticated by the edge JWT check and by the target service's own guard.
+ *
+ * Crucially, a malformed key is always rejected. The previous implementation
+ * accepted any non-empty value and skipped validation entirely when a Bearer
+ * header was present.
  */
-const BYPASS_PATHS = [
-  '/api/v1/public/track',
-  '/api/v1/public/verify',
-  // Auth endpoints under /api/v1/client/* (login, google, forgot/reset password).
-  // NOTE: /api/v1/client/auth/change-password is still protected by JwtAuthGuard
-  // in iam-service, so bypassing only the API-key check is safe.
-  '/api/v1/client/auth',
-];
-
 @Injectable()
 export class ApiKeyMiddleware implements NestMiddleware {
   private readonly logger = new Logger(ApiKeyMiddleware.name);
+  /**
+   * Xác thực API key gọi tới service giữ endpoint `/api/v1/api-keys/verify`.
+   * Khi core-api đã gom nhóm route IAM thì endpoint nằm ở core-api.
+   */
+  private readonly verifyUrl =
+    (process.env.CORE_API_URL || 'http://core-api:8081') + '/api/v1/api-keys/verify';
+  private readonly cache = new Map<string, CacheEntry>();
 
-  use(req: Request, res: Response, next: NextFunction) {
-    const path = req.originalUrl.split('?')[0];
-
-    if (!this.requiresApiKey(path)) {
-      return next();
-    }
-
-    // JWT-authenticated browser sessions are already verified by the target
-    // service's JwtAuthGuard. They must not also need an API key, otherwise
-    // every portal page (which sends a Bearer token) is rejected at the edge.
-    const authHeader = req.headers.authorization as string;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      return next();
-    }
-
-    // Anonymous / server-to-server calls to API-key protected paths still
-    // need the header. Phase 3 of the API-key track will validate the value.
+  async use(req: Request, res: Response, next: NextFunction) {
     const apiKey = req.headers['x-api-key'] as string;
+
     if (!apiKey) {
+      return next();
+    }
+
+    let result: { valid: boolean; tenantId?: string };
+    try {
+      result = await this.verify(apiKey);
+    } catch (error: any) {
+      this.logger.error(`API key verification failed: ${error.message}`);
+      res.status(503).json({
+        statusCode: 503,
+        message: 'API key verification is temporarily unavailable',
+        error: 'Service Unavailable',
+      });
+      return;
+    }
+
+    if (!result.valid) {
       res.status(401).json({
         statusCode: 401,
-        message: 'Missing X-API-Key header',
+        message: 'Invalid or revoked API key',
         error: 'Unauthorized',
       });
       return;
     }
 
-    this.logger.debug(`API key validation skipped (delegated to IAM service): ${path}`);
+    if (result.tenantId) {
+      (req as any).apiKeyTenantId = result.tenantId;
+    }
     next();
   }
 
-  private requiresApiKey(path: string): boolean {
-    if (BYPASS_PATHS.some((bp) => path.startsWith(bp))) {
-      return false;
+  private async verify(apiKey: string): Promise<{ valid: boolean; tenantId?: string }> {
+    const cacheKey = crypto.createHash('sha256').update(apiKey).digest('hex');
+    const cached = this.cache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return { valid: cached.valid, tenantId: cached.tenantId };
     }
-    return API_KEY_PATHS.some((prefix) => path.startsWith(prefix));
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), VERIFY_TIMEOUT_MS);
+    try {
+      const response = await fetch(this.verifyUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key: apiKey }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`API key verification upstream responded with ${response.status}`);
+      }
+
+      const body: any = await response.json();
+      const result = { valid: body?.valid === true, tenantId: body?.tenantId };
+      this.remember(cacheKey, result);
+      return result;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private remember(key: string, result: { valid: boolean; tenantId?: string }) {
+    if (this.cache.size >= CACHE_MAX_ENTRIES) {
+      const oldest = this.cache.keys().next().value;
+      if (oldest) this.cache.delete(oldest);
+    }
+    this.cache.set(key, { ...result, expiresAt: Date.now() + CACHE_TTL_MS });
   }
 }
