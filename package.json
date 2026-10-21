@@ -3,7 +3,13 @@
   "private": true,
   "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "dev": "pnpm --parallel --filter \"!shared-types\" --filter \"!*-engine\" --filter \"!*-bridge\" --filter \"!*-components\" --filter \"!mobile-ui-kit\" --filter \"!prisma-schemas\" dev",
+    "dev": "pnpm --filter shared-types build && pnpm --filter ui-components build && pnpm --filter ui-kit build && pnpm --parallel --filter \"!shared-types\" --filter \"!ui-components\" --filter \"!ui-kit\" --filter \"!*-engine\" --filter \"!*-bridge\" --filter \"!*-components\" --filter \"!mobile-ui-kit\" --filter \"!prisma-schemas\" dev",
+    "build": "pnpm -r --filter \"./packages/**\" --filter \"./backend/**\" --filter \"./api/**\" build",
+    "typecheck": "pnpm -r --filter \"./packages/**\" --filter \"./backend/**\" --filter \"./api/**\" exec tsc --noEmit",
+    "test": "pnpm --filter api-gateway test",
+    "db:migrate": "pnpm --filter prisma-schemas migrate:deploy",
+    "db:seed": "pnpm --filter prisma-schemas seed",
+    "smoke": "node scripts/smoke-api.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

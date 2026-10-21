@@ -160,6 +160,23 @@ services:
       - EMAIL_PROVIDER=${EMAIL_PROVIDER:-console}
       - SMS_PROVIDER=${SMS_PROVIDER:-console}
       - PUSH_PROVIDER=${PUSH_PROVIDER:-console}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL:-}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
+      - TWILIO_FROM_PHONE=${TWILIO_FROM_PHONE:-}
+      - DEFAULT_NOTIFICATION_EMAIL=${DEFAULT_NOTIFICATION_EMAIL:-no-reply@smartlogi.vn}
+      - RETURN_NOTIFICATION_EMAIL=${RETURN_NOTIFICATION_EMAIL:-returns@smartlogi.vn}
+      # --- module IAM (billing / thông báo) ---
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - TENANT_BASE_DOMAIN=${TENANT_BASE_DOMAIN:-smartlogi.vn}
+      - GOOGLE_GEOCODING_API_KEY=${GOOGLE_GEOCODING_API_KEY:-}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      # --- chung ---
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:4001,http://localhost:4002,http://localhost:4003,http://localhost:4004}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
     depends_on:
       postgres:
         condition: service_healthy
@@ -189,6 +206,10 @@ services:
     build:
       context: ./backend/gps-ingestion-service
     environment:
+      # Schema PostgreSQL chứa dữ liệu của tenant mà thiết bị thuộc về.
+      # `public` là schema của tenant demo; production nên đặt theo tenant.
+      - DB_SCHEMA=${DB_SCHEMA:-public}
+      - UDP_PORT=${UDP_PORT:-8091}
       - DATABASE_URL=postgresql://${APP_DB_USER:-smartlogi_app}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - GPS_AUTH_TOKEN=${GPS_AUTH_TOKEN}
     ports:
@@ -216,6 +237,8 @@ services:
     build:
       context: ./backend/webhook-service
     environment:
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - DATABASE_URL=postgresql://${APP_DB_USER:-smartlogi_app}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -256,6 +279,10 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:8081/api/v1/admin/auth/google/callback}
       - CORE_API_URL=http://core-api:8081
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:4001,http://localhost:4002,http://localhost:4003,http://localhost:4004}
+      - GATEWAY_RATE_LIMIT=${GATEWAY_RATE_LIMIT:-1000}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - SENTRY_ENVIRONMENT=${SENTRY_ENVIRONMENT:-development}
       - AI_WORKER_URL=${AI_WORKER_URL:-http://host.docker.internal:8787}
       - GPS_INGESTION_URL=http://gps-ingestion-service:8090
       - WEBHOOK_SERVICE_URL=http://webhook-service:8092

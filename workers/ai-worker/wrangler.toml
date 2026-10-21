@@ -14,8 +14,8 @@ JWT_ALGORITHM = "HS256"
 DEFAULT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fast"
 
 # --- Secrets (fill via: npx wrangler secret put <NAME> OR .dev.vars) ---
-# JWT_SECRET          - HS256 secret used to verify caller JWTs (share with api-gateway/iam).
-# AI_API_KEY          - shared key accepted for internal service-to-service calls (logistics-service).
+# JWT_SECRET          - HS256 secret used to verify caller JWTs (share with api-gateway/core-api).
+# AI_API_KEY          - shared key accepted for internal service-to-service calls (core-api -> Worker).
 
 [[d1_databases]]
 binding = "DB"

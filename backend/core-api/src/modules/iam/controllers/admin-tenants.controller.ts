@@ -1,4 +1,5 @@
 ﻿import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, InternalServerErrorException, NotFoundException, BadRequestException, Logger } from "@nestjs/common"
+import { SchemaProvisioner } from '../../../core/provisioner/schema-provisioner';
 import { TenantCreateDto } from "../dtos/tenant-create.dto"
 import { UpdateTenantDto } from "../dtos/tenant-update.dto"
 import { Permissions, PermissionsGuard, RequirePermissions } from "../../../core/types/shared-types"
@@ -102,8 +103,6 @@ export class AdminTenantsController {
   async create(@Body() body: TenantCreateDto & { adminEmail?: string, adminPassword?: string }) {
     const dbSchemaName = `tenant_${body.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now().toString(36)}`;
     
-    // Provisioner đã chuyển sang core/ khi gộp modular monolith.
-    const { SchemaProvisioner } = require('../../../core/provisioner/schema-provisioner');
     let ddlStatements: string[] = [];
     try {
       ddlStatements = await SchemaProvisioner.getProvisioningSql(dbSchemaName);

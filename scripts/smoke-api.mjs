@@ -63,8 +63,28 @@ function authHeaders() {
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
+async function waitForGateway(timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${BASE_URL}/health`, { method: 'GET' });
+      if (response.ok) return true;
+    } catch {
+      // chưa sẵn sàng
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return false;
+}
+
 async function main() {
   console.log(`Smoke testing ${BASE_URL}\n`);
+
+  if (!(await waitForGateway())) {
+    record('Gateway sẵn sàng', false, `không phản hồi trong 60s tại ${BASE_URL}`);
+    process.exitCode = 1;
+    return;
+  }
 
   await expect('Gateway health', '/health', { method: 'GET' }, [200]);
 

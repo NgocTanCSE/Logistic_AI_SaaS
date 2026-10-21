@@ -1,4 +1,5 @@
 ﻿import { Injectable, Logger } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 
@@ -89,7 +90,6 @@ export class FcmPushProvider implements PushProvider {
   private signJwt(payload: any, privateKey: string): string {
     const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
     const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
-    const crypto = require('crypto');
     const signature = crypto.createSign('RSA-SHA256').update(`${header}.${body}`).sign(privateKey, 'base64url');
     return `${header}.${body}.${signature}`;
   }

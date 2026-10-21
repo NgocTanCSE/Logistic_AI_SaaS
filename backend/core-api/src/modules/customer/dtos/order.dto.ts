@@ -8,7 +8,7 @@ export class CreateOrderDto {
 
   @IsString()
   @IsNotEmpty()
-  @Matches(/^[0-9\-\+]{9,15}$/, { message: 'Invalid phone number format' })
+  @Matches(/^[0-9+-]{9,15}$/, { message: 'Invalid phone number format' })
   recipientPhone!: string;
 
   @IsString()

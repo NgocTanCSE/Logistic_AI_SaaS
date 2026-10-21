@@ -1,4 +1,4 @@
-﻿const Stripe = require('stripe');
+﻿import Stripe from 'stripe';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/prisma/prisma.service';
 
@@ -12,7 +12,8 @@ export class StripeService {
     if (!secretKey) {
       this.logger.warn('STRIPE_SECRET_KEY not configured. Stripe payment features will be unavailable.');
     } else {
-      this.stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' });
+      // apiVersion của package stripe đang cài (2023-10-16) - đổi khi nâng SDK.
+      this.stripe = new Stripe(secretKey, { apiVersion: '2023-10-16' });
     }
   }
 
