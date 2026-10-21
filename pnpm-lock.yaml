@@ -340,6 +340,9 @@ importers:
       ui-components:
         specifier: workspace:*
         version: link:../../../packages/ui-components
+      ui-kit:
+        specifier: workspace:*
+        version: link:../../../packages/ui-kit
     devDependencies:
       '@types/node':
         specifier: '22'
@@ -468,6 +471,9 @@ importers:
       ui-components:
         specifier: workspace:*
         version: link:../../../packages/ui-components
+      ui-kit:
+        specifier: workspace:*
+        version: link:../../../packages/ui-kit
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -526,6 +532,9 @@ importers:
       ui-components:
         specifier: workspace:*
         version: link:../../../packages/ui-components
+      ui-kit:
+        specifier: workspace:*
+        version: link:../../../packages/ui-kit
     devDependencies:
       '@types/node':
         specifier: ^22
@@ -596,6 +605,9 @@ importers:
       ui-components:
         specifier: workspace:*
         version: link:../../../packages/ui-components
+      ui-kit:
+        specifier: workspace:*
+        version: link:../../../packages/ui-kit
     devDependencies:
       '@types/node':
         specifier: '22'
@@ -702,6 +714,25 @@ importers:
       '@nestjs/core':
         specifier: 10.3.10
         version: 10.3.10(@nestjs/common@10.3.10(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(@nestjs/microservices@10.3.10)(@nestjs/platform-express@10.3.10)(@nestjs/websockets@10.4.22)(reflect-metadata@0.2.2)(rxjs@7.8.1)
+      typescript:
+        specifier: ^5.5.3
+        version: 5.5.3
+
+  packages/ui-kit:
+    dependencies:
+      react:
+        specifier: ^19.0.0
+        version: 19.2.3
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.0.0(react@19.2.3)
+    devDependencies:
+      '@types/react':
+        specifier: 19.0.0
+        version: 19.0.0
+      '@types/react-dom':
+        specifier: 19.0.0
+        version: 19.0.0
       typescript:
         specifier: ^5.5.3
         version: 5.5.3
