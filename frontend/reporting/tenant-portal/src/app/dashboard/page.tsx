@@ -12,7 +12,7 @@ import {
   StatusLabel,
   type EditorialMetric,
   type StatusTone,
-} from '../../../../../../packages/ui-kit/editorial';
+} from 'ui-kit';
 
 type HealthState = 'unknown' | 'operational' | 'degraded';
 

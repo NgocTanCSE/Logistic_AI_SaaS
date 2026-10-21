@@ -1,4 +1,5 @@
 ﻿import { Controller, Post, UseInterceptors, UploadedFile, UseGuards, Request, BadRequestException, Logger } from '@nestjs/common';
+import { generateTrackingCode } from '../../../core/utils/tracking-code';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as os from 'os';
@@ -97,8 +98,7 @@ export class BulkUploadController {
                 throw new Error(`Missing mandatory info (Name, Phone, or Address)`);
               }
 
-              const randomSuffix = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
-              const trackingCode = `SLG-${dateStr}-${randomSuffix}`;
+              const trackingCode = generateTrackingCode();
 
               const order = await tx.order.create({
                 data: {

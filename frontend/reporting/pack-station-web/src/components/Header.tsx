@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { Topbar } from '../../../../../packages/ui-kit/Topbar';
+import { Topbar } from 'ui-kit';
 
 export default function Header() {
   const router = useRouter();

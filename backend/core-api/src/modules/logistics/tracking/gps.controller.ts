@@ -92,7 +92,7 @@ export class GpsController {
 
       // Run on the request transaction so that the tenant context
       // (`app.tenant_id`) is active for the row-level-security policy.
-      await this.prisma.getTenantDb().$executeRawUnsafe(
+      await this.prisma.tenantExec(
         `UPDATE "${schemaName}"."drivers"
         SET last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
             location_updated_at = NOW()
@@ -100,7 +100,7 @@ export class GpsController {
         lng, lat, driverId
       );
 
-      const geofenceAlerts: any[] = await this.prisma.getTenantDb().$queryRawUnsafe(
+      const geofenceAlerts: any[] = await this.prisma.tenantQuery(
         `SELECT name, zone_type 
         FROM "${schemaName}"."geofences"
         WHERE is_active = true 

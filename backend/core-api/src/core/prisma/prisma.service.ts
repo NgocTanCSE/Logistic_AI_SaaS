@@ -195,6 +195,25 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     return tenantId;
   }
 
+  /**
+   * Chạy raw SQL trong đúng tenant scope của request.
+   *
+   * Raw SQL trên client gốc sẽ chạy ngoài transaction của request ⇒ mất
+   * `app.tenant_id` ⇒ RLS chặn (fail-closed) và có thể đọc nhầm tenant.
+   * Hàm này luôn chạy trên transaction của request (mở mới nếu cần).
+   */
+  public async tenantQuery<T = any>(sql: string, ...params: any[]): Promise<T> {
+    const db = this.getTenantDb();
+    return (db as any).$queryRawUnsafe(sql, ...params) as Promise<T>;
+  }
+
+  /** @see tenantQuery - dùng cho UPDATE/INSERT/DELETE. */
+  public async tenantExec(sql: string, ...params: any[]): Promise<number> {
+    const db = this.getTenantDb();
+    const result = await (db as any).$executeRawUnsafe(sql, ...params);
+    return Number(result ?? 0);
+  }
+
   public runWithTenant<T>(store: TenantStore, callback: () => Promise<T>): Promise<T> {
     return tenantContext.run(store, callback);
   }

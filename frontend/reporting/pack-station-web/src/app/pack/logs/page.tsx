@@ -9,7 +9,7 @@ import {
   EmptyNote,
   MetricBand,
   StatusLabel,
-} from '../../../../../../../packages/ui-kit/editorial';
+} from 'ui-kit';
 
 function formatTime(value?: string) {
   if (!value) return '—';

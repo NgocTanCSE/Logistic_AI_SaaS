@@ -6,8 +6,8 @@ import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import AuthGate from '@/components/AuthGate';
 import AIChatButton from '@/components/AIChatButton';
-import { AppShell } from '../../../../../packages/ui-kit/AppShell';
-import { ShellProvider } from '../../../../../packages/ui-kit/shell-context';
+import { AppShell } from 'ui-kit';
+import { ShellProvider } from 'ui-kit';
 
 function ShellInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();

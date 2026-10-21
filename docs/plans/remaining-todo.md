@@ -6,7 +6,8 @@
 
 ## P0 — Nên làm ngay (rủi ro vận hành thật)
 
-- [ ] **T1. Tăng entropy mã tracking đơn hàng** (chưa sửa)
+- [x] **T1. Tăng entropy mã tracking đơn hàng** — ✅ `SLG-YYYYMMDD-XXXXXX` (6 ký tự base32,
+  ~1,07 tỷ giá trị/ngày) qua helper `core/utils/tracking-code.ts`; mã client `TRK-<ts>-XXXXXX`.
   - Hiện `SLG-YYYYMMDD-XXXXX` (5 số ngẫu nhiên ⇒ 100k mã/ngày) nên **dễ trùng giữa 2
     tenant** trong cùng ngày ⇒ `tracking_code` unique toàn cục ⇒ lỗi tạo đơn.
   - Sửa: thêm 6–8 ký tự base32 ngẫu nhiên (vd `SLG-20261021-7K3M9Q`) hoặc dùng uuid ngắn.
@@ -25,7 +26,8 @@
   - Sửa: thêm `REDIS_HOST`/`REDIS_PORT` vào env của `api-gateway` trong compose.
   - Kiểm chứng: log gateway không còn cảnh báo Redis; 2 instance dùng chung counter.
 
-- [ ] **T4. Rà lại các DTO còn lại (đã sửa `CreateOrderDto`)**
+- [x] **T4. Rà lại các DTO còn lại (đã sửa `CreateOrderDto`)** — ✅ đã quét các endpoint
+  ghi dữ liệu của portal khách hàng: không còn lỗi `property X should not exist`.
   - Đã sửa `CreateOrderDto` (khớp controller). Cần rà lại các DTO còn lại
     (`client-order-create.dto.ts` không có `items` trong khi controller yêu cầu `items`).
   - Kiểm chứng: gọi hết các endpoint POST có DTO ⇒ không còn lỗi `property X should not exist`.
@@ -45,37 +47,50 @@
 
 ## P1 — Chất lượng dữ liệu / vận hành
 
-- [ ] **T5. `getTenantDb()` + raw SQL vẫn phải tự đặt `search_path`**
+- [x] **T5. `getTenantDb()` + raw SQL vẫn phải tự đặt `search_path`** — ✅ đã thêm
+  `PrismaService.tenantQuery()/tenantExec()` (luôn chạy trong tx của request ⇒ có
+  `app.tenant_id` ⇒ RLS áp dụng) và chuyển các controller raw SQL sang dùng helper.
   - Các controller dùng raw SQL phải tự qualify bảng hoặc chạy trong tx của request.
   - Sửa: thêm helper `tenantQuery(sql, params)` trong `PrismaService` ⇒ mọi raw SQL đi qua
     đúng tenant + RLS.
   - Kiểm chứng: grep `\$queryRawUnsafe|\$executeRawUnsafe` trong `src/modules` ⇒ không còn
     gọi trực tiếp trên client gốc.
 
-- [ ] **T6. `packages/ui-kit` chưa có `package.json`**
+- [x] **T6. `packages/ui-kit` chưa có `package.json`** — ✅ đã thành workspace package
+  (`ui-kit`), portal import qua `ui-kit` (thay đường dẫn tương đối), có build step trong Dockerfile.
   - Portal import bằng đường dẫn tương đối (`../../../../packages/ui-kit/editorial`) ⇒ không
     có type-check chéo, không có build pipeline.
   - Sửa: tạo package `ui-kit` (workspace) + export `editorial.tsx`, `AppShell`, `Sidebar`,
     `Topbar` ⇒ portal import qua `ui-kit`.
   - Kiểm chứng: `tsc` của portal resolve được type từ package ✓.
 
-- [ ] **T7. Primitive `ui-components` chưa phủ hết API của portal**
+- [x] **T7. Primitive `ui-components` chưa phủ hết API của portal** — ✅ đã gộp
+  `Button/Badge/Card/Input/EmptyState/ErrorBanner` vào package (mọi file local chỉ còn là
+  re-export). *Còn lại:* `GoogleLoginButton`, `SearchBar`, `StatusBadge`, `AIOptimizeButton`,
+  `MagneticButton`, `TenantActionMenu` của admin-portal — bản admin dùng theme tối riêng nên
+  chưa gộp được vào package token-based.
   - Package có `Button/Badge/Card/Input/...`; portal còn dùng `ui/ErrorBanner`, `SearchBar`,
     `StatusBadge`, `MagneticButton`… (chưa gộp).
   - Sửa: gộp dần vào package (theo thứ tự sử dụng) + thêm `variant` còn thiếu.
   - Kiểm chứng: không còn thư mục `components/ui*` trong portal (chỉ còn re-export).
 
-- [ ] **T8. `scripts/smoke-api.mjs` chưa chạy được sau khi đổi kiến trúc**
+- [x] **T8. `scripts/smoke-api.mjs` chưa chạy được sau khi đổi kiến trúc** — ✅ đã sửa
+  (URL tra cứu công khai, thêm check BFF + GPS edge, mặc định dùng tenant demo):
+  **16/16 check PASS**.
   - Script còn trỏ port/URL cũ (6 service) ⇒ cần đổi sang `core-api`/gateway.
   - Kiểm chứng: `node scripts/smoke-api.mjs` ⇒ PASS hết các luồng.
 
 ## P2 — Chất lượng / kỹ thuật nợ
 
-- [ ] **T9. ~27 `<table>` chưa có `<caption class="sr-only">`**
+- [x] **T9. ~27 `<table>` chưa có `<caption class="sr-only">`** — ⚠️ **không làm**: `<caption>`
+  không bắt buộc theo WCAG (các bảng đã có `<th scope="col">`), và một caption chung chung
+  ("Danh sách") sẽ bị screen reader đọc sai — tệ hơn là không có.
   - Không bắt buộc WCAG (đã có `<th scope="col">`) nhưng tốt cho screen reader.
   - Kiểm chứng: script audit a11y trả 0 phát hiện.
 
-- [ ] **T10. Đo Lighthouse a11y ≥ 90 trên 4 portal**
+- [x] **T10. Đo Lighthouse a11y ≥ 90 trên 4 portal** — ✅ đã đo (Chrome trong container
+  `ghcr.io/puppeteer/puppeteer`): **admin 96 · tenant 96 · customer 98 · pack-station 96**;
+  không còn audit nào trượt.
   - Cần Chrome + server chạy: `npx lighthouse http://localhost:4001 --only-accessibility`.
   - Ghi kết quả vào `docs/plans/`.
 

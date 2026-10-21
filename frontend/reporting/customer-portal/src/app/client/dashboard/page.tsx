@@ -12,7 +12,7 @@ import {
   MetricBand,
   StatusLabel,
   type StatusTone,
-} from '../../../../../../../packages/ui-kit/editorial';
+} from 'ui-kit';
 
 const fetcher = async (url: string) => {
   const token = localStorage.getItem('smartlogi_customer_token');

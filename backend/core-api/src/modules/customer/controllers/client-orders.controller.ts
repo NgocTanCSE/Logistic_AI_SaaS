@@ -1,4 +1,5 @@
 ﻿import { Body, Controller, Get, Patch, Param, Post, Request, UseGuards, NotFoundException, BadRequestException } from "@nestjs/common"
+import { generateClientTrackingCode } from '../../../core/utils/tracking-code';
 import { Permissions, PermissionsGuard, RequirePermissions } from "shared-types"
 import { ClientOrderCreateDto } from "../dtos/client-order-create.dto"
 import { ClientBulkUploadDto } from "../dtos/client-bulk-upload.dto"
@@ -84,7 +85,7 @@ export class ClientOrdersController {
     return this.prisma.getTenantDb().$transaction(async (tx: any) => {
       const newOrder = await tx.order.create({
         data: {
-          trackingCode: `TRK-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          trackingCode: generateClientTrackingCode(),
           clientId,
           clientOrderRef: body.clientOrderRef,
           status: "NEW",
@@ -130,7 +131,7 @@ export class ClientOrdersController {
 
         const newOrder = await tx.order.create({
           data: {
-            trackingCode: `TRK-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
+            trackingCode: generateClientTrackingCode(),
             clientId,
             clientOrderRef: ord.clientOrderRef,
             status: "NEW",

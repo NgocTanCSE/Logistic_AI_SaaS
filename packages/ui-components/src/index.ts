@@ -8,6 +8,7 @@ export * from './Select';
 export * from './Toast';
 export * from './ToastHost';
 export * from './DataState';
+export * from './ErrorBanner';
 export * from './Skeleton';
 export * from './EmptyState';
 export * from './Tabs';

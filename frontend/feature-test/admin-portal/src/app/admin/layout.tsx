@@ -4,10 +4,10 @@ import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import AIChatButton from '@/components/AIChatButton';
-import { AppShell } from '../../../../../../packages/ui-kit/AppShell';
-import { ShellProvider } from '../../../../../../packages/ui-kit/shell-context';
-import { Sidebar, type NavSection } from '../../../../../../packages/ui-kit/Sidebar';
-import { Topbar } from '../../../../../../packages/ui-kit/Topbar';
+import { AppShell } from 'ui-kit';
+import { ShellProvider } from 'ui-kit';
+import { Sidebar, type NavSection } from 'ui-kit';
+import { Topbar } from 'ui-kit';
 
 const adminSections: NavSection[] = [
   {

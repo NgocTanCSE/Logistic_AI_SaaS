@@ -76,7 +76,7 @@ export class GeofencesController {
       }));
     }
 
-    const result: any[] = await this.prisma.getTenantDb().$queryRawUnsafe(
+    const result: any[] = await this.prisma.tenantQuery(
       `SELECT id, name, ST_AsGeoJSON(polygon)::json as polygon, zone_type as "zoneType", is_active as "isActive"
       FROM "${schemaName}"."geofences"`
     );
@@ -106,7 +106,7 @@ export class GeofencesController {
       return { ok: true };
     }
 
-    const result: any[] = await this.prisma.getTenantDb().$queryRawUnsafe(
+    const result: any[] = await this.prisma.tenantQuery(
       `UPDATE "${schemaName}"."geofences" SET name = COALESCE($1, name), zone_type = COALESCE($2, zone_type), is_active = COALESCE($3, is_active) WHERE id = $4 RETURNING id`,
       body.name || null, body.zoneType || null, body.isActive ?? null, id
     );
@@ -133,7 +133,7 @@ export class GeofencesController {
       return { ok: true };
     }
 
-    const result: any[] = await this.prisma.getTenantDb().$queryRawUnsafe(
+    const result: any[] = await this.prisma.tenantQuery(
       `DELETE FROM "${schemaName}"."geofences" WHERE id = $1 RETURNING id`,
       id
     );

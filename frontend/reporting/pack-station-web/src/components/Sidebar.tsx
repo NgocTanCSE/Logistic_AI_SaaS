@@ -1,6 +1,6 @@
 'use client';
 
-import { Sidebar as SharedSidebar, type NavSection } from '../../../../../packages/ui-kit/Sidebar';
+import { Sidebar as SharedSidebar, type NavSection } from 'ui-kit';
 
 const sections: NavSection[] = [
   {

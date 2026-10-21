@@ -23,7 +23,7 @@ import {
   EmptyNote,
   MetricBand,
   StatusLabel,
-} from '../../../../../../../packages/ui-kit/editorial';
+} from 'ui-kit';
 
 type StatData = {
   totalTenants: number;

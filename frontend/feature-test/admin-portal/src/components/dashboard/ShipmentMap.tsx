@@ -6,7 +6,7 @@ import {
   EditorialSection,
   EmptyNote,
   StatusLabel,
-} from '../../../../../../packages/ui-kit/editorial';
+} from 'ui-kit';
 
 type LogisticsData = {
   activeShipments: number;

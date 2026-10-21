@@ -7,6 +7,7 @@ WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc tsconfig.base.json ./
 COPY packages/prisma-schemas/package.json ./packages/prisma-schemas/
 COPY packages/ui-components/package.json ./packages/ui-components/
+COPY packages/ui-kit/package.json ./packages/ui-kit/
 COPY frontend/reporting/pack-station-web/package.json ./frontend/reporting/pack-station-web/
 
 # Copy source code
@@ -23,6 +24,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
 RUN pnpm --filter ui-components build
+RUN pnpm --filter ui-kit build
 RUN pnpm --filter pack-station-web build
 
 FROM node:20-alpine AS runner

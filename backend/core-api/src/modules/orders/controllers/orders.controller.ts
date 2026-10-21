@@ -5,6 +5,7 @@ import { JwtAuthGuard } from "../../../core/auth/jwt-auth.guard";
 import { PermissionsGuard, RequirePermissions, Permissions } from "shared-types";
 import { PrismaService } from "../../../core/prisma/prisma.service";
 import { OutboxService } from '../../../core/outbox/outbox.service';
+import { generateTrackingCode } from '../../../core/utils/tracking-code';
 import { ApiTags } from "@nestjs/swagger";
 
 class OrderItemDto {
@@ -68,9 +69,9 @@ export class OrdersController {
       throw new BadRequestException("Order must have at least one item");
     }
 
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const randomSuffix = Math.floor(Math.random() * 100000).toString().padStart(5, '0');
-    const trackingCode = `SLG-${dateStr}-${randomSuffix}`;
+    // Mã tracking phải duy nhất toàn cục và không đoán được (khách chỉ có
+    // mã để tra cứu) => 6 ký tự base32 thay vì 5 chữ số.
+    const trackingCode = generateTrackingCode();
 
     try {
       const createdOrder = await this.prisma.getTenantDb().$transaction(async (tx: any) => {
