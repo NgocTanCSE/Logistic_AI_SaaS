@@ -63,14 +63,20 @@ function authHeaders() {
   return token ? { authorization: `Bearer ${token}` } : {};
 }
 
-async function waitForGateway(timeoutMs = 60000) {
+/**
+ * Chờ API sẵn sàng. Phải kiểm tra `/api/v1/health` (đi qua gateway tới core-api)
+ * chứ không chỉ `/health` của gateway - gateway có thể đã lên trước core-api.
+ */
+async function waitForApi(timeoutMs = 90000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    try {
-      const response = await fetch(`${BASE_URL}/health`, { method: 'GET' });
-      if (response.ok) return true;
-    } catch {
-      // chưa sẵn sàng
+    for (const path of ['/api/v1/health', '/health']) {
+      try {
+        const response = await fetch(`${BASE_URL}${path}`, { method: 'GET' });
+        if (response.ok) return true;
+      } catch {
+        // chưa sẵn sàng
+      }
     }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -80,8 +86,8 @@ async function waitForGateway(timeoutMs = 60000) {
 async function main() {
   console.log(`Smoke testing ${BASE_URL}\n`);
 
-  if (!(await waitForGateway())) {
-    record('Gateway sẵn sàng', false, `không phản hồi trong 60s tại ${BASE_URL}`);
+  if (!(await waitForApi())) {
+    record('API sẵn sàng', false, `không phản hồi trong 90s tại ${BASE_URL}`);
     process.exitCode = 1;
     return;
   }
