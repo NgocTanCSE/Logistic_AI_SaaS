@@ -1,6 +1,8 @@
 # Remediation TODO — Logistic_AI / SmartLogi
 
-> Trạng thái tổng: **Item 1 hoàn tất (trừ 1.9 cần rotate secret, 1.10 cần Docker)**
+> Trạng thái tổng: **Item 1–3B hoàn tất & đã verify runtime trên Docker** (1.9 cần bạn rotate secret).
+> Item 4 (UX/UI) xong 4.1/4.2/4.4/4.5/4.6, 4.3 migrate 29/71 trang, 4.7 audit tĩnh xong (đo Lighthouse cần Chrome).
+> Phần còn lại: [`docs/plans/remaining-todo.md`](./remaining-todo.md).
 > Quy tắc: xong 1 item → báo cáo → chờ duyệt → mới sang item kế tiếp.
 
 ## Quyết định kỹ thuật đã chốt
@@ -27,7 +29,7 @@ Mục tiêu: từ máy trắng `docker compose up` chạy được **2 lần li�
 - [x] **1.7** Bỏ fallback `DATABASE_URL=file:./dev.db` trong seed (fail-fast)
 - [x] **1.8** Untrack `workers/ai-worker/.dev.vars`, thêm pattern vào `.gitignore`
 - [ ] **1.9** Rotate `JWT_SECRET` + `AI_API_KEY` — **cần bạn làm ở provider** (file đã nằm trong git history)
-- [ ] **1.10** Chạy `docker compose up` 2 lần để verify — **blocked: Docker daemon tắt (`/var/run/docker.sock` không tồn tại)**
+- [x] **1.10** Chạy `docker compose up` 2 lần để verify — **đã chạy ✅** (fresh volume + seed + 4 portal + 6 service)
 
 ### Acceptance criteria
 1. `pnpm --filter prisma-schemas exec prisma validate` pass.
@@ -88,7 +90,7 @@ Mục tiêu: từ máy trắng `docker compose up` chạy được **2 lần li�
   - Invoice pay gửi `{method:'CARD'}`; backend chấp nhận body rỗng.
   - Thêm `DELETE /products/:id`; import Excel/CSV thật bằng `exceljs` (upsert theo SKU).
   - Stripe webhook: bật `rawBody: true` ở IAM.
-- [ ] **2.11** Playwright smoke 12 luồng chính — **blocked: chưa có Playwright + Docker**
+- [ ] **2.11** Playwright smoke 12 luồng chính — Docker đã có, còn thiếu kịch bản Playwright (xem `remaining-todo.md` T8)
   - Thay thế: `scripts/smoke-api.mjs` (dependency-free) kiểm tra 14 luồng qua gateway.
   - Chạy: `SMOKE_TENANT_SLUG=... SMOKE_EMAIL=... SMOKE_PASSWORD=... node scripts/smoke-api.mjs`
 
