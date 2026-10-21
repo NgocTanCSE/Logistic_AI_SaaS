@@ -232,6 +232,52 @@ def rewrite_imports(content: str, service: str, old_rel: str, new_rel: str, tabl
 
 # Chỉnh sửa sau khi copy: các thay đổi phải tồn tại qua mọi lần chạy lại script.
 FIXUPS = {
+    # Provisioner: đường dẫn tìm schema.prisma phải cover cả dev lẫn docker.
+    'core/provisioner/schema-provisioner.ts': [
+        (
+            "    // Resolve the schema path flexibly depending on run context (dev vs dist).\n"
+            "    let schemaPath = path.join(\n"
+            "      __dirname,\n"
+            "      '../../../../../packages/prisma-schemas/prisma/schema.prisma',\n"
+            "    );\n"
+            "    if (!fs.existsSync(schemaPath)) {\n"
+            "      schemaPath = path.join(process.cwd(), '../../packages/prisma-schemas/prisma/schema.prisma');\n"
+            "    }\n"
+            "    if (!fs.existsSync(schemaPath)) {\n"
+            "      schemaPath = path.join(process.cwd(), 'packages/prisma-schemas/prisma/schema.prisma');\n"
+            "    }\n"
+            "    if (!fs.existsSync(schemaPath)) {\n"
+            "      throw new Error(`Prisma schema not found (looked for ${schemaPath})`);\n"
+            "    }",
+            "    // Resolve the schema path flexibly depending on run context:\n"
+            "    //   - dev (ts-node): <repo>/packages/prisma-schemas/prisma/schema.prisma\n"
+            "    //   - build (dist):  cung duong dan, tinh tu file da compile\n"
+            "    //   - docker:        /app/prisma/schema.prisma (Dockerfile copy vao)\n"
+            "    const candidates = [\n"
+            "      path.join(__dirname, '../../../../../packages/prisma-schemas/prisma/schema.prisma'),\n"
+            "      path.join(__dirname, '../../../../../../packages/prisma-schemas/prisma/schema.prisma'),\n"
+            "      path.join(process.cwd(), 'packages/prisma-schemas/prisma/schema.prisma'),\n"
+            "      path.join(process.cwd(), '../../packages/prisma-schemas/prisma/schema.prisma'),\n"
+            "      path.join(process.cwd(), 'prisma/schema.prisma'),\n"
+            "    ];\n"
+            "    const schemaPath = candidates.find((candidate) => fs.existsSync(candidate));\n"
+            "    if (!schemaPath) {\n"
+            "      throw new Error(\n"
+            "        `Prisma schema not found (looked in: ${candidates.join(', ')})`,\n"
+            "      );\n"
+            "    }",
+        ),
+    ],
+    # Prisma thêm comment `-- CreateTable` vào đầu statement -> regex phải
+    # không neo `^` để tìm được câu CREATE TABLE.
+    'core/provisioner/schema-provisioner.ts': [
+        (
+            "        const match = statement.match(/^CREATE TABLE \"([^\"]+)\"/);",
+            "        // Prisma thêm comment `-- CreateTable` ở đầu mỗi statement nên không\n"
+            "        // được neo `^CREATE TABLE` - statement phải bắt đầu bằng comment.\n"
+            "        const match = statement.match(/CREATE TABLE \"([^\"]+)\"/);",
+        ),
+    ],
     # `auth.controller.ts` của order-service không dùng AuthService (chỉ dùng
     # JwtService để đổi refresh token) => bỏ dependency không cần thiết.
     'modules/orders/auth/auth.controller.ts': [

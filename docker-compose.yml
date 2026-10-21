@@ -135,6 +135,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://${APP_DB_USER:-smartlogi_app}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-smartlogi}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - GOOGLE_CALLBACK_URL=${GOOGLE_CALLBACK_URL:-http://localhost:8081/api/v1/admin/auth/google/callback}
@@ -247,6 +249,8 @@ services:
     ports:
       - "3000:3000"
     environment:
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
@@ -259,6 +263,8 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       core-api:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - smartlogi-net

@@ -74,8 +74,8 @@ export async function seedAdvancedFleet(prisma: PrismaClient) {
   // it, so the rows are inserted with a raw statement.
   for (const fence of geofences) {
     await prisma.$executeRawUnsafe(
-      `INSERT INTO "geofences" (id, name, polygon, zone_type, is_active)
-       VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326), $4, $5)`,
+      `INSERT INTO "geofences" (id, name, polygon, zone_type, is_active, created_at, updated_at)
+       VALUES ($1, $2, ST_SetSRID(ST_GeomFromGeoJSON($3), 4326), $4, $5, NOW(), NOW())`,
       fence.id,
       fence.name,
       fence.polygon,

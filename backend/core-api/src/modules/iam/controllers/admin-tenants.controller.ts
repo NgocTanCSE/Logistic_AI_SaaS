@@ -102,7 +102,8 @@ export class AdminTenantsController {
   async create(@Body() body: TenantCreateDto & { adminEmail?: string, adminPassword?: string }) {
     const dbSchemaName = `tenant_${body.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now().toString(36)}`;
     
-    const { SchemaProvisioner } = require('../scripts/schema-provisioner');
+    // Provisioner đã chuyển sang core/ khi gộp modular monolith.
+    const { SchemaProvisioner } = require('../../../core/provisioner/schema-provisioner');
     let ddlStatements: string[] = [];
     try {
       ddlStatements = await SchemaProvisioner.getProvisioningSql(dbSchemaName);

@@ -181,6 +181,9 @@ export const PUBLIC_PATHS = [
   '/api/gateway/health',
   // Public tracking + partner callbacks.
   '/api/v1/public',
+  // Thiết bị GPS dùng GPS_AUTH_TOKEN (xác thực tại chính gps-ingestion-service)
+  // nên không được chặn bằng JWT ở edge.
+  '/api/v1/gps/ingest',
   '/api/v1/track',
   '/api/v1/health',
   '/api/v1/webhooks/stripe',

@@ -34,7 +34,9 @@ async function clearDatabase() {
     await prisma.featureFlag.deleteMany();
     await prisma.tenantSetting.deleteMany();
     await prisma.tenantUiConfig.deleteMany();
-    await prisma.tenant.deleteMany();
+    // `Tenant` phải xoá SAU các bảng có FK tới nó
+    // (invoices, payment_transactions, api_usage_daily, tenant_api_keys,
+    //  feature_flags, tenant_settings, tenant_ui_configs).
 
     // Notification & AI
     await prisma.notification.deleteMany();
@@ -102,8 +104,14 @@ async function clearDatabase() {
     await prisma.tenantUser.deleteMany();
     await prisma.branch.deleteMany();
     await prisma.apiUsageDaily.deleteMany();
+
+    // Cuối cùng mới xoá tenant (sau mọi bảng tham chiếu tới nó).
+    await prisma.tenant.deleteMany();
   } catch (e) {
+    // Không được nuốt lỗi: nếu xoá dở thì seed sẽ ghi đè lên dữ liệu cũ
+    // và báo lỗi khó hiểu ở bước createMany.
     console.error('Error wiping database:', e);
+    throw e;
   }
 }
 

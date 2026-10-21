@@ -50,13 +50,17 @@ BEGIN
 
   -- A second tenant is created on the fly so that the test also works on a
   -- freshly seeded (single tenant) database.
-  INSERT INTO public."Tenant" (id, name, slug, db_schema_name, status)
+  -- `updated_at` là cột NOT NULL do Prisma quản lý (@updatedAt) nên raw
+  -- INSERT phải tự điền.
+  INSERT INTO public."Tenant" (id, name, slug, db_schema_name, status, created_at, updated_at)
   VALUES (
     gen_random_uuid()::text,
     'RLS Test Tenant',
     'rls-test-' || suffix,
     'rls_test_' || suffix,
-    'ACTIVE'
+    'ACTIVE',
+    NOW(),
+    NOW()
   )
   RETURNING id INTO tenant_b;
 
@@ -65,10 +69,11 @@ BEGIN
   EXECUTE 'SELECT count(*) FROM public."orders"' INTO rows_total;
 
   -- A row that belongs to tenant B only.
+  -- EXECUTE không hỗ trợ $1 => phải nội suy giá trị bằng %L (đã escape).
   EXECUTE format(
     'INSERT INTO public."orders" (id, tenant_id, tracking_code, recipient_name, '
-    'recipient_phone, recipient_address, shipping_fee, updated_at) '
-    'VALUES ($1, $2, $3, $4, $5, $6, 0, now())',
+    'recipient_phone, recipient_address, shipping_fee, status, updated_at) '
+    'VALUES (%L, %L, %L, %L, %L, %L, 0, ''NEW'', now())',
     probe_id, tenant_b, 'RLS-' || probe_id, 'RLS Probe', '0000000000', 'RLS probe address');
   EXECUTE format('SELECT set_config(''app.tenant_id'', %L, true)', tenant_a);
 

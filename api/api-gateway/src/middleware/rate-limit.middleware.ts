@@ -32,8 +32,10 @@ export class RateLimitMiddleware implements NestMiddleware, OnModuleDestroy {
         password: REDIS_CONFIG.password,
         maxRetriesPerRequest: 1,
         retryStrategy: (times) => {
-          if (times > 2) return null;
-          return 1000;
+          // Cho thêm cơ hội khi Redis khởi động chậm hơn gateway
+          // (trước đây từ bỏ sau 2 lần => rơi về in-memory vĩnh viễn).
+          if (times > 8) return null;
+          return Math.min(1000 * times, 5000);
         },
         lazyConnect: true,
       });

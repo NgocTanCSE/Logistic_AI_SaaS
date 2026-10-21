@@ -54,7 +54,7 @@ func tenantForDriver(ctx context.Context, driverID string) (string, error) {
 
 	var tenantID string
 	if err := tx.QueryRow(ctx,
-		`SELECT tenant_id::text FROM `+schemaName+`.drivers WHERE id = $1::uuid`,
+		`SELECT tenant_id::text FROM `+schemaName+`.drivers WHERE id = $1`,
 		driverID,
 	).Scan(&tenantID); err != nil {
 		return "", err
@@ -84,6 +84,15 @@ func withTenant(ctx context.Context, tenantID string, fn func(tx pgx.Tx) error) 
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// nullIfEmpty trả nil cho chuỗi rỗng để cột FK nullable nhận NULL thay vì
+// chuỗi rỗng (vi phạm foreign key).
+func nullIfEmpty(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 func generateUUID() string {
@@ -244,7 +253,7 @@ func processUDPPacket(data []byte) {
 			INSERT INTO `+schemaName+`.gps_tracking_logs 
 			(id, driver_id, trip_id, lat, lng, speed, heading, is_offline_cached, timestamp)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		`, generateUUID(), pt.DriverID, pt.TripID, pt.Lat, pt.Lng, pt.Speed, pt.Heading, pt.IsOfflineCached, pt.Timestamp); err != nil {
+		`, generateUUID(), pt.DriverID, nullIfEmpty(pt.TripID), pt.Lat, pt.Lng, pt.Speed, pt.Heading, pt.IsOfflineCached, pt.Timestamp); err != nil {
 			return err
 		}
 
@@ -252,7 +261,7 @@ func processUDPPacket(data []byte) {
 			UPDATE `+schemaName+`.drivers
 			SET last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
 				location_updated_at = NOW()
-			WHERE id = $3::uuid
+			WHERE id = $3
 		`, pt.Lng, pt.Lat, pt.DriverID)
 		return err
 	})
@@ -343,7 +352,7 @@ func handleGPSBatch(w http.ResponseWriter, r *http.Request) {
 					INSERT INTO `+schemaName+`.gps_tracking_logs 
 					(id, driver_id, trip_id, lat, lng, speed, heading, is_offline_cached, timestamp)
 					VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-				`, generateUUID(), pt.DriverID, pt.TripID, pt.Lat, pt.Lng, pt.Speed, pt.Heading, pt.IsOfflineCached, pt.Timestamp); err != nil {
+				`, generateUUID(), pt.DriverID, nullIfEmpty(pt.TripID), pt.Lat, pt.Lng, pt.Speed, pt.Heading, pt.IsOfflineCached, pt.Timestamp); err != nil {
 					return err
 				}
 			}
@@ -353,7 +362,7 @@ func handleGPSBatch(w http.ResponseWriter, r *http.Request) {
 				UPDATE `+schemaName+`.drivers
 				SET last_known_location = ST_SetSRID(ST_MakePoint($1, $2), 4326),
 					location_updated_at = NOW()
-				WHERE id = $3::uuid
+				WHERE id = $3
 			`, lastPt.Lng, lastPt.Lat, driverID)
 			return err
 		})

@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useEffect, useState, createContext, useContext, useCallback, useRef } from 'react';
 
 export interface ToastItem {

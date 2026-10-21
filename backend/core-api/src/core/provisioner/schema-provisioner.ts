@@ -53,19 +53,22 @@ export class SchemaProvisioner {
       throw new Error('Invalid schema name. Only alphanumeric and underscores allowed.');
     }
 
-    // Resolve the schema path flexibly depending on run context (dev vs dist).
-    let schemaPath = path.join(
-      __dirname,
-      '../../../../../packages/prisma-schemas/prisma/schema.prisma',
-    );
-    if (!fs.existsSync(schemaPath)) {
-      schemaPath = path.join(process.cwd(), '../../packages/prisma-schemas/prisma/schema.prisma');
-    }
-    if (!fs.existsSync(schemaPath)) {
-      schemaPath = path.join(process.cwd(), 'packages/prisma-schemas/prisma/schema.prisma');
-    }
-    if (!fs.existsSync(schemaPath)) {
-      throw new Error(`Prisma schema not found (looked for ${schemaPath})`);
+    // Resolve the schema path flexibly depending on run context:
+    //   - dev (ts-node): <repo>/packages/prisma-schemas/prisma/schema.prisma
+    //   - build (dist):  cùng đường dẫn, tính từ file đã compile
+    //   - docker:        /app/prisma/schema.prisma (Dockerfile copy vào)
+    const candidates = [
+      path.join(__dirname, '../../../../../packages/prisma-schemas/prisma/schema.prisma'),
+      path.join(__dirname, '../../../../../../packages/prisma-schemas/prisma/schema.prisma'),
+      path.join(process.cwd(), 'packages/prisma-schemas/prisma/schema.prisma'),
+      path.join(process.cwd(), '../../packages/prisma-schemas/prisma/schema.prisma'),
+      path.join(process.cwd(), 'prisma/schema.prisma'),
+    ];
+    const schemaPath = candidates.find((candidate) => fs.existsSync(candidate));
+    if (!schemaPath) {
+      throw new Error(
+        `Prisma schema not found (looked in: ${candidates.join(', ')})`,
+      );
     }
 
     try {
@@ -112,7 +115,9 @@ export class SchemaProvisioner {
       // is identical to the one installed by the RLS migration on the shared
       // schema, so a tenant can only ever read or write its own rows.
       for (const statement of [...statements]) {
-        const match = statement.match(/^CREATE TABLE "([^"]+)"/);
+        // Prisma thêm comment `-- CreateTable` ở đầu mỗi statement nên không
+        // được neo `^CREATE TABLE` - statement phải bắt đầu bằng comment.
+        const match = statement.match(/CREATE TABLE "([^"]+)"/);
         if (!match || !statement.includes('"tenant_id"')) continue;
         const table = match[1];
         statements.push(...this.rlsStatements(dbSchemaName, table));

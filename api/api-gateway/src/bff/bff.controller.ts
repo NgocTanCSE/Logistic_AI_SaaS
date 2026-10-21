@@ -10,7 +10,8 @@ import { AdminDashboardDto, TenantDashboardDto } from './dto';
  * Các route này được gateway phục vụ trực tiếp (không proxy xuống core-api).
  */
 @ApiTags('BFF')
-@Controller('api/v1/bff')
+// Gateway đặt global prefix 'api' => controller path là 'v1/buff'.
+@Controller('v1/bff')
 @UseGuards(JwtGatewayGuard)
 export class BffController {
   constructor(private readonly bff: BffService) {}

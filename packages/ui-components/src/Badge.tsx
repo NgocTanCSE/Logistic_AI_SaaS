@@ -1,3 +1,5 @@
+'use client';
+
 import React, { memo } from 'react';
 
 export type BadgeVariant = 'neutral' | 'default' | 'success' | 'warning' | 'error' | 'danger' | 'info';

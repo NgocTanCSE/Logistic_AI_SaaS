@@ -7,9 +7,18 @@
     "declarationMap": true,
     "sourceMap": true,
     "jsx": "react-jsx",
-    "module": "commonjs",
-    "lib": ["es2021", "dom"]
+    "module": "esnext",
+    "lib": [
+      "es2021",
+      "dom"
+    ],
+    "moduleResolution": "bundler"
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
 }

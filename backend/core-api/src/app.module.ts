@@ -30,7 +30,9 @@ import { NotificationModule } from './modules/notification/notification.module';
  */
 @Module({
   imports: [
-    CacheModule.register({ ttl: 300000 }),
+    // isGlobal: các module (Customer/WMS/...) dùng CacheInterceptor nhưng không
+    // import CacheModule riêng.
+    CacheModule.register({ ttl: 300000, isGlobal: true }),
     ThrottlerModule.forRoot([
       {
         ttl: 60000,
