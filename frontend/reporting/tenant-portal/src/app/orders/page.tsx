@@ -1,5 +1,6 @@
 'use client';
 
+import { TableState } from 'ui-components';
 import { useState, useEffect, useCallback } from 'react';
 import {formatDateTime} from '@/lib/date-utils';
 import { useAuth } from '@/lib/auth-context';
@@ -243,21 +244,17 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                      <span className="text-sm font-medium text-slate-400 uppercase tracking-widest">Retrieving Logistics Data...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : orders.length === 0 ? (
-                <tr>
+              <TableState
+          loading={loading}
+          empty={!loading && orders.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchOrders}
+          colSpan={6}
+          emptyContent={<tr>
                   <td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-medium">No active orders found.</td>
-                </tr>
-              ) : (
-                orders.map(order => {
+                </tr>}
+        >
+          {orders.map(order => {
                   // BƯỚC 1/4: Defensive logic for Cancel button
                   const canCancel = order.status === 'NEW' || order.status === 'PENDING_PICKUP' || order.status === 'UNASSIGNED';
 
@@ -301,8 +298,8 @@ export default function OrdersPage() {
                       </td>
                     </tr>
                   )
-                })
-              )}
+                })}
+        </TableState>
             </tbody>
           </table>
         </div>

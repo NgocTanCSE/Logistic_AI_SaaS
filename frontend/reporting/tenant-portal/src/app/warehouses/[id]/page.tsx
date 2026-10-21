@@ -1,4 +1,5 @@
 'use client';
+import { DataState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
@@ -139,13 +140,10 @@ export default function WarehouseStructurePage() {
       </div>
 
       <div className="grid grid-cols-1 gap-8">
-        {loading ? (
-          <div className="py-20 text-center">
-            <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Mapping Physical Layout...</span>
-          </div>
-        ) : (
-          zones.map((zone) => (
+        <DataState
+          loading={loading}
+        >
+          {zones.map((zone) => (
             <div key={zone.id} className="space-y-4">
               <div className="flex items-center justify-between px-2">
                 <div className="flex items-center gap-3">
@@ -197,8 +195,8 @@ export default function WarehouseStructurePage() {
                 ))}
               </div>
             </div>
-          ))
-        )}
+          ))}
+        </DataState>
       </div>
 
       {/* Modals */}

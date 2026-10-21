@@ -40,7 +40,7 @@ export function AIInsightsPanel({ token }: { token: string | null }) {
       setLoadError(null);
 
       const [analysisResult, modelsResult] = await Promise.allSettled([
-        api.get('/ai/v1/analyze'),
+        api.post('/ai/v1/analyze', {}),
         api.get('/ai/v1/models'),
       ]);
 

@@ -2,8 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card } from '@/components/ui-new/Card';
-import { Badge } from '@/components/ui-new/Badge';
+import { Card, Badge } from 'ui-components';
 
 export default function CustomerPortalHome() {
   const [trackingCode, setTrackingCode] = useState('');

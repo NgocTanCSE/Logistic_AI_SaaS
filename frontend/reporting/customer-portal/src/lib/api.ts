@@ -56,8 +56,17 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    if (error?.response?.status >= 500) {
-      showToast('Server error. Please try again later.', 'error');
+    // Mọi lỗi (4xx/5xx) đều được báo bằng message của backend, trước đây chỉ
+    // lỗi 5xx mới có toast nên lỗi nghiệp vụ (400/403/404) im lặng.
+    const status = error?.response?.status ?? 0;
+    const serverMessage = error?.response?.data?.message;
+    if (status >= 500) {
+      showToast(
+        serverMessage ? `Lỗi máy chủ: ${serverMessage}` : 'Lỗi máy chủ. Vui lòng thử lại sau.',
+        'error',
+      );
+    } else if (serverMessage) {
+      showToast(String(serverMessage), 'error');
     }
 
     return Promise.reject(error);

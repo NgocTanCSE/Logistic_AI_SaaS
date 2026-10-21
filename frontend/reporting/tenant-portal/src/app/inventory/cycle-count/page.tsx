@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDateTime} from '@/lib/date-utils';
 import api from '@/lib/api';
@@ -136,16 +137,15 @@ export default function CycleCountPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                 <tr><td colSpan={5} className="px-8 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Syncing Plans...</span>
-                    </div>
-                 </td></tr>
-              ) : counts.length === 0 ? (
-                <tr><td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-medium">No cycle count plans active.</td></tr>
-              ) : counts.map(c => (
+              <TableState
+          loading={loading}
+          empty={!loading && counts.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchWarehouses}
+          colSpan={6}
+          emptyContent={<tr><td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-medium">No cycle count plans active.</td></tr>}
+        >
+          {counts.map(c => (
                 <tr key={c.id} className="hover:bg-slate-50/80 transition-all">
                   <td className="px-8 py-6 font-bold text-ink font-mono text-xs">{c.id}</td>
                   <td className="px-8 py-6 font-bold text-ink">{c.warehouse?.name || 'Main DC'}</td>
@@ -164,6 +164,7 @@ export default function CycleCountPage() {
                   </td>
                 </tr>
               ))}
+        </TableState>
             </tbody>
           </table>
         </div>

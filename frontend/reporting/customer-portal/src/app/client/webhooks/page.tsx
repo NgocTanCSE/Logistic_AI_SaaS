@@ -1,5 +1,6 @@
 "use client";
 
+import { DataState } from 'ui-components';
 import React, { useEffect, useState } from 'react';
 
 import api from '@/lib/api';
@@ -96,12 +97,10 @@ export default function ClientWebhooksPage() {
       </div>
 
       <div className="space-y-4">
-        {loading ? (
-          <div className="p-12 flex justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        ) : (
-          webhooks.length === 0 && !error ? (
+        <DataState
+          loading={loading}
+        >
+          {webhooks.length === 0 && !error ? (
             <div className="p-12 text-center">
               <Globe className="w-8 h-8 text-ink-soft mx-auto mb-3" />
               <p className="text-ink-soft">No webhooks registered yet</p>
@@ -144,8 +143,8 @@ export default function ClientWebhooksPage() {
                 </button>
               </div>
             </div>
-          ))
-        )}
+          ))}
+        </DataState>
       </div>
     </div>
   );

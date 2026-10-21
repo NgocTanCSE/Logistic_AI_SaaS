@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDate} from '@/lib/date-utils';
 import api from '@/lib/api';
@@ -82,12 +83,15 @@ export default function ExpenseApprovalPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[11px]">Auditing Receipts...</td></tr>
-              ) : expenses.length === 0 ? (
-                <tr><td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-medium">No expenses found.</td></tr>
-              ) : (
-                expenses.map(exp => (
+              <TableState
+          loading={loading}
+          empty={!loading && expenses.length === 0}
+          
+          onRetry={fetchExpenses}
+          colSpan={6}
+          emptyContent={<tr><td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-medium">No expenses found.</td></tr>}
+        >
+          {expenses.map(exp => (
                   <tr key={exp.id} className="hover:bg-slate-50/80 transition-all">
                     <td className="px-8 py-6">
                       <div className="font-bold text-ink">{exp.driver?.user?.fullName}</div>
@@ -103,8 +107,8 @@ export default function ExpenseApprovalPage() {
                        <Button variant="ghost" size="sm" className="font-bold text-primary tracking-widest text-[10px]" onClick={() => handleViewReceipt((exp as any).receiptUrl)}>VIEW RECEIPT</Button>
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
+        </TableState>
             </tbody>
           </table>
         </div>

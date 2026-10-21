@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDate, formatTime} from '@/lib/date-utils';
 import api from '@/lib/api';
@@ -101,18 +102,17 @@ export default function InventoryAdjustmentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="px-8 py-20 text-center text-slate-400 uppercase tracking-widest text-[11px] font-bold">
-                    Syncing with Vault...
-                  </td>
-                </tr>
-              ) : adjustments.length === 0 ? (
-                <tr>
+              <TableState
+          loading={loading}
+          empty={!loading && adjustments.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchAdjustments}
+          colSpan={6}
+          emptyContent={<tr>
                   <td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-medium">No adjustment records found.</td>
-                </tr>
-              ) : (
-                adjustments.map(adj => (
+                </tr>}
+        >
+          {adjustments.map(adj => (
                   <tr key={adj.id} className="hover:bg-slate-50/80 transition-all group">
                     <td className="px-8 py-6">
                       <div className="font-bold text-ink">{formatDate(adj.createdAt)}</div>
@@ -135,8 +135,8 @@ export default function InventoryAdjustmentsPage() {
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
+        </TableState>
             </tbody>
           </table>
         </div>

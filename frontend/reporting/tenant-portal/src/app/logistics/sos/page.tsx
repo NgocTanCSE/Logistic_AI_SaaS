@@ -1,4 +1,5 @@
 'use client';
+import { DataState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDateTime} from '@/lib/date-utils';
 import api from '@/lib/api';
@@ -72,16 +73,18 @@ export default function SosControlCenterPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {loading ? (
-          <div className="md:col-span-2 py-20 text-center text-slate-400 uppercase tracking-widest text-[11px] font-bold">Scanning for Emergencies...</div>
-        ) : alerts.length === 0 ? (
-          <div className="md:col-span-2 py-20 text-center bg-emerald-50 rounded-3xl border-2 border-emerald-100/50">
+        <DataState
+          loading={loading}
+          empty={!loading && alerts.length === 0}
+          
+          onRetry={fetchAlerts}
+          emptyContent={<div className="md:col-span-2 py-20 text-center bg-emerald-50 rounded-3xl border-2 border-emerald-100/50">
              <svg className="w-12 h-12 text-emerald-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
              <p className="font-bold text-emerald-800">No active SOS alerts</p>
              <p className="text-sm text-emerald-600 mt-1">All fleet operations are currently safe.</p>
-          </div>
-        ) : (
-          alerts.map(alert => (
+          </div>}
+        >
+          {alerts.map(alert => (
             <Card key={alert.id} className="border-rose-200 bg-rose-50/30 overflow-hidden group">
               <div className="p-8">
                 <div className="flex justify-between items-start mb-6">
@@ -112,8 +115,8 @@ export default function SosControlCenterPage() {
                 </div>
               </div>
             </Card>
-          ))
-        )}
+          ))}
+        </DataState>
       </div>
 
       {!loading && total > limit && (

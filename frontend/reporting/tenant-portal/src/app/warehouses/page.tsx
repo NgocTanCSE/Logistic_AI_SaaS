@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/Button';
@@ -95,11 +96,15 @@ export default function WarehousesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Loading...</td></tr>
-              ) : warehouses.length === 0 ? (
-                <tr><td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">No warehouses found.</td></tr>
-              ) : warehouses.map(w => (
+              <TableState
+          loading={loading}
+          empty={!loading && warehouses.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchWarehouses}
+          colSpan={6}
+          emptyContent={<tr><td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">No warehouses found.</td></tr>}
+        >
+          {warehouses.map(w => (
                 <tr key={w.id} className="hover:bg-slate-50/80 transition-all">
                   <td className="px-8 py-6 font-mono font-bold text-primary">{w.code}</td>
                   <td className="px-8 py-6 font-bold text-ink">{w.name}</td>
@@ -112,6 +117,7 @@ export default function WarehousesPage() {
                   </td>
                 </tr>
               ))}
+        </TableState>
             </tbody>
           </table>
         </div>

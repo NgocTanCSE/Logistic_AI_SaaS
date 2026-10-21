@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDateTime} from '@/lib/date-utils';
 import api from '@/lib/api';
@@ -95,12 +96,13 @@ export default function AuditLogsPage() {
       {error && <ErrorBanner message={error} onRetry={fetchLogs} />}
 
       <Card className="overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center">
-            <p className="text-sm text-slate-400">Loading audit logs...</p>
-          </div>
-        ) : logs.length === 0 ? (
-          <div className="p-12 text-center">
+        <TableState
+          loading={loading}
+          empty={!loading && logs.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchLogs}
+          colSpan={6}
+          emptyContent={<div className="p-12 text-center">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -110,20 +112,9 @@ export default function AuditLogsPage() {
             <p className="text-sm text-slate-500 mt-1">
               {actionFilter ? 'No logs match the selected filter.' : 'Audit logging service is not available yet.'}
             </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 border-b border-slate-100">
-                <tr>
-                  <th className="px-6 py-4 font-bold">Action</th>
-                  <th className="px-6 py-4 font-bold">Actor</th>
-                  <th className="px-6 py-4 font-bold">Resource</th>
-                  <th className="px-6 py-4 font-bold">Detail</th>
-                  <th className="px-6 py-4 font-bold">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
+          </div>}
+        >
+          
                 {logs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
@@ -150,10 +141,8 @@ export default function AuditLogsPage() {
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              
+        </TableState>
         {!loading && total > 0 && (
           <div className="p-4 border-t border-slate-100 flex items-center justify-between text-sm">
             <span className="text-slate-500">

@@ -3,6 +3,7 @@ import "./globals.css";
 import "../styles/layout-tokens.css"; /* editorial layout tokens — colors kept per portal */
 import { AuthProvider } from "@/lib/auth-context";
 import AppShell from "@/components/AppShell";
+import { ToastHost } from 'ui-components';
 import { GoogleOAuthProvider } from "@react-oauth/google";
 
 export const metadata: Metadata = {
@@ -20,6 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-background text-ink antialiased">
+        <ToastHost />
         <GoogleOAuthProvider clientId={googleClientId}>
           <AuthProvider>
             <AppShell>{children}</AppShell>

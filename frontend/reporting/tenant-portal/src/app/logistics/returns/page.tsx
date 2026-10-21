@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDate} from '@/lib/date-utils';
 import { Button } from '@/components/ui/Button';
@@ -95,11 +96,15 @@ export default function ReturnsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading ? (
-                    <tr><td colSpan={5} className="text-center py-10 text-xs text-slate-400 animate-pulse">LOADING...</td></tr>
-                  ) : returns.length === 0 ? (
-                    <tr><td colSpan={5} className="text-center py-10 text-xs text-slate-400">No return requests found</td></tr>
-                  ) : returns.map((r: any) => (
+                  <TableState
+          loading={loading}
+          empty={!loading && returns.length === 0}
+          
+          onRetry={fetchReturns}
+          colSpan={6}
+          emptyContent={<tr><td colSpan={5} className="text-center py-10 text-xs text-slate-400">No return requests found</td></tr>}
+        >
+          {returns.map((r: any) => (
                     <tr
                       key={r.id}
                       onClick={() => setSelectedReturn(r)}
@@ -121,6 +126,7 @@ export default function ReturnsPage() {
                       </td>
                     </tr>
                   ))}
+        </TableState>
                 </tbody>
               </table>
             </div>

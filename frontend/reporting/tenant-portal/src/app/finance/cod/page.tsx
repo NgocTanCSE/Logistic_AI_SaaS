@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDate} from '@/lib/date-utils';
 import {formatVnd} from '@/lib/format';
@@ -93,12 +94,15 @@ export default function CodRemittancePage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={6} className="px-8 py-20 text-center text-slate-400 font-bold uppercase text-[11px]">Syncing with Financial Ledger...</td></tr>
-              ) : remittances.length === 0 ? (
-                <tr><td colSpan={6} className="px-8 py-20 text-center text-slate-400 font-medium">No pending remittances.</td></tr>
-              ) : (
-                remittances.map(rem => (
+              <TableState
+          loading={loading}
+          empty={!loading && remittances.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchRemittances}
+          colSpan={6}
+          emptyContent={<tr><td colSpan={6} className="px-8 py-20 text-center text-slate-400 font-medium">No pending remittances.</td></tr>}
+        >
+          {remittances.map(rem => (
                   <tr key={rem.id} className="hover:bg-slate-50/80 transition-all">
                     <td className="px-8 py-6">
                       <div className="font-bold text-ink">{rem.driver?.user?.fullName}</div>
@@ -120,8 +124,8 @@ export default function CodRemittancePage() {
                       )}
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
+        </TableState>
             </tbody>
           </table>
         </div>

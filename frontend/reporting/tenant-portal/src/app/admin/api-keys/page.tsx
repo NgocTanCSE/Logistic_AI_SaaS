@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDate} from '@/lib/date-utils';
 import api from '@/lib/api';
@@ -101,12 +102,13 @@ export default function ApiKeysPage() {
       {error && <ErrorBanner message={error} onRetry={fetchKeys} />}
 
       <Card className="overflow-hidden">
-        {loading ? (
-          <div className="p-12 text-center">
-            <p className="text-sm text-slate-400">Loading API keys...</p>
-          </div>
-        ) : keys.length === 0 ? (
-          <div className="p-12 text-center">
+        <TableState
+          loading={loading}
+          empty={!loading && keys.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchKeys}
+          colSpan={6}
+          emptyContent={<div className="p-12 text-center">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
@@ -119,19 +121,9 @@ export default function ApiKeysPage() {
             <Button variant="primary" className="mt-6" onClick={() => setIsCreateOpen(true)}>
               Create Your First Key
             </Button>
-          </div>
-        ) : (
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 border-b border-slate-100">
-              <tr>
-                <th className="px-6 py-4 font-bold">Name</th>
-                <th className="px-6 py-4 font-bold">Key</th>
-                <th className="px-6 py-4 font-bold">Created</th>
-                <th className="px-6 py-4 font-bold">Status</th>
-                <th className="px-6 py-4 font-bold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
+          </div>}
+        >
+          
               {keys.map((key) => (
                 <tr key={key.id} className="hover:bg-slate-50/50 transition-colors group">
                   <td className="px-6 py-4 font-semibold text-ink">{key.name}</td>
@@ -172,9 +164,8 @@ export default function ApiKeysPage() {
                   </td>
                 </tr>
               ))}
-            </tbody>
-          </table>
-        )}
+            
+        </TableState>
       </Card>
 
       {!loading && total > limit && (

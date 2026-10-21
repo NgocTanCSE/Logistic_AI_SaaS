@@ -44,7 +44,7 @@ export function AIFeedbackModal({ isOpen, onClose, predictionData, resourceId, r
   };
 
   return (
-    <div className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-slate-900/60  ">
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-[5000] flex items-center justify-center p-4 bg-slate-900/60  ">
       <Card className="w-full max-w-md p-8 shadow-2xl border-primary/20">
         <div className="flex items-center gap-2 mb-6">
           <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center text-primary">

@@ -1,4 +1,5 @@
 'use client';
+import { DataState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import api from '@/lib/api';
@@ -129,15 +130,10 @@ export default function SettingsPage() {
         {/* Settings Form */}
         <div className="flex-1 p-8">
           {error && <ErrorBanner message={error} onRetry={fetchSettings} />}
-          {loading ? (
-            <div className="animate-pulse flex flex-col gap-6">
-              <div className="h-8 bg-slate-100 rounded w-1/4"></div>
-              <div className="h-10 bg-slate-100 rounded w-full"></div>
-              <div className="h-10 bg-slate-100 rounded w-full"></div>
-              <div className="h-10 bg-slate-100 rounded w-2/3"></div>
-            </div>
-          ) : (
-            <form onSubmit={handleSave} className="animate-in fade-in duration-300 flex flex-col h-full">
+          <DataState
+          loading={loading}
+        >
+          <form onSubmit={handleSave} className="animate-in fade-in duration-300 flex flex-col h-full">
               
               {activeTab === 'general' && (
                 <div className="space-y-6 flex-1">
@@ -291,7 +287,7 @@ export default function SettingsPage() {
                 </Can>
               </div>
             </form>
-          )}
+        </DataState>
         </div>
       </div>
     </div>

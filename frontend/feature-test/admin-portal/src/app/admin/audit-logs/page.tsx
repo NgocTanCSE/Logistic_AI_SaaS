@@ -1,5 +1,6 @@
 'use client';
 
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { SearchBar } from '@/components/ui/SearchBar';
@@ -122,16 +123,17 @@ export default function AuditLogsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-inkSoft">Loading logs...</td>
-                </tr>
-              ) : logs.length === 0 ? (
-                <tr>
+              <TableState
+          loading={loading}
+          empty={!loading && logs.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchLogs}
+          colSpan={6}
+          emptyContent={<tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-inkSoft">No logs found.</td>
-                </tr>
-              ) : (
-                logs.map((log) => {
+                </tr>}
+        >
+          {logs.map((log) => {
                   const when = formatTimestamp(log);
                   const actor = log.actor ?? log.actorEmail ?? 'System';
                   const ip = log.ip ?? log.ipAddress ?? '—';
@@ -170,8 +172,8 @@ export default function AuditLogsPage() {
                       </td>
                     </tr>
                   );
-                })
-              )}
+                })}
+        </TableState>
             </tbody>
           </table>
         </div>

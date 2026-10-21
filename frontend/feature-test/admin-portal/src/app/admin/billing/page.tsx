@@ -1,5 +1,6 @@
 'use client';
 
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { SearchBar } from '@/components/ui/SearchBar';
@@ -105,16 +106,17 @@ export default function BillingPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/30">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-inkSoft">Loading invoices...</td>
-                </tr>
-              ) : invoices.length === 0 ? (
-                <tr>
+              <TableState
+          loading={loading}
+          empty={!loading && invoices.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchBilling}
+          colSpan={6}
+          emptyContent={<tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-inkSoft">No invoices found.</td>
-                </tr>
-              ) : (
-                invoices.map((invoice) => (
+                </tr>}
+        >
+          {invoices.map((invoice) => (
                   <tr key={invoice.id} className="hover:bg-surface/30 transition-colors font-mono group">
                     <td className="px-6 py-4">
                       <div className="font-semibold text-ink">{invoice.id}</div>
@@ -148,8 +150,8 @@ export default function BillingPage() {
                       </span>
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
+        </TableState>
             </tbody>
           </table>
         </div>

@@ -1,4 +1,5 @@
 'use client';
+import { DataState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDate} from '@/lib/date-utils';
 import { Button } from '@/components/ui/Button';
@@ -331,11 +332,14 @@ return (
             <div className="p-4 overflow-y-auto flex-1 custom-scrollbar">
               {activeTab === 'orders' ? (
                 <div className="space-y-3">
-                  {loading ? (
-                    <div className="py-10 text-center text-xs font-bold text-slate-400 animate-pulse">SYNCING ORDERS...</div>
-                  ) : orders.length === 0 ? (
-                    <div className="py-10 text-center text-xs font-bold text-slate-400">NO PENDING ORDERS</div>
-                  ) : orders.map((o: any) => (
+                  <DataState
+          loading={loading}
+          empty={!loading && orders.length === 0}
+          
+          onRetry={fetchDispatchData}
+          emptyContent={<div className="py-10 text-center text-xs font-bold text-slate-400">NO PENDING ORDERS</div>}
+        >
+          {orders.map((o: any) => (
                     <div key={o.id} className="p-4 rounded-xl bg-slate-50 border border-slate-100 shadow-sm">
                       <div className="flex justify-between items-start mb-2">
                         <span className="text-xs font-bold text-ink font-mono tracking-tight">{o.trackingCode}</span>
@@ -344,6 +348,7 @@ return (
                       <p className="text-[11px] text-inkSoft font-medium line-clamp-1">{o.recipientAddress}</p>
                     </div>
                   ))}
+        </DataState>
                 </div>
               ) : (
                 <Droppable droppableId="drivers-list" isDropDisabled={true}>

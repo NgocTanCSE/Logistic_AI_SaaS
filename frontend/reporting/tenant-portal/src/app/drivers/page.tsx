@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDate} from '@/lib/date-utils';
 import { useAuth } from '@/lib/auth-context';
@@ -89,11 +90,15 @@ export default function DriversPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Loading...</td></tr>
-              ) : drivers.length === 0 ? (
-                <tr><td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">No drivers found.</td></tr>
-              ) : drivers.map(d => {
+              <TableState
+          loading={loading}
+          empty={!loading && drivers.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchDrivers}
+          colSpan={6}
+          emptyContent={<tr><td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">No drivers found.</td></tr>}
+        >
+          {drivers.map(d => {
                 const expired = isLicenseExpired(d.licenseExpiry);
                 return (
                   <tr key={d.id} className="hover:bg-slate-50/80 transition-all">
@@ -104,6 +109,7 @@ export default function DriversPage() {
                   </tr>
                 );
               })}
+        </TableState>
             </tbody>
           </table>
         </div>

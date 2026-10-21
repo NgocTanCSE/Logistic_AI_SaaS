@@ -1,5 +1,6 @@
 'use client';
 
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { Card } from '@/components/ui-new/Card';
@@ -77,12 +78,15 @@ export default function ShipmentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">Loading shipments…</td></tr>
-              ) : shipments.length === 0 ? (
-                <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">No shipments found.</td></tr>
-              ) : (
-                shipments.map((shipment) => (
+              <TableState
+          loading={loading}
+          empty={!loading && shipments.length === 0}
+          error={error ? new Error(error) : undefined}
+          
+          colSpan={6}
+          emptyContent={<tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">No shipments found.</td></tr>}
+        >
+          {shipments.map((shipment) => (
                   <tr key={shipment.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs font-bold text-ink">{shipment.trackingNumber}</td>
                     <td className="px-6 py-4 text-ink">{shipment.driver}</td>
@@ -100,8 +104,8 @@ export default function ShipmentsPage() {
                       {new Date(shipment.eta).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
+        </TableState>
             </tbody>
           </table>
         </div>

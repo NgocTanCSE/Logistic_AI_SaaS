@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/Button';
@@ -61,17 +62,22 @@ export default function RolesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={3} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">Loading...</td></tr>
-              ) : roles.length === 0 ? (
-                <tr><td colSpan={3} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">No roles found.</td></tr>
-              ) : roles.map(r => (
+              <TableState
+          loading={loading}
+          empty={!loading && roles.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchRoles}
+          colSpan={6}
+          emptyContent={<tr><td colSpan={3} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest">No roles found.</td></tr>}
+        >
+          {roles.map(r => (
                 <tr key={r.id} className="hover:bg-slate-50/80 transition-all">
                   <td className="px-8 py-6 font-bold text-ink">{r.name}</td>
                   <td className="px-8 py-6"><Badge variant={r.isSystemDefault ? 'info' : 'neutral'}>{r.isSystemDefault ? 'SYSTEM' : 'CUSTOM'}</Badge></td>
                   <td className="px-8 py-6"><Badge variant="success">{r.permissions?.length || 0} perms</Badge></td>
                 </tr>
               ))}
+        </TableState>
             </tbody>
           </table>
         </div>

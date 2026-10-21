@@ -17,7 +17,8 @@
     "react-dom": "19.0.0",
     "recharts": "^3.8.1",
     "swr": "^2.4.1",
-    "tailwind-merge": "^2.1.1"
+    "tailwind-merge": "^2.1.1",
+    "ui-components": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "22",

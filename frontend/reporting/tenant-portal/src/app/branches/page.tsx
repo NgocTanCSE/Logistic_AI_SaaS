@@ -1,4 +1,5 @@
 'use client';
+import { DataState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
@@ -111,12 +112,10 @@ export default function BranchesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {loading ? (
-          <div className="col-span-full py-20 text-center">
-            <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto"></div>
-          </div>
-        ) : (
-          branches.map((br) => (
+        <DataState
+          loading={loading}
+        >
+          {branches.map((br) => (
             <Card key={br.id} className="p-8 group hover:border-primary/30 transition-all">
               <div className="flex justify-between items-start mb-6">
                  <div className="flex items-center gap-4">
@@ -146,8 +145,8 @@ export default function BranchesPage() {
                  </Can>
               </div>
             </Card>
-          ))
-        )}
+          ))}
+        </DataState>
       </div>
 
       {!loading && total > limit && (

@@ -2,8 +2,7 @@
 import { use } from 'react';
 import useSWR from 'swr';
 import api from '@/lib/api';
-import { Card } from '@/components/ui-new/Card';
-import { Badge } from '@/components/ui-new/Badge';
+import { Card, Badge } from 'ui-components';
 
 const fetcher = async (url: string) => {
   const res = await api.get(url);

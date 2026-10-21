@@ -1,5 +1,6 @@
 'use client';
 
+import { TableState } from 'ui-components';
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
@@ -252,21 +253,17 @@ export default function TenantsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-8 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Retrieving Tenant Data...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : tenants.length === 0 ? (
-                <tr>
+              <TableState
+          loading={loading}
+          empty={!loading && tenants.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchTenants}
+          colSpan={6}
+          emptyContent={<tr>
                   <td colSpan={6} className="px-8 py-20 text-center text-slate-400 font-medium font-bold uppercase tracking-widest text-xs">No tenants matched your search criteria.</td>
-                </tr>
-              ) : (
-                tenants.map((row) => (
+                </tr>}
+        >
+          {tenants.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/80 transition-all group">
                     <td className="px-8 py-6">
                       <div className="flex items-center gap-4">
@@ -308,8 +305,8 @@ export default function TenantsPage() {
                       <TenantActionMenu tenantId={row.id} tenantName={row.name} status={row.status} />
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
+        </TableState>
             </tbody>
           </table>
         </div>

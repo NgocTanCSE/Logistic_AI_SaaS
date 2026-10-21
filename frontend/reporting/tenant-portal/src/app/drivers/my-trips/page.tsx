@@ -1,4 +1,5 @@
 'use client';
+import { DataState } from 'ui-components';
 import { useAuth } from '@/lib/auth-context';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -32,15 +33,17 @@ export default function MyTripsPage() {
       </div>
 
       <Card className="p-6">
-        {loading ? (
-           <div className="p-8 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">Loading trips...</div>
-        ) : trips.length === 0 ? (
-          <EmptyState 
+        <DataState
+          loading={loading}
+          empty={!loading && trips.length === 0}
+          
+          
+          emptyContent={<EmptyState 
             title="No Active Trips" 
             description="You do not have any trips assigned to you at the moment. Please wait for dispatch to assign a route."
             icon={<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>}
-          />
-        ) : (
+          />}
+        >
           <div className="space-y-4">
              {trips.map(trip => (
                 <div key={trip.id} className="border border-slate-100 rounded-xl p-5 hover:border-slate-300 transition-all">
@@ -60,7 +63,7 @@ export default function MyTripsPage() {
                 </div>
              ))}
           </div>
-        )}
+        </DataState>
       </Card>
 
       {mapModalOpen && selectedTrip && (

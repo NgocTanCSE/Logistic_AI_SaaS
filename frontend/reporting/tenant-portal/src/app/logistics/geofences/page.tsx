@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/Button';
@@ -118,20 +119,19 @@ function GeofencesContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {loading ? (
-                <tr>
-                  <td colSpan={2} className="px-6 py-12 text-center text-sm text-slate-400">
-                    Loading geofences...
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
+              <TableState
+          loading={loading}
+          empty={!loading && filtered.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchGeofences}
+          colSpan={6}
+          emptyContent={<tr>
                   <td colSpan={2} className="px-6 py-12 text-center text-sm text-slate-400">
                     {search ? 'No zones match your search.' : 'No geofences yet. Create one to get started.'}
                   </td>
-                </tr>
-              ) : (
-                filtered.map((row) => (
+                </tr>}
+        >
+          {filtered.map((row) => (
                   <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -149,8 +149,8 @@ function GeofencesContent() {
                       </Badge>
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
+        </TableState>
             </tbody>
           </table>
         </div>

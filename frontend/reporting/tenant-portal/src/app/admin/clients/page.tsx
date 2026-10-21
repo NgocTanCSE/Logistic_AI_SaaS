@@ -1,4 +1,5 @@
 'use client';
+import { DataState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDate} from '@/lib/date-utils';
 import api from '@/lib/api';
@@ -139,12 +140,12 @@ export default function ClientAccountsPage() {
       </Card>
 
       <div className="space-y-4">
-        {loading ? (
-          <Card className="p-12 text-center">
-            <p className="text-slate-400 text-sm">Loading clients...</p>
-          </Card>
-        ) : filtered.length === 0 ? (
-          <Card className="p-12 text-center">
+        <DataState
+          loading={loading}
+          empty={!loading && filtered.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchClients}
+          emptyContent={<Card className="p-12 text-center">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -154,9 +155,9 @@ export default function ClientAccountsPage() {
             <p className="text-sm text-slate-500 mt-1">
               {search ? 'No clients match your search.' : 'Create your first B2B client to get started.'}
             </p>
-          </Card>
-        ) : (
-          filtered.map((client) => (
+          </Card>}
+        >
+          {filtered.map((client) => (
             <Card key={client.id} className="p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -210,8 +211,8 @@ export default function ClientAccountsPage() {
                 </div>
               )}
             </Card>
-          ))
-        )}
+          ))}
+        </DataState>
       </div>
 
       {!loading && total > limit && (

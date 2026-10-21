@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import {formatDateTime, formatDate} from '@/lib/date-utils';
 import api from '@/lib/api';
@@ -118,12 +119,15 @@ function AiInsightsContent() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={4} className="px-8 py-10 text-center text-slate-400 font-bold uppercase text-[10px]">Filtering corrections...</td></tr>
-              ) : feedbacks.length === 0 ? (
-                <tr><td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-medium italic">No new human corrections found for training.</td></tr>
-              ) : (
-                feedbacks.map(fb => (
+              <TableState
+          loading={loading}
+          empty={!loading && feedbacks.length === 0}
+          
+          onRetry={fetchData}
+          colSpan={6}
+          emptyContent={<tr><td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-medium italic">No new human corrections found for training.</td></tr>}
+        >
+          {feedbacks.map(fb => (
                   <tr key={fb.id} className="hover:bg-slate-50/80 transition-all">
                     <td className="px-8 py-6">
                       <Badge variant="neutral" className="mb-1">{fb.resourceType}</Badge>
@@ -147,8 +151,8 @@ function AiInsightsContent() {
                        </Button>
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
+        </TableState>
             </tbody>
           </table>
         </div>

@@ -1,20 +1,2 @@
-import React, { memo } from 'react';
-
-interface CardProps {
-  children: React.ReactNode;
-  className?: string;
-  glass?: boolean;
-  style?: React.CSSProperties;
-}
-
-export const Card = memo(({ children, className = '', glass = true, style }: CardProps) => {
-  return (
-    <div className={`
-      ${glass ? 'bg-white  border-slate-200' : 'bg-white border-slate-200'}
-      rounded-3xl border shadow-glass overflow-hidden
-      ${className}
-    `} style={style}>
-      {children}
-    </div>
-  );
-});
+export { Card } from 'ui-components';
+export type { CardProps } from 'ui-components';

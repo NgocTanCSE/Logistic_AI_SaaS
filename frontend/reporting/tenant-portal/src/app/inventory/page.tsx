@@ -1,4 +1,5 @@
 'use client';
+import { TableState } from 'ui-components';
 import { useState, useEffect, useRef } from 'react';
 import {formatDate, formatTime} from '@/lib/date-utils';
 import { useAuth } from '@/lib/auth-context';
@@ -224,21 +225,17 @@ export default function InventoryLedgerPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {loading ? (
-                  <tr>
-                    <td colSpan={4} className="px-8 py-20 text-center">
-                       <div className="flex flex-col items-center gap-3">
-                        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Loading Stock Ledger...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : movements.length === 0 ? (
-                  <tr>
+                <TableState
+          loading={loading}
+          empty={!loading && movements.length === 0}
+          error={error ? new Error(error) : undefined}
+          onRetry={fetchMovements}
+          colSpan={6}
+          emptyContent={<tr>
                     <td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No movements found.</td>
-                  </tr>
-                ) : (
-                  movements.map(mov => (
+                  </tr>}
+        >
+          {movements.map(mov => (
                     <tr key={mov.id} className="hover:bg-slate-50/80 transition-all group">
                       <td className="px-8 py-6">
                         <div className="font-bold text-ink">{formatDate(mov.createdAt)}</div>
@@ -264,8 +261,8 @@ export default function InventoryLedgerPage() {
                         </span>
                       </td>
                     </tr>
-                  ))
-                )}
+                  ))}
+        </TableState>
               </tbody>
             </table>
           </div>
