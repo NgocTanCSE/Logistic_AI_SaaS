@@ -17,6 +17,8 @@ dist/
 .env.test.local
 .env.production.local
 **/.env*
+# Wrangler local secrets (never commit)
+**/.dev.vars
 
 # AI Models (Heavy files)
 models/*.joblib
@@ -57,3 +59,7 @@ pnpm-debug.log*
 #/.github
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
+
+# Python bytecode
+__pycache__/
+*.pyc
