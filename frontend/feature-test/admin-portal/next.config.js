@@ -1,13 +1,17 @@
 /** @type {import('next').NextConfig} */
+const isVercel = process.env.VERCEL === '1';
+
+// `output: 'standalone'` is only needed for Docker self-hosting.
+// On Vercel the platform's own build pipeline is used instead.
 const nextConfig = {
-  output: 'standalone',
+  ...(isVercel ? {} : { output: 'standalone' }),
   typescript: { ignoreBuildErrors: false },
   eslint: { ignoreDuringBuilds: true },
   reactStrictMode: true,
   async rewrites() {
-    // All API traffic is proxied to the API Gateway. This keeps SSR requests
-    // working inside Docker (where 127.0.0.1 points at the portal container,
-    // not at the backend services).
+    // All API traffic is proxied to the API Gateway.
+    // In Docker:  API_INTERNAL_URL = http://api-gateway:3000 (docker service name)
+    // On Vercel:  API_INTERNAL_URL = https://api.your-domain.com (must be set as env var)
     const gateway = process.env.API_INTERNAL_URL || 'http://api-gateway:3000';
     return [
       {

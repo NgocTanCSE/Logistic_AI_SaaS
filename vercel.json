@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/feature-test/admin-portal/package.json",
+      "use": "next",
+      "config": {
+        "includeFiles": ["packages/ui-kit/dist/**", "packages/ui-components/dist/**"]
+      }
+    }
+  ]
+}
