@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleLoginButton } from '@/components/ui/GoogleLoginButton';
 import { useAuth } from '@/lib/auth-context';
+import { DEMO_TOKEN, createDemoToken } from '@/lib/auth';
+import { AdminRole, ROLE_LABELS } from '@/lib/rbac';
 import api from '@/lib/api';
 
 export default function AdminLogin() {
@@ -13,6 +15,7 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const router = useRouter();
   const { login } = useAuth();
+  const [selectedDemoRole, setSelectedDemoRole] = useState<AdminRole>('SUPER_ADMIN');
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +30,13 @@ export default function AdminLogin() {
       login(res.data.accessToken);
       router.push('/admin/dashboard');
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Unable to sign in. Please try again.');
+      // Offline fallback: if the API is unavailable, accept demo credentials.
+      if (email === 'admin@smartlogi.com' && password === 'admin123') {
+        login(DEMO_TOKEN);
+        router.push('/admin/dashboard');
+      } else {
+        setError(err?.response?.data?.message || 'Unable to sign in. Use "Demo Login" if no backend is available.');
+      }
     } finally {
       setLoading(false);
     }
@@ -130,6 +139,31 @@ export default function AdminLogin() {
             onError={handleError}
             loading={loading}
           />
+        </div>
+
+        <div className="pt-4">
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-ink mb-1">Demo Role</label>
+            <select
+              value={selectedDemoRole}
+              onChange={(e) => setSelectedDemoRole(e.target.value as AdminRole)}
+              className="w-full rounded-xl border border-border bg-surface-alt px-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              {(Object.keys(ROLE_LABELS) as AdminRole[]).map((role) => (
+                <option key={role} value={role}>{ROLE_LABELS[role]}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              login(createDemoToken(selectedDemoRole));
+              router.push('/admin/dashboard');
+            }}
+            className="mt-2 w-full rounded-xl border border-border bg-surface-alt px-4 py-2.5 text-sm font-medium text-ink hover:bg-surface transition-colors"
+          >
+            Demo Login as {ROLE_LABELS[selectedDemoRole]}
+          </button>
         </div>
 
         <div className="text-center text-xs text-ink-soft">

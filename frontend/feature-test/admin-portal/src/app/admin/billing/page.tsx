@@ -4,13 +4,13 @@ import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { SearchBar } from '@/components/ui/SearchBar';
-import api from '@/lib/api';
+import { Invoice, fetchFromStoreOrAPI, getAll, initStore } from '@/lib/local-store';
 
 const PAGE_SIZE = 15;
 
 export default function BillingPage() {
   const [page, setPage] = useState(1);
-  const [invoices, setInvoices] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mrr, setMrr] = useState(0);
@@ -24,18 +24,16 @@ export default function BillingPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.get('/admin/billing', {
-        params: { page: pageNum, limit: PAGE_SIZE }
-      });
-      if (res.data) {
-        setInvoices(res.data.data || []);
-        setTotal(res.data.meta?.total || 0);
-        setMrr(res.data.meta?.mrr || 0);
-      }
+      initStore();
+      const data = await fetchFromStoreOrAPI<Invoice[]>('invoices', '/admin/billing');
+      const start = (pageNum - 1) * PAGE_SIZE;
+      setInvoices(data.slice(start, start + PAGE_SIZE));
+      setTotal(data.length);
+      setMrr(data.filter((inv) => inv.status === 'PAID').length * 500);
     } catch (err) {
       console.error('API Error:', err);
       setError('Failed to load billing data.');
-      setInvoices([]);
+      setInvoices(getAll<Invoice[]>('invoices'));
       setTotal(0);
       setMrr(0);
     } finally {

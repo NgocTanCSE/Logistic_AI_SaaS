@@ -10,6 +10,7 @@ import { Card } from "@/components/ui-new/Card";
 import { Input } from "@/components/ui-new/Input";
 import { SearchBar } from "@/components/ui/SearchBar";
 import { TenantActionMenu } from "@/components/ui/TenantActionMenu";
+import { Tenant, fetchFromStoreOrAPI, getAll, create, initStore } from '@/lib/local-store';
 import api from '@/lib/api';
 
 const PAGE_SIZE = 15;
@@ -20,7 +21,7 @@ export default function TenantsPage() {
   const pageParam = searchParams.get('page');
   const page = Math.max(1, Number(pageParam ?? '1') || 1);
 
-  const [tenants, setTenants] = useState<any[]>([]);
+   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
@@ -50,19 +51,31 @@ export default function TenantsPage() {
     setNewTenantSlug(name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
   };
 
-  const handleCreateTenant = async (e: React.FormEvent) => {
+   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTenantName || !newTenantSlug) return;
     setError('');
     setCreating(true);
     try {
       const token = localStorage.getItem('smartlogi_admin_token');
-      await api.post('/admin/tenants', { 
+      const payload = {
         name: newTenantName,
-        slug: newTenantSlug 
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
+        slug: newTenantSlug,
+      };
+      await api.post('/admin/tenants', payload, {
+        headers: { Authorization: `Bearer ${token}` },
       });
+      const newTenant: Tenant = {
+        id: `tnnt_${Date.now()}`,
+        name: newTenantName,
+        slug: newTenantSlug,
+        plan: 'Starter',
+        maxUsers: 10,
+        maxWarehouses: 2,
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString(),
+      };
+      create('tenants', newTenant);
       setIsModalOpen(false);
       setNewTenantName('');
       setNewTenantSlug('');
@@ -74,35 +87,21 @@ export default function TenantsPage() {
     }
   };
 
-  const fetchTenants = async (pageNum: number, currentFilter: string) => {
+   const fetchTenants = async (pageNum: number, currentFilter: string) => {
     setLoading(true);
     setError('');
     try {
-      const token = localStorage.getItem('smartlogi_admin_token');
-      const res = await api.get('/admin/tenants', {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { page: pageNum, limit: PAGE_SIZE, status: currentFilter === 'All' ? undefined : currentFilter }
-      });
-      
-      if (res.data && res.data.data) {
-        const mappedTenants = res.data.data.map((t: any) => ({
-          id: t.id,
-          name: t.name,
-          slug: t.slug,
-          plan: t.plan?.name || 'Free',
-          users: t.maxUsers,
-          warehouses: t.maxWarehouses,
-          createdAt: t.createdAt,
-          status: t.status,
-        }));
-        
-        setTenants(mappedTenants);
-        setTotal(res.data.meta?.total || 0);
-      }
-    } catch (err) {
+      initStore();
+      const data = await fetchFromStoreOrAPI<Tenant[]>('tenants', '/admin/tenants');
+      const filtered = currentFilter === 'All' ? data : data.filter((t) => t.status === currentFilter);
+      const start = (pageNum - 1) * PAGE_SIZE;
+      const paged = filtered.slice(start, start + PAGE_SIZE);
+      setTenants(paged);
+      setTotal(filtered.length);
+    } catch (err: any) {
       console.error('API Error:', err);
       setError('Failed to load tenants.');
-      setTenants([]);
+      setTenants(getAll<Tenant[]>('tenants'));
       setTotal(0);
     } finally {
       setLoading(false);
@@ -294,15 +293,15 @@ export default function TenantsPage() {
                       </div>
                     </td>
                     <td className="px-8 py-6 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                      {new Date(row.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {row.createdAt ? new Date(row.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
                     </td>
                     <td className="px-8 py-6">
-                      <Badge variant={getStatusVariant(row.status)}>
+                      <Badge variant={getStatusVariant(row.status || 'UNKNOWN')}>
                         {row.status}
                       </Badge>
                     </td>
                     <td className="px-8 py-6 text-right">
-                      <TenantActionMenu tenantId={row.id} tenantName={row.name} status={row.status} />
+                      <TenantActionMenu tenantId={row.id} tenantName={row.name} status={row.status || 'UNKNOWN'} />
                     </td>
                   </tr>
                 ))}

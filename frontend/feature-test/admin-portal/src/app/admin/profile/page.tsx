@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { switchRole } from '@/lib/role-switch';
 import api from '@/lib/api';
 import { ROLES } from '@/lib/roles';
+import { initStore, getAll, getOne, create, update, UserProfile } from '@/lib/local-store';
 
 export default function AdminProfile() {
   const { user, logout } = useAuth();
@@ -27,31 +28,41 @@ export default function AdminProfile() {
     loadProfile();
   }, []);
 
-  const loadProfile = async () => {
+   const loadProfile = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/admin/auth/profile');
-      const data = res.data?.data || res.data;
+      initStore();
+      const response = await api.get('/admin/auth/profile');
+      const data = response.data?.data || response.data;
       setProfile(data);
       setFullName(data.fullName || user?.email?.split('@')[0] || '');
+      create('adminProfile', { id: 'current', ...data });
     } catch {
-      setProfile(null);
+      const cached = getOne('adminProfile', 'current');
+      setProfile(cached || null);
+      if (cached) {
+        setFullName((cached as UserProfile).fullName || user?.email?.split('@')[0] || '');
+      } else {
+        setProfile(null);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setSaveMsg(null);
     try {
-      const res = await api.patch('/admin/auth/profile', { fullName });
-      const data = res.data?.data || res.data;
+      const response = await api.patch('/admin/auth/profile', { fullName });
+      const data = response.data?.data || response.data;
       if (data) setProfile(data);
       setSaveMsg('Profile updated successfully.');
     } catch (err: any) {
-      setSaveMsg(err?.response?.data?.message || 'Failed to update profile.');
+      setProfile({ ...profile, fullName });
+      update('adminProfile', 'current', { fullName });
+      setSaveMsg(err?.response?.data?.message || 'Profile saved locally. API server unavailable.');
     } finally {
       setSaving(false);
     }
@@ -107,7 +118,7 @@ export default function AdminProfile() {
     }
   };
 
-  const displayRole = profile?.role || user?.role || 'SUPER_ADMIN';
+  const displayRole = user?.role || profile?.role || 'SUPER_ADMIN';
 
   return (
     <div className="max-w-4xl mx-auto">

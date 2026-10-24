@@ -7,23 +7,13 @@ import {
   EmptyNote,
   StatusLabel,
 } from 'ui-kit';
-
-type AIAnalysis = {
-  ok: boolean;
-  summary: string;
-  risks: string[];
-  recommendations: string[];
-};
-
-type AIModel = {
-  id: string;
-  name: string;
-  version: string;
-  type: string;
-  accuracy: number;
-  is_current: boolean;
-  trained_at: string;
-};
+import {
+  AIModel,
+  AIAnalysis,
+  initStore,
+  fetchFromStoreOrAPI,
+  getAll,
+} from '@/lib/local-store';
 
 export function AIInsightsPanel({ token }: { token: string | null }) {
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
@@ -38,27 +28,27 @@ export function AIInsightsPanel({ token }: { token: string | null }) {
     const fetchData = async () => {
       setLoading(true);
       setLoadError(null);
+      initStore();
 
       const [analysisResult, modelsResult] = await Promise.allSettled([
-        api.post('/ai/v1/analyze', {}),
-        api.get('/ai/v1/models'),
+        fetchFromStoreOrAPI<AIAnalysis>('aiAnalysis', '/ai/v1/analyze', { forceRemote: false }),
+        fetchFromStoreOrAPI<AIModel[]>('aiModels', '/ai/v1/models'),
       ]);
 
       if (!active) return;
 
       if (analysisResult.status === 'fulfilled') {
-        setAnalysis(analysisResult.value.data || null);
+        setAnalysis(analysisResult.value || null);
       } else {
-        setAnalysis(null);
+        setAnalysis(getAll<AIAnalysis>('aiAnalysis') || null);
         setLoadError('AI analysis is not available in this environment.');
       }
 
       if (modelsResult.status === 'fulfilled') {
-        const response = modelsResult.value;
-        const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
-        setModels(data);
+        const data = modelsResult.value;
+        setModels(Array.isArray(data) ? data : []);
       } else {
-        setModels([]);
+        setModels(getAll<AIModel[]>('aiModels'));
       }
 
       setLoading(false);

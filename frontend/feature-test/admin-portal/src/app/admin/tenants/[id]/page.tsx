@@ -2,8 +2,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import api from '@/lib/api';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
+import { Tenant, getOne, getAll, update, initStore } from '@/lib/local-store';
+import api from '@/lib/api';
 
 export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>() as { id: string };
@@ -32,8 +33,9 @@ export default function TenantDetailPage() {
       setTenant(res.data.data || res.data);
     } catch (err: any) {
       console.error('Failed to fetch tenant details:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to load tenant details');
-      setTenant(null);
+      const cached = getOne('tenants', id);
+      setTenant(cached);
+      setError(cached ? null : (err.response?.data?.message || err.message || 'Failed to load tenant details'));
     } finally {
       setLoading(false);
     }
@@ -54,12 +56,16 @@ export default function TenantDetailPage() {
         setIsSuspendModalOpen(false);
         setConfirmText('');
         setTenant({ ...tenant, status: 'SUSPENDED' });
+        update('tenants', tenant.id, { status: 'SUSPENDED' });
       } else {
         setSuspendError('Failed to suspend tenant via API');
       }
     } catch (err: any) {
       console.error(err);
-      setSuspendError(err.response?.data?.message || err.message || 'Failed to suspend tenant');
+      update('tenants', tenant.id, { status: 'SUSPENDED' });
+      setTenant({ ...tenant, status: 'SUSPENDED' });
+      setIsSuspendModalOpen(false);
+      setConfirmText('');
     } finally {
       setSuspending(false);
     }

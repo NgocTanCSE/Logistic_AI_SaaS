@@ -4,13 +4,13 @@ import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
 import { ErrorBanner } from '@/components/ui/ErrorBanner';
 import { SearchBar } from '@/components/ui/SearchBar';
-import api from '@/lib/api';
+import { AuditLog, fetchFromStoreOrAPI, getAll, initStore } from '@/lib/local-store';
 
 const PAGE_SIZE = 15;
 
 export default function AuditLogsPage() {
   const [page, setPage] = useState(1);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,17 +23,15 @@ export default function AuditLogsPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.get('/admin/audit-logs', {
-        params: { page: pageNum, limit: PAGE_SIZE }
-      });
-      if (res.data) {
-        setLogs(res.data.data || []);
-        setTotal(res.data.meta?.total || 0);
-      }
+      initStore();
+      const data = await fetchFromStoreOrAPI<AuditLog[]>('auditLogs', '/admin/audit-logs?page=' + pageNum + '&limit=' + PAGE_SIZE);
+      const start = (pageNum - 1) * PAGE_SIZE;
+      setLogs(data.slice(start, start + PAGE_SIZE));
+      setTotal(data.length);
     } catch (err) {
       console.error('API Error:', err);
       setError('Failed to load audit logs.');
-      setLogs([]);
+      setLogs(getAll<AuditLog[]>('auditLogs'));
       setTotal(0);
     } finally {
       setLoading(false);
@@ -58,7 +56,7 @@ export default function AuditLogsPage() {
     };
   };
 
-  const getActionStyle = (action: string) => {
+  const getActionStyle = (action?: string) => {
     switch(action) {
       case 'CREATE': return 'bg-moss/10 text-moss border-moss/30';
       case 'UPDATE': return 'bg-cobalt/10 text-cobalt border-cobalt/30';

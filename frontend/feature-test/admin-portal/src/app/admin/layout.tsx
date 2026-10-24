@@ -7,7 +7,22 @@ import AIChatButton from '@/components/AIChatButton';
 import { AppShell } from 'ui-kit';
 import { ShellProvider } from 'ui-kit';
 import { Sidebar, type NavSection } from 'ui-kit';
+import { roleCanAccessPage, getDefaultPageForRole, AdminRole } from '@/lib/rbac';
+
+const NAV_ITEM_ROLES: Record<string, AdminRole[]> = {
+  '/admin/dashboard': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER', 'DRIVER', 'CUSTOMER_CLIENT', 'TENANT_USER'],
+  '/admin/orders': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'CUSTOMER_CLIENT'],
+  '/admin/orders/new': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER'],
+  '/admin/orders/upload': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER'],
+  '/admin/shipments': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER', 'DRIVER'],
+  '/admin/tenants': ['SUPER_ADMIN', 'TENANT_ADMIN'],
+  '/admin/billing': ['SUPER_ADMIN', 'TENANT_ADMIN'],
+  '/admin/audit-logs': ['SUPER_ADMIN', 'TENANT_ADMIN'],
+  '/admin/ai-models': ['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'LOGISTICS_MANAGER'],
+  '/admin/profile': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER', 'DRIVER', 'CUSTOMER_CLIENT', 'TENANT_USER'],
+};
 import { Topbar } from 'ui-kit';
+import { ROLE_LABELS } from '@/lib/rbac';
 
 const adminSections: NavSection[] = [
   {
@@ -48,11 +63,23 @@ function AdminChrome({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const userRole = user?.role as AdminRole | undefined;
 
   const handleLogout = () => {
     logout();
     router.replace('/admin/login');
   };
+
+  const filteredSections = adminSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        const allowedRoles = NAV_ITEM_ROLES[item.href];
+        if (!allowedRoles) return true;
+        return userRole ? allowedRoles.includes(userRole) : false;
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <AppShell
@@ -61,11 +88,11 @@ function AdminChrome({ children }: { children: React.ReactNode }) {
         <Sidebar
           brand={{
             name: 'SmartLogi',
-            tagline: 'Super Admin',
-            href: '/admin/dashboard',
-            initials: 'SA',
+            tagline: userRole ? (ROLE_LABELS[userRole] || 'Admin Portal') : 'Admin Portal',
+            href: getDefaultPageForRole(userRole),
+            initials: userRole ? userRole.split('_')[0][0] + 'A' : 'SA',
           }}
-          sections={adminSections}
+          sections={filteredSections}
           labels={{ navigation: 'Admin navigation' }}
         />
       }
@@ -88,7 +115,7 @@ function AdminChrome({ children }: { children: React.ReactNode }) {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { token, isLoading } = useAuth();
+  const { token, user, isLoading } = useAuth();
 
   const isPublicRoute = ADMIN_PUBLIC_ROUTES.some(
     (route) => pathname === route || pathname.startsWith(route + '/'),
@@ -97,8 +124,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (!isPublicRoute && !isLoading && typeof window !== 'undefined' && !token) {
       router.push('/admin/login');
+      return;
     }
-  }, [isPublicRoute, isLoading, router, token]);
+    if (!isPublicRoute && token && user?.role && !roleCanAccessPage(user?.role, pathname)) {
+      router.replace(getDefaultPageForRole(user?.role));
+    }
+  }, [isPublicRoute, isLoading, router, token, user?.role, pathname]);
 
   // Public auth pages — render children directly without sidebar/topbar.
   if (isPublicRoute) {

@@ -1,35 +1,18 @@
 'use client';
 
-import { TableState } from 'ui-components';
 import { useState, useEffect } from 'react';
+import { TableState } from 'ui-components';
 import api from '@/lib/api';
 import { Card } from '@/components/ui-new/Card';
 import { Badge } from '@/components/ui-new/Badge';
-
-type Shipment = {
-  id: string;
-  trackingNumber: string;
-  driver: string;
-  vehicle: string;
-  origin: string;
-  destination: string;
-  status: string;
-  progress: number;
-  eta: string;
-};
-
-const MOCK_SHIPMENTS: Shipment[] = [
-  { id: '1', trackingNumber: 'SHP-2024-0847', driver: 'Nguyen Van A', vehicle: 'Truck #T001', origin: 'Hanoi', destination: 'Ho Chi Minh', status: 'IN_TRANSIT', progress: 65, eta: '2024-09-16T18:00:00Z' },
-  { id: '2', trackingNumber: 'SHP-2024-0848', driver: 'Tran Thi B', vehicle: 'Truck #T002', origin: 'Da Nang', destination: 'Hai Phong', status: 'IN_TRANSIT', progress: 30, eta: '2024-09-16T12:00:00Z' },
-  { id: '3', trackingNumber: 'SHP-2024-0849', driver: 'Le Van C', vehicle: 'Truck #T003', origin: 'Can Tho', destination: 'Nha Trang', status: 'DELAYED', progress: 45, eta: '2024-09-18T10:00:00Z' },
-  { id: '4', trackingNumber: 'SHP-2024-0850', driver: 'Pham Thi D', vehicle: 'Truck #T004', origin: 'Hai Phong', destination: 'Da Nang', status: 'DELIVERED', progress: 100, eta: '2024-09-15T09:00:00Z' },
-];
+import { Shipment, fetchFromStoreOrAPI, getAll, initStore } from '@/lib/local-store';
 
 const STATUS_VARIANT: Record<string, 'neutral' | 'success' | 'warning' | 'error' | 'info'> = {
   IN_TRANSIT: 'info',
   DELAYED: 'warning',
   DELIVERED: 'success',
   PENDING: 'neutral',
+  OUT_FOR_DELIVERY: 'success',
 };
 
 export default function ShipmentsPage() {
@@ -37,23 +20,28 @@ export default function ShipmentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchShipments = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      initStore();
+      const data = await fetchFromStoreOrAPI<Shipment[]>('shipments', '/logistics/shipments?limit=20');
+      setShipments(data);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load shipments');
+      setShipments(getAll<Shipment[]>('shipments'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchShipments = async () => {
-      setLoading(true);
-      try {
-        const res = await api.get('/logistics/shipments?limit=20');
-        // Logistics service wraps responses as { success, data: { data: [...] } }.
-        const payload = res.data?.data?.data ?? res.data?.data ?? res.data;
-        const data = Array.isArray(payload) ? payload : [];
-        setShipments(data.length > 0 ? data : MOCK_SHIPMENTS);
-      } catch {
-        setShipments(MOCK_SHIPMENTS);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchShipments();
+    void fetchShipments();
   }, []);
+
+  const inTransit = shipments.filter((s) => s.status === 'IN_TRANSIT' || s.status === 'OUT_FOR_DELIVERY').length;
+  const delayed = shipments.filter((s) => s.status === 'DELAYED').length;
+  const delivered = shipments.filter((s) => s.status === 'DELIVERED').length;
 
   return (
     <div className="pb-10">
@@ -61,6 +49,25 @@ export default function ShipmentsPage() {
         <div>
           <h2 className="text-2xl font-bold text-ink">Shipments</h2>
           <p className="text-sm text-inkSoft mt-1">Real-time tracking of all active and completed shipments.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-ink">{shipments.length}</div>
+          <div className="text-xs text-inkSoft">Total Shipments</div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-cyan-600">{inTransit}</div>
+          <div className="text-xs text-inkSoft">In Transit</div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-amber-600">{delayed}</div>
+          <div className="text-xs text-inkSoft">Delayed</div>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
+          <div className="text-2xl font-bold text-emerald-600">{delivered}</div>
+          <div className="text-xs text-inkSoft">Delivered</div>
         </div>
       </div>
 
@@ -79,14 +86,13 @@ export default function ShipmentsPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               <TableState
-          loading={loading}
-          empty={!loading && shipments.length === 0}
-          error={error ? new Error(error) : undefined}
-          
-          colSpan={6}
-          emptyContent={<tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">No shipments found.</td></tr>}
-        >
-          {shipments.map((shipment) => (
+                loading={loading}
+                empty={!loading && shipments.length === 0}
+                error={error ? new Error(error) : undefined}
+                colSpan={6}
+                emptyContent={<tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">No shipments found.</td></tr>}
+              >
+                {shipments.map((shipment) => (
                   <tr key={shipment.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs font-bold text-ink">{shipment.trackingNumber}</td>
                     <td className="px-6 py-4 text-ink">{shipment.driver}</td>
@@ -105,11 +111,17 @@ export default function ShipmentsPage() {
                     </td>
                   </tr>
                 ))}
-        </TableState>
+              </TableState>
             </tbody>
           </table>
         </div>
       </Card>
+
+      {error && (
+        <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
+          {error} Data shown is from local storage.
+        </div>
+      )}
     </div>
   );
 }

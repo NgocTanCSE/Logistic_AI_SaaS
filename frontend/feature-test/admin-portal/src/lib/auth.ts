@@ -42,3 +42,32 @@ export const clearToken = () => {
   window.localStorage.removeItem(TOKEN_KEY);
   window.localStorage.removeItem(USER_KEY);
 };
+
+export const DEMO_TOKEN =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
+  btoa(JSON.stringify({ sub: '1', email: 'admin@smartlogi.com', role: 'SUPER_ADMIN', fullName: 'Admin User' })) +
+  '.demo-signature';
+
+export const DEMO_CREDENTIALS = { email: 'admin@smartlogi.com', password: 'admin123' };
+
+export const createDemoToken = (role: string) => {
+  return (
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
+    btoa(JSON.stringify({ sub: '1', email: 'user@smartlogi.com', role, fullName: 'Demo User' })) +
+    '.demo-signature'
+  );
+};
+
+export const demoLogin = () => {
+  const payload = decodeJwt(DEMO_TOKEN) || {};
+  const user = {
+    id: payload.sub || '',
+    email: payload.email || '',
+    role: payload.role || 'SUPER_ADMIN',
+    fullName: payload.fullName || '',
+  };
+  if (isBrowser()) {
+    window.localStorage.setItem(TOKEN_KEY, DEMO_TOKEN);
+    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+  }
+};

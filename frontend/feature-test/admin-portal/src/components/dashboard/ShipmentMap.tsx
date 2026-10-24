@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import api from '@/lib/api';
 import {
   EditorialSection,
   EmptyNote,
   StatusLabel,
 } from 'ui-kit';
+import { initStore, fetchFromStoreOrAPI, getAll } from '@/lib/local-store';
 
 type LogisticsData = {
   activeShipments: number;
@@ -42,10 +42,9 @@ export function ShipmentMap({ logistics }: { logistics: LogisticsData | null }) 
     const fetchShipments = async () => {
       setLoading(true);
       setLoadError(null);
+      initStore();
       try {
-        const response = await api.get('/logistics/shipments?status=ACTIVE&limit=10');
-        const payload = response.data?.data?.data ?? response.data?.data ?? response.data;
-        const data = Array.isArray(payload) ? payload : [];
+        const data = await fetchFromStoreOrAPI<any[]>('shipments', '/logistics/shipments?status=ACTIVE&limit=10');
         if (!active) return;
         setShipments(
           data.map((shipment: any) => ({
