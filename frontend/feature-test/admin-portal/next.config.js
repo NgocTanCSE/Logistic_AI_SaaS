@@ -9,10 +9,11 @@ const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   reactStrictMode: true,
   async rewrites() {
-    // All API traffic is proxied to the API Gateway.
+    // API Gateway proxy — only active when API_INTERNAL_URL is set.
     // In Docker:  API_INTERNAL_URL = http://api-gateway:3000 (docker service name)
     // On Vercel:  API_INTERNAL_URL = https://api.your-domain.com (must be set as env var)
-    const gateway = process.env.API_INTERNAL_URL || 'http://api-gateway:3000';
+    const gateway = process.env.API_INTERNAL_URL;
+    if (!gateway) return [];
     return [
       {
         source: '/api/v1/:path*',
@@ -20,6 +21,6 @@ const nextConfig = {
       },
     ];
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;
