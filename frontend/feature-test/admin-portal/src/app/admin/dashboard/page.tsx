@@ -452,7 +452,7 @@ export default function AdminDashboardPage() {
 
       {/* Shipment map — operations + delivery; AI panel — platform + warehouse + logistics only */}
       {showLogistics && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className={`grid gap-6 ${showAI ? 'lg:grid-cols-2' : 'lg:grid-cols-1'}`}>
           <ShipmentMap logistics={logistics} />
           {showAI ? <AIInsightsPanel token={token} /> : null}
         </div>
