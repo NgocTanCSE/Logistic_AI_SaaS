@@ -191,7 +191,7 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-    <div className="mx-auto max-w-[1180px] space-y-4">
+    <div className="mx-auto max-w-full space-y-4">
         <div className="h-8 w-64 animate-pulse bg-surface-alt" />
         <div className="h-4 w-96 animate-pulse bg-surface-alt" />
         <div className="grid grid-cols-2 border-b border-line bg-line lg:grid-cols-4">
