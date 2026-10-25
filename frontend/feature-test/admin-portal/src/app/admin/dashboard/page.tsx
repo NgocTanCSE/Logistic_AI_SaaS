@@ -209,7 +209,7 @@ export default function AdminDashboardPage() {
   const predicted = logistics?.predictedShipments ?? [];
 
   return (
-    <div className="max-w-[1180px] space-y-4">
+    <div className="mx-auto max-w-full space-y-4">
       {/* Role indicator banner */}
       <div className="flex items-center justify-between rounded-lg border border-line bg-surface-alt px-4 py-3">
         <div className="flex items-center gap-3">
