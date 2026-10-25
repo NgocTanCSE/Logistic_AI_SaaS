@@ -3,10 +3,7 @@
   "builds": [
     {
       "src": "frontend/feature-test/admin-portal/package.json",
-      "use": "next",
-      "config": {
-        "nodeVersion": "20.x"
-      }
+      "use": "next"
     }
   ]
 }
