@@ -74,7 +74,7 @@ export default function AIChatButton() {
     } catch (e: any) {
       setMessages((m) => [
         ...m,
-        { role: 'assistant', content: 'Connection error: ' + (e?.message || 'unknown'). + '. Please try again.' },
+        { role: 'assistant', content: 'Connection error: ' + (e?.message || 'unknown') + '. Please try again.' },
       ]);
     } finally {
       setLoading(false);

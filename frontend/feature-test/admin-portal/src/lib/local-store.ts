@@ -248,6 +248,24 @@ export type SimulationResult = {
 
 type StoredRecord = { id: string; [key: string]: any };
 
+/** Individual entry in the seed store: a single value or a seeded table. */
+type SeedEntry =
+  | Order[]
+  | Shipment[]
+  | DashboardStats
+  | LogisticsData
+  | AuditLog[]
+  | UserProfile
+  | Tenant[]
+  | Invoice[]
+  | AIModel[]
+  | AIAnalysis
+  | ControlTowerData
+  | PricingData
+  | AIInsight[]
+  | CostProjection[]
+  | SimulationResult[];
+
 const PREFIX = 'smartlogi_local_';
 const SEED_VERSION_KEY = `${PREFIX}seed_version`;
 const SEED_VERSION = '1.4';
@@ -790,6 +808,7 @@ const SEED_LOGISTICS_SIMULATIONS: SimulationResult[] = [
   },
 ];
 
+export const SEED_DATA: Record<StoreTable, SeedEntry> = {
   orders: SEED_ORDERS,
   shipments: SEED_SHIPMENTS,
   dashboardStats: SEED_DASHBOARD_STATS,
