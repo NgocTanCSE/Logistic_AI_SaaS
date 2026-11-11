@@ -85,6 +85,8 @@ export default function AIModelsPage() {
     void fetchModels();
   }, []);
 
+  const highestAccuracy = models.reduce((max, m) => Math.max(max, m.accuracy ?? 0), 0);
+
   return (
     <div>
       <EditorialPageHeader
@@ -107,7 +109,7 @@ export default function AIModelsPage() {
         metrics={[
           { label: 'Active models', value: formatNumber(models.filter((m) => m.is_current).length), meta: 'Currently deployed' },
           { label: 'Inactive models', value: formatNumber(models.filter((m) => !m.is_current).length), meta: 'Available to deploy' },
-          { label: 'Highest accuracy', value: `${models.length > 0 ? `${Math.round(Math.max(...(models.map((m) => m.accuracy ?? 0)) * 100))}%` : '—'}`, meta: 'Accuracy of all models' },
+          { label: 'Highest accuracy', value: models.length > 0 ? `${Math.round(highestAccuracy * 100)}%` : '—', meta: 'Accuracy of all models' },
           { label: 'Trained recently', value: formatNumber(models.filter((m) => new Date(m.trained_at).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000).length), meta: 'Trained in the last 7 days' },
         ]}
       />
