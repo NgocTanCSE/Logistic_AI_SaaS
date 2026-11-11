@@ -43,6 +43,7 @@ type AuditActivity = {
   resourceType?: string;
   resourceId?: string;
   createdAt?: string;
+  result?: 'SUCCESS' | 'FAILED';
 };
 
 function formatMoney(value?: number) {
