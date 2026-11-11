@@ -1024,6 +1024,11 @@ export function getPricing(): PricingData {
   return getAll<PricingData>('pricing');
 }
 
+export function setPricing(data: PricingData): PricingData {
+  window.localStorage.setItem(tableKey('pricing'), safeJSONStringify(data) ?? '{}');
+  return data;
+}
+
 export function savePricingRule(rule: PricingRule): PricingData {
   const sheet = getPricing();
   const rules = [...sheet.rules, { ...rule, id: rule.id || `rule_${Date.now()}` }];

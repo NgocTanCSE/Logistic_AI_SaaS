@@ -32,9 +32,10 @@ export default function TenantDetailPage() {
       initStore();
       const data = await fetchFromStoreOrAPI<Tenant>('tenants', '/admin/tenants');
       const found = Array.isArray(data) ? data.find((t) => t.id === id) : null;
-      setTenant(found || getOne('tenants', id) || null);
+      const cached = getOne('tenants', id) as Tenant | null;
+      setTenant(found || cached || null);
     } catch (err: any) {
-      const cached = getOne('tenants', id);
+      const cached = getOne('tenants', id) as Tenant | null;
       setTenant(cached || null);
       setError(cached ? null : err?.message || 'Failed to load tenant details');
     } finally {
