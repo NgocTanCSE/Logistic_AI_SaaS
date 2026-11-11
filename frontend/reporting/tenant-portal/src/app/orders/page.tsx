@@ -1,520 +1,1017 @@
 'use client';
 
-import { TableState } from 'ui-components';
-import { useState, useEffect, useCallback } from 'react';
-import {formatDateTime} from '@/lib/date-utils';
-import { useAuth } from '@/lib/auth-context';
-import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
-import { useDropzone } from 'react-dropzone';
-import api from '@/lib/api';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import type { EditorialMetric } from 'ui-kit';
+import { Button, Input, Modal, Pagination, Select, TableState } from 'ui-components';
+import type { Client, Order, OrderStatus, ServiceLevel, Warehouse } from '@/lib/mock';
+import {
+  formatCurrency,
+  formatDateTimeVN,
+  formatNumber,
+  orderStatusLabel,
+  orderStatusTone,
+  serviceLabel,
+} from '@/lib/labels';
 
-type Order = {
-  id: string;
-  trackingCode: string;
-  status: string;
-  recipientName: string;
-  recipientAddress: string;
-  codAmount: number;
-  shippingFee: number;
-  createdAt: string;
+const PAGE_SIZE = 12;
+
+const SERVICE_LABELS: Record<ServiceLevel, string> = {
+  STANDARD: 'Tiêu chuẩn',
+  EXPRESS: 'Nhanh',
+  SAME_DAY: 'Trong ngày',
 };
 
+/** Bước tiến hợp lệ của đơn — phản chiếu state machine ở BE. */
+const NEXT_STATUS: Partial<Record<OrderStatus, { status: OrderStatus; label: string }>> = {
+  NEW: { status: 'UNASSIGNED', label: 'Chuyển chưa gán chuyến' },
+  UNASSIGNED: { status: 'PENDING_PICKUP', label: 'Chờ lấy hàng' },
+  PENDING_PICKUP: { status: 'PICKING', label: 'Bắt đầu soạn' },
+  PICKING: { status: 'PACKED', label: 'Đã đóng gói' },
+  PACKED: { status: 'IN_TRANSIT', label: 'Bàn giao vận chuyển' },
+  IN_TRANSIT: { status: 'OUT_FOR_DELIVERY', label: 'Bắt đầu phát' },
+  OUT_FOR_DELIVERY: { status: 'DELIVERED', label: 'Giao thành công' },
+  FAILED: { status: 'RETURN_REQUESTED', label: 'Tạo yêu cầu trả' },
+  RETURN_REQUESTED: { status: 'RETURNED', label: 'Xác nhận đã trả hàng' },
+};
+
+const CANCELLABLE: OrderStatus[] = ['NEW', 'UNASSIGNED', 'PENDING_PICKUP'];
+
+/** Đơn đang trên đường mới có thể ghi nhận giao thất bại. */
+const FAILABLE: OrderStatus[] = ['IN_TRANSIT', 'OUT_FOR_DELIVERY'];
+
+const ALL_STATUSES: OrderStatus[] = [
+  'NEW',
+  'UNASSIGNED',
+  'PENDING_PICKUP',
+  'PICKING',
+  'PACKED',
+  'IN_TRANSIT',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
+  'FAILED',
+  'RETURN_REQUESTED',
+  'RETURNED',
+  'CANCELLED',
+];
+
+/** Tách một dòng CSV, hỗ trợ dấu phẩy hoặc chấm phẩy và ô có ngoặc kép. */
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let current = '';
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (quoted) {
+      if (char === '"') {
+        if (line[index + 1] === '"') {
+          current += '"';
+          index += 1;
+        } else {
+          quoted = false;
+        }
+      } else {
+        current += char;
+      }
+    } else if (char === '"') {
+      quoted = true;
+    } else if (char === ',' || char === ';') {
+      cells.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  cells.push(current.trim());
+  return cells;
+}
+
+function isCsvHeader(cells: string[]) {
+  const row = cells.join(' ').toLowerCase();
+  return row.includes('tên') && (row.includes('điện thoại') || row.includes('số điện thoại'));
+}
+
+const PROVINCES = [
+  { value: 'TP. Hồ Chí Minh', lat: 10.7769, lng: 106.7009, districts: ['Quận 1', 'Quận 3', 'Quận 7', 'Tân Bình', 'Thủ Đức'] },
+  { value: 'Bình Dương', lat: 10.9239, lng: 106.7147, districts: ['Thuận An', 'Dĩ An', 'Thủ Dầu Một'] },
+  { value: 'Đồng Nai', lat: 10.9574, lng: 106.8427, districts: ['Biên Hòa', 'Long Thành'] },
+  { value: 'Đà Nẵng', lat: 16.0471, lng: 108.2196, districts: ['Hải Châu', 'Thanh Khê'] },
+  { value: 'Hà Nội', lat: 21.0313, lng: 105.7987, districts: ['Cầu Giấy', 'Hoàng Mai'] },
+];
+
+type OrderForm = {
+  clientId: string;
+  warehouseId: string;
+  clientOrderRef: string;
+  name: string;
+  phone: string;
+  address: string;
+  ward: string;
+  district: string;
+  province: string;
+  service: ServiceLevel;
+  weightKg: string;
+  itemCount: string;
+  codAmount: string;
+  shippingFee: string;
+  notes: string;
+};
+
+const EMPTY_FORM: OrderForm = {
+  clientId: '',
+  warehouseId: '',
+  clientOrderRef: '',
+  name: '',
+  phone: '',
+  address: '',
+  ward: '',
+  district: 'Quận 1',
+  province: 'TP. Hồ Chí Minh',
+  service: 'STANDARD',
+  weightKg: '1',
+  itemCount: '1',
+  codAmount: '0',
+  shippingFee: '24000',
+  notes: '',
+};
+
+function isLate(order: Order) {
+  if (['DELIVERED', 'RETURNED', 'CANCELLED'].includes(order.status)) return false;
+  return new Date(order.promisedAt).getTime() < Date.now();
+}
+
 export default function OrdersPage() {
-  const { user, token } = useAuth();
+  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Modal States
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [trackingModalOpen, setTrackingModalOpen] = useState(false);
-  const [trackingData, setTrackingData] = useState<any[]>([]);
-  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
-  const [orderToCancel, setOrderToCancel] = useState<string | null>(null);
-  
-  // Single Order Form State (Multi-step)
-  const [step, setStep] = useState(1);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    customerName: '',
-    phone: '',
-    address: '',
-    amount: ''
-  });
-
   const [error, setError] = useState('');
 
-  // Upload Excel State
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
+  const [serviceFilter, setServiceFilter] = useState<ServiceLevel | 'ALL'>('ALL');
+  const [warehouseFilter, setWarehouseFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
 
-  // Dropzone setup with validation
-  const onDrop = useCallback((acceptedFiles: File[], fileRejections: any[]) => {
-    setUploadError('');
-    if (fileRejections.length > 0) {
-      setUploadError('Invalid file. Please upload an Excel/CSV file under 10MB.');
-      return;
-    }
-    if (acceptedFiles.length > 0) {
-      const file = acceptedFiles[0];
-      // BƯỚC 1/4: Phòng thủ - Check MIME type & Size (Double check despite Dropzone rules)
-      if (file.size > 10 * 1024 * 1024) {
-        setUploadError('File exceeds 10MB limit.');
-        return;
-      }
-      setUploadFile(file);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState<OrderForm>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkResult, setBulkResult] = useState('');
+
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [failTarget, setFailTarget] = useState<Order | null>(null);
+  const [failing, setFailing] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
+  const [noticeTone, setNoticeTone] = useState<'success' | 'error'>('success');
+
+  const notify = (message: string, tone: 'success' | 'error' = 'success') => {
+    setNotice(message);
+    setNoticeTone(tone);
+  };
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [orderRows, clientRows, warehouseRows] = await Promise.all([
+        data.orders.list(),
+        data.clients.list(),
+        data.warehouses.list(),
+      ]);
+      setOrders(orderRows);
+      setClients(clientRows);
+      setWarehouses(warehouseRows);
+      setForm((current) => ({
+        ...current,
+        clientId: current.clientId || clientRows[0]?.id || '',
+        warehouseId: current.warehouseId || warehouseRows[0]?.id || '',
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không tải được danh sách đơn hàng.');
+      setOrders([]);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
-    onDrop,
-    accept: {
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'application/vnd.ms-excel': ['.xls'],
-      'text/csv': ['.csv']
-    },
-    maxSize: 10485760, // 10MB
-    disabled: isUploading
-  });
-
   useEffect(() => {
-    fetchOrders();
-  }, [token]);
+    load();
+  }, [load]);
 
-  const fetchOrders = async () => {
-    if (!token) return;
-    setError('');
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return orders
+      .filter((order) => (statusFilter === 'ALL' ? true : order.status === statusFilter))
+      .filter((order) => (serviceFilter === 'ALL' ? true : order.service === serviceFilter))
+      .filter((order) =>
+        warehouseFilter === 'ALL' ? true : order.warehouseId === warehouseFilter,
+      )
+      .filter((order) => {
+        if (!term) return true;
+        return (
+          order.trackingCode.toLowerCase().includes(term) ||
+          order.clientName.toLowerCase().includes(term) ||
+          order.customer.name.toLowerCase().includes(term) ||
+          order.customer.phone.includes(term)
+        );
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [orders, search, statusFilter, serviceFilter, warehouseFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const metrics: EditorialMetric[] = [
+    {
+      label: 'Tổng đơn',
+      value: formatNumber(orders.length),
+      meta: `${formatNumber(filtered.length)} trong bộ lọc`,
+    },
+    {
+      label: 'Chờ xử lý',
+      value: formatNumber(
+        orders.filter((order) =>
+          ['NEW', 'UNASSIGNED', 'PENDING_PICKUP'].includes(order.status),
+        ).length,
+      ),
+      meta: 'Mới · chưa gán · chờ lấy',
+      tone: 'warning',
+    },
+    {
+      label: 'Đang giao',
+      value: formatNumber(
+        orders.filter((order) => ['IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(order.status))
+          .length,
+      ),
+      meta: `${orders.filter((order) => order.status === 'PACKED').length} đơn đã đóng gói`,
+    },
+    {
+      label: 'COD đang thu',
+      value: formatCurrency(
+        orders
+          .filter((order) => order.codAmount > 0 && order.status !== 'CANCELLED')
+          .reduce((sum, order) => sum + order.codAmount, 0),
+      ),
+      meta: 'Chưa đối soát',
+    },
+  ];
+
+  const advance = async (order: Order) => {
+    const next = NEXT_STATUS[order.status];
+    if (!next) return;
+    setBusyId(order.id);
+    setNotice('');
     try {
-      const res = await api.get('/orders');
-      const data = res.data;
-      setOrders(Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []));
-      setLoading(false);
+      await data.orders.advanceStatus(order.id, next.status, next.label);
+      notify(`Đơn ${order.trackingCode} → ${orderStatusLabel(next.status)}.`);
+      await load();
     } catch (err) {
-      if (err instanceof Error) {
-        setError(`Failed to fetch orders: ${err.message}. Please check connection or try again.`);
-      } else {
-        setError('Failed to fetch orders. Please check connection or try again.');
-      }
-      setOrders([]);
-      setLoading(false);
+      notify(
+        err instanceof Error ? err.message : 'Không cập nhật được trạng thái.',
+        'error',
+      );
+    } finally {
+      setBusyId(null);
     }
   };
 
-  const handleCreateOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (step === 1) {
-      if (!form.customerName || !form.phone) return;
-      setStep(2);
-      return;
+  const failDelivery = async () => {
+    if (!failTarget) return;
+    setFailing(true);
+    try {
+      await data.orders.advanceStatus(
+        failTarget.id,
+        'FAILED',
+        'Giao thất bại — khách không nhận hàng',
+      );
+      notify(`Đã ghi nhận giao thất bại cho đơn ${failTarget.trackingCode}.`);
+      setFailTarget(null);
+      await load();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Không ghi nhận được giao thất bại.', 'error');
+    } finally {
+      setFailing(false);
     }
-    
+  };
+
+  const cancel = async () => {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await data.orders.advanceStatus(
+        cancelTarget.id,
+        'CANCELLED',
+        'Huỷ đơn theo yêu cầu khách hàng',
+      );
+      notify(`Đã huỷ đơn ${cancelTarget.trackingCode}.`);
+      setCancelTarget(null);
+      await load();
+    } catch (err) {
+      notify(err instanceof Error ? err.message : 'Không huỷ được đơn.', 'error');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const submitCreate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setFormError('');
+    const province = PROVINCES.find((row) => row.value === form.province) ?? PROVINCES[0];
     setSaving(true);
     try {
-       await api.post('/orders', {
-         recipientName: form.customerName,
-         recipientPhone: form.phone,
-         recipientAddress: form.address,
-         codAmount: Number(form.amount) || 0,
-         clientId: '',
-         items: []
-       });
-       setIsModalOpen(false);
-       setStep(1);
-       setForm({ customerName: '', phone: '', address: '', amount: '' });
-       fetchOrders();
-    } catch (err) {
-       console.error("Error creating order", err);
-       setError('Failed to create order');
-    } finally {
-       setSaving(false);
-    }
-  };
-
-  const handleUploadExcel = async () => {
-    if (!uploadFile) return;
-    setIsUploading(true);
-    setUploadProgress(0);
-    setUploadError('');
-
-    try {
-      const formData = new FormData();
-      formData.append('file', uploadFile);
-
-      // Simulate Progress because api doesn't easily expose axios onUploadProgress here without extending the client
-      const interval = setInterval(() => setUploadProgress(p => Math.min(p + 10, 90)), 200);
-
-      await api.post('/orders/bulk/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
+      const created = await data.orders.createOrder({
+        clientId: form.clientId,
+        warehouseId: form.warehouseId,
+        service: form.service,
+        customer: {
+          name: form.name.trim(),
+          phone: form.phone.trim(),
+          address: form.address.trim(),
+          ward: form.ward.trim() || `Phường ${1 + (form.name.length % 12)}`,
+          district: form.district,
+          province: form.province,
+          lat: Number((province.lat + (Math.random() - 0.5) * 0.02).toFixed(6)),
+          lng: Number((province.lng + (Math.random() - 0.5) * 0.02).toFixed(6)),
+        },
+        codAmount: Number(form.codAmount) || 0,
+        shippingFee: Number(form.shippingFee) || 24_000,
+        weightKg: Number(form.weightKg) || 1,
+        itemCount: Number(form.itemCount) || 1,
+        notes: form.notes.trim() || undefined,
       });
-      
-      clearInterval(interval);
-      setUploadProgress(100);
-      await new Promise(r => setTimeout(r, 400));
-      
-      setIsUploadModalOpen(false);
-      setUploadFile(null);
-      fetchOrders();
-    } catch (error) {
-      setUploadError('Upload failed. Please try again.');
+      setCreateOpen(false);
+      setForm((current) => ({ ...EMPTY_FORM, clientId: current.clientId, warehouseId: current.warehouseId }));
+      setNotice(`Đã tạo đơn ${created.trackingCode}.`);
+      await load();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Không tạo được đơn hàng.');
     } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
+      setSaving(false);
     }
   };
 
-  const handleCancelOrder = async () => {
-    if (!orderToCancel) return;
-    try {
-      await api.post(`/orders/${orderToCancel}/cancel`);
-      setConfirmCancelOpen(false);
-      setOrderToCancel(null);
-      fetchOrders();
-    } catch (error) {
-      console.error('Failed to cancel order.', error);
-      setError('Failed to cancel order');
+  /**
+   * Nhập hàng loạt: mỗi dòng CSV gồm
+   * tên người nhận, số điện thoại, địa chỉ, quận, COD.
+   * Đơn được tạo thật trong mock và hiện ngay ở bảng bên dưới.
+   */
+  const submitBulk = async () => {
+    const lines = bulkText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (lines.length === 0) {
+      setBulkResult('Chưa có dòng dữ liệu nào để nhập.');
+      return;
     }
+    const clientId = form.clientId || clients[0]?.id;
+    const warehouseId = form.warehouseId || warehouses[0]?.id;
+    if (!clientId || !warehouseId) {
+      setBulkResult('Thiếu khách hàng hoặc kho nhận. Tải lại trang rồi thử lại.');
+      return;
+    }
+    setBulkBusy(true);
+    setBulkResult('');
+    let created = 0;
+    const failures: string[] = [];
+    for (const [index, line] of lines.entries()) {
+      const cells = parseCsvLine(line);
+      if (isCsvHeader(cells)) continue;
+      const [name, phone, address, district, cod] = cells;
+      try {
+        await data.orders.createOrder({
+          clientId,
+          warehouseId,
+          customer: {
+            name: name || `Người nhận ${index + 1}`,
+            phone,
+            address: address || 'Chưa cập nhật',
+            ward: 'Phường 1',
+            district: district || 'Quận 1',
+            province: 'TP. Hồ Chí Minh',
+            lat: 10.7769,
+            lng: 106.7009,
+          },
+          codAmount: Number(cod) || 0,
+          itemCount: 1,
+          weightKg: 1,
+        });
+        created += 1;
+      } catch (err) {
+        failures.push(`Dòng ${index + 1}: ${err instanceof Error ? err.message : 'lỗi'}`);
+      }
+    }
+    setBulkResult(
+      `Tạo thành công ${created}/${lines.length} đơn.${failures.length ? ` ${failures.length} dòng lỗi: ${failures[0]}` : ''}`,
+    );
+    if (created > 0) await load();
+    setBulkBusy(false);
   };
 
-  const handleViewDetails = async (orderId: string) => {
-    try {
-      const res = await api.get(`/orders/${orderId}/tracking`);
-      setTrackingData(res.data?.data || res.data || []);
-      setTrackingModalOpen(true);
-    } catch (error) {
-      console.error('Failed to fetch tracking details.', error);
-      setError('Failed to fetch tracking details');
-    }
-  };
-
-  const getStatusVariant = (status: string) => {
-    switch(status) {
-      case 'NEW': return 'warning';
-      case 'UNASSIGNED': return 'neutral';
-      case 'PENDING_PICKUP': return 'neutral';
-      case 'IN_TRANSIT': return 'info';
-      case 'DELIVERED': return 'success';
-      case 'RETURNED': return 'error';
-      case 'RETURN_REQUESTED': return 'warning';
-      case 'CANCELLED': return 'error';
-      default: return 'neutral';
-    }
-  };
+  const activeFilters =
+    search.trim() !== '' ||
+    statusFilter !== 'ALL' ||
+    serviceFilter !== 'ALL' ||
+    warehouseFilter !== 'ALL';
 
   return (
-    <div className="p-8 max-w-7xl mx-auto ">
-      {error && <ErrorBanner message={error} onRetry={fetchOrders} />}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
-        <div>
-          <h1 className="text-4xl font-bold text-ink tracking-tight">
-            Order Management
-          </h1>
-          <p className="text-sm text-inkSoft mt-2 font-medium">Manage single requests and bulk supply chain throughput.</p>
-        </div>
-        <div className="flex gap-3">
-          <Button variant="outline" size="md" onClick={() => setIsUploadModalOpen(true)} className="font-bold text-[10px] tracking-widest gap-2">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-            BULK UPLOAD
-          </Button>
-          <Button variant="primary" size="md" onClick={() => { setIsModalOpen(true); setStep(1); }} className="gap-2 shadow-lg ">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4"/></svg>
-            Create New Order
-          </Button>
-        </div>
-      </div>
+    <>
+      <EditorialPageHeader
+        eyebrow="Vận hành · Đơn hàng"
+        title="Đơn hàng"
+        description="Danh sách đơn theo kho, dịch vụ và trạng thái. Mỗi lần đổi trạng thái đều đi qua state machine của backend và ghi vào dòng thời gian của đơn."
+        meta={`${filtered.length} / ${orders.length} đơn`}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setBulkOpen(true)}>
+              Nhập hàng loạt
+            </Button>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              Tạo đơn
+            </Button>
+          </div>
+        }
+      />
 
-      <Card className="">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-border">
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Order ID</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Customer Details</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Amount</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
+      <MetricBand metrics={metrics} />
+
+      {notice ? (
+        <div className="border-l-2 border-accent bg-surface px-3 py-2 text-[12px] text-ink">
+          {notice}
+        </div>
+      ) : null}
+
+      <EditorialSection
+        title="Hàng đợi đơn hàng"
+        eyebrow="Bảng vận hành"
+        action={
+          <span className="text-[11px] text-ink-faint">
+            Trang {currentPage}/{totalPages}
+          </span>
+        }
+      >
+        <div className="mb-3 flex flex-wrap items-end gap-2">
+          <Input
+            type="search"
+            placeholder="Tìm mã đơn, khách, người nhận, SĐT"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
+            className="h-9 w-72"
+          />
+          <div className="w-48">
+            <Select
+              className="h-9"
+              aria-label="Lọc theo trạng thái"
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value as OrderStatus | 'ALL');
+                setPage(1);
+              }}
+              options={[
+                { value: 'ALL', label: 'Mọi trạng thái' },
+                ...(
+                  [
+                    'NEW',
+                    'UNASSIGNED',
+                    'PENDING_PICKUP',
+                    'PICKING',
+                    'PACKED',
+                    'IN_TRANSIT',
+                    'OUT_FOR_DELIVERY',
+                    'DELIVERED',
+                    'FAILED',
+                    'RETURN_REQUESTED',
+                    'RETURNED',
+                    'CANCELLED',
+                  ] as OrderStatus[]
+                ).map((status) => ({ value: status, label: orderStatusLabel(status) })),
+              ]}
+            />
+          </div>
+          <div className="w-40">
+            <Select
+              className="h-9"
+              aria-label="Lọc theo dịch vụ"
+              value={serviceFilter}
+              onChange={(event) => {
+                setServiceFilter(event.target.value as ServiceLevel | 'ALL');
+                setPage(1);
+              }}
+              options={[
+                { value: 'ALL', label: 'Mọi dịch vụ' },
+                ...(['STANDARD', 'EXPRESS', 'SAME_DAY'] as ServiceLevel[]).map((service) => ({
+                  value: service,
+                  label: SERVICE_LABELS[service],
+                })),
+              ]}
+            />
+          </div>
+          <div className="w-48">
+            <Select
+              className="h-9"
+              aria-label="Lọc theo kho"
+              value={warehouseFilter}
+              onChange={(event) => {
+                setWarehouseFilter(event.target.value);
+                setPage(1);
+              }}
+              options={[
+                { value: 'ALL', label: 'Mọi kho' },
+                ...warehouses.map((warehouse) => ({
+                  value: warehouse.id,
+                  label: `${warehouse.code} · ${warehouse.name}`,
+                })),
+              ]}
+            />
+          </div>
+          {activeFilters ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSearch('');
+                setStatusFilter('ALL');
+                setServiceFilter('ALL');
+                setWarehouseFilter('ALL');
+                setPage(1);
+              }}
+            >
+              Xoá bộ lọc
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="overflow-x-auto border border-line">
+          <table className="min-w-full divide-y divide-line">
+            <thead className="bg-surface-alt">
+              <tr>
+                {[
+                  'Mã đơn',
+                  'Người nhận',
+                  'Khách hàng',
+                  'Trạng thái',
+                  'Dịch vụ',
+                  'Kho',
+                  'COD',
+                  'Hẹn giao',
+                  '',
+                ].map((label, index) => (
+                  <th
+                    key={`${label}-${index}`}
+                    className="whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint"
+                  >
+                    {label}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-line text-[12px]">
               <TableState
-          loading={loading}
-          empty={!loading && orders.length === 0}
-          error={error ? new Error(error) : undefined}
-          onRetry={fetchOrders}
-          colSpan={6}
-          emptyContent={<tr>
-                  <td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-medium">No active orders found.</td>
-                </tr>}
-        >
-          {orders.map(order => {
-                  // BƯỚC 1/4: Defensive logic for Cancel button
-                  const canCancel = order.status === 'NEW' || order.status === 'PENDING_PICKUP' || order.status === 'UNASSIGNED';
-
+                loading={loading}
+                empty={!loading && paged.length === 0}
+                error={error ? new Error(error) : undefined}
+                onRetry={load}
+                colSpan={9}
+                emptyTitle={activeFilters ? 'Không có đơn khớp bộ lọc' : 'Chưa có đơn hàng'}
+                emptyDescription={
+                  activeFilters
+                    ? 'Thử xoá bộ lọc hoặc tìm bằng mã đơn khác.'
+                    : 'Tạo đơn đầu tiên để bắt đầu luồng vận hành.'
+                }
+              >
+                {paged.map((order) => {
+                  const next = NEXT_STATUS[order.status];
+                  const late = isLate(order);
                   return (
-                    <tr key={order.id} className="hover:bg-slate-50/80 transition-all group">
-                      <td className="px-8 py-6">
-                        <div className="font-bold text-ink">{order.trackingCode}</div>
+                    <tr
+                      key={order.id}
+                      className="cursor-pointer hover:bg-surface-alt"
+                      onClick={() => router.push(`/orders/${order.trackingCode}`)}
+                    >
+                      <td className="px-3 py-2">
+                        <Link
+                          href={`/orders/${order.trackingCode}`}
+                          onClick={(event) => event.stopPropagation()}
+                          className="font-mono text-[12px] font-semibold text-ink hover:text-accent"
+                        >
+                          {order.trackingCode}
+                        </Link>
+                        {late ? (
+                          <div className="mt-0.5">
+                            <StatusLabel tone="warning">Trễ hẹn</StatusLabel>
+                          </div>
+                        ) : null}
                       </td>
-                      <td className="px-8 py-6">
-                        <Badge variant={getStatusVariant(order.status)}>
-                          {order.status}
-                        </Badge>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="font-semibold text-ink leading-tight">{order.recipientName}</div>
-                        <div className="text-xs text-inkSoft flex items-center gap-1.5 mt-1.5">
-                          <svg className="w-3.5 h-3.5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                          <span className="truncate max-w-[240px]">{order.recipientAddress}</span>
+                      <td className="px-3 py-2">
+                        <div className="font-medium text-ink">{order.customer.name}</div>
+                        <div className="text-[11px] text-ink-faint">
+                          {order.customer.district} · {order.customer.phone}
                         </div>
                       </td>
-                      <td className="px-8 py-6">
-                        <div className="text-sm font-bold text-ink">${Number(order.codAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+                      <td className="px-3 py-2 text-ink-soft">{order.clientName}</td>
+                      <td className="px-3 py-2">
+                        <StatusLabel tone={orderStatusTone(order.status)}>
+                          {orderStatusLabel(order.status)}
+                        </StatusLabel>
                       </td>
-                      <td className="px-8 py-6 text-right">
-                        <div className="flex justify-end gap-3 items-center">
-                          <Button variant="ghost" size="sm" className="font-bold text-primary tracking-wide" onClick={() => handleViewDetails(order.id)}>
-                            DETAILS
-                          </Button>
-                          <button 
-                            onClick={() => { setOrderToCancel(order.id); setConfirmCancelOpen(true); }}
-                            disabled={!canCancel}
-                            className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
-                              canCancel 
-                                ? 'text-red-500 hover:bg-red-50 active:bg-red-100' 
-                                : 'text-slate-300 cursor-not-allowed'
-                            }`}
-                          >
-                            CANCEL
-                          </button>
+                      <td className="px-3 py-2 text-ink-soft">{serviceLabel(order.service)}</td>
+                      <td className="px-3 py-2 font-mono text-[11px] text-ink-soft">
+                        {warehouses.find((row) => row.id === order.warehouseId)?.code ?? '—'}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums text-ink">
+                        {order.codAmount > 0 ? formatCurrency(order.codAmount) : '—'}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums text-ink-soft">
+                        {formatDateTimeVN(order.promisedAt)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <div className="flex items-center gap-3 text-[11px]">
+                          {next ? (
+                            <button
+                              type="button"
+                              disabled={busyId === order.id}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                advance(order);
+                              }}
+                              className="font-semibold text-ink-soft hover:text-accent disabled:opacity-50"
+                            >
+                              {next.label}
+                            </button>
+                          ) : null}
+                          {CANCELLABLE.includes(order.status) ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setCancelTarget(order);
+                              }}
+                              className="font-semibold text-danger hover:underline"
+                            >
+                              Huỷ
+                            </button>
+                          ) : null}
+                          {FAILABLE.includes(order.status) ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setFailTarget(order);
+                              }}
+                              className="font-semibold text-danger hover:underline"
+                            >
+                              Giao thất bại
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
-                  )
+                  );
                 })}
-        </TableState>
+              </TableState>
             </tbody>
           </table>
         </div>
-      </Card>
 
-      {/* Multi-step Create Order Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40  animate-in fade-in duration-200">
-          <Card className="w-full max-w-lg bg-white border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-             <div className="p-8 border-b border-slate-100 relative">
-               <button 
-                 onClick={() => !saving && setIsModalOpen(false)} 
-                 disabled={saving}
-                 className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 disabled:opacity-50"
-               >
-                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12"/></svg>
-               </button>
-               <h2 className="text-2xl font-bold text-ink tracking-tight">Create New Order</h2>
-               <p className="text-sm text-inkSoft mt-1 font-medium">Step {step} of 2 - {step === 1 ? 'Customer Details' : 'Logistics Info'}</p>
-               
-               {/* Progress indicator */}
-               <div className="flex gap-2 mt-4">
-                 <div className={`h-1.5 flex-1 rounded-full ${step >= 1 ? 'bg-primary' : 'bg-slate-100'}`}></div>
-                 <div className={`h-1.5 flex-1 rounded-full ${step >= 2 ? 'bg-primary' : 'bg-slate-100'}`}></div>
-               </div>
-             </div>
-
-             <form onSubmit={handleCreateOrder} className="p-8 relative min-h-[300px]">
-                {step === 1 && (
-                  <div className="grid grid-cols-1 gap-5 animate-in slide-in-from-right-4">
-                    <Input label="Customer / Recipient Name" required value={form.customerName} onChange={e => setForm({...form, customerName: e.target.value})} placeholder="e.g. Global Tech Solutions" />
-                    <Input label="Contact Phone" required value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="+84 901 234 567" />
-                  </div>
-                )}
-
-                {step === 2 && (
-                  <div className="grid grid-cols-1 gap-5 animate-in slide-in-from-right-4">
-                    <Input label="Order Total ($)" type="number" required value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} placeholder="0.00" />
-                    <Input label="Delivery Address" required value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="Full street address, city" />
-                  </div>
-                )}
-
-                <div className="absolute bottom-8 left-8 right-8 flex gap-4">
-                  {step === 2 && (
-                    <Button type="button" variant="outline" onClick={() => setStep(1)} disabled={saving} className="flex-1 font-bold uppercase tracking-widest text-[10px]">
-                      Back
-                    </Button>
-                  )}
-                  <Button type="submit" isLoading={saving} disabled={saving} className="flex-1 font-bold uppercase tracking-widest text-[10px]">
-                    {step === 1 ? 'CONTINUE' : saving ? 'PROCESSING...' : 'INITIATE ORDER'}
-                  </Button>
-                </div>
-             </form>
-          </Card>
-        </div>
-      )}
-
-      {/* Bulk Upload Dropzone Modal */}
-      {isUploadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60  animate-in fade-in duration-200">
-          <div className="absolute inset-0" onClick={() => !isUploading && setIsUploadModalOpen(false)}></div>
-          
-          <Card className="w-full max-w-xl bg-white border-slate-200 shadow-2xl relative z-10 animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center">
-              <div>
-                <h2 className="text-2xl font-bold text-ink tracking-tight">Bulk Upload Orders</h2>
-                <p className="text-sm text-inkSoft mt-1">Upload a CSV or Excel file to process multiple orders.</p>
-              </div>
-              <button 
-                onClick={() => !isUploading && setIsUploadModalOpen(false)} 
-                disabled={isUploading}
-                className="text-slate-400 hover:text-slate-600 disabled:opacity-50 transition-all"
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-
-            <div className="p-8">
-              {!uploadFile ? (
-                <div 
-                  {...getRootProps()} 
-                  className={`
-                    border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all
-                    ${isDragActive ? 'border-primary bg-primary/5' : 'border-slate-300 hover:border-primary/50 hover:bg-slate-50'}
-                    ${uploadError ? 'border-red-400 bg-red-50/50' : ''}
-                  `}
-                >
-                  <input {...getInputProps()} />
-                  <div className={`p-4 rounded-full mb-4 ${isDragActive ? 'bg-primary/20 text-primary' : 'bg-slate-100 text-slate-500'}`}>
-                    <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                  </div>
-                  <h3 className="font-bold text-ink mb-1">Drag & Drop your file here</h3>
-                  <p className="text-sm text-slate-500 mb-4">or click to browse from your computer</p>
-                  
-                  <div className="text-xs font-medium text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
-                    Supported: .xlsx, .xls, .csv (Max 10MB)
-                  </div>
-                  
-                  {uploadError && (
-                    <p className="mt-4 text-sm font-semibold text-red-500 animate-in slide-in-from-bottom-2">{uploadError}</p>
-                  )}
-                </div>
-              ) : (
-                <div className="border border-slate-200 rounded-xl p-6">
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="p-3 bg-emerald-100 text-emerald-600 rounded-lg">
-                      <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                    </div>
-                    <div className="flex-1 overflow-hidden">
-                      <h4 className="font-bold text-ink truncate">{uploadFile.name}</h4>
-                      <p className="text-xs text-slate-500">{(uploadFile.size / 1024 / 1024).toFixed(2)} MB</p>
-                    </div>
-                    {!isUploading && (
-                      <button onClick={() => setUploadFile(null)} className="text-slate-400 hover:text-red-500 p-2">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                      </button>
-                    )}
-                  </div>
-
-                  {isUploading && (
-                    <div className="mb-4">
-                      <div className="flex justify-between text-xs font-bold text-slate-500 mb-2">
-                        <span>Uploading & Parsing...</span>
-                        <span className="text-primary">{uploadProgress}%</span>
-                      </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-primary transition-all duration-300 ease-out"
-                          style={{ width: `${uploadProgress}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 mt-6">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setUploadFile(null)} 
-                      disabled={isUploading}
-                      className="flex-1"
-                    >
-                      Change File
-                    </Button>
-                    <Button 
-                      variant="primary" 
-                      onClick={handleUploadExcel} 
-                      disabled={isUploading}
-                      isLoading={isUploading}
-                      className="flex-1"
-                    >
-                      {isUploading ? 'PROCESSING' : 'UPLOAD & PROCESS'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Tracking Details Modal */}
-      {trackingModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40  ">
-          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <h2 className="text-xl font-bold text-ink tracking-tight">Tracking History</h2>
-              <button onClick={() => setTrackingModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-            <div className="p-8 overflow-y-auto">
-              {trackingData.length === 0 ? (
-                <div className="text-center text-slate-400 font-medium py-8">No tracking events found for this order.</div>
-              ) : (
-                <div className="space-y-6">
-                  {trackingData.map((event, idx) => (
-                    <div key={idx} className="flex gap-4">
-                      <div className="flex flex-col items-center">
-                        <div className="w-3 h-3 rounded-full bg-primary mt-1"></div>
-                        {idx !== trackingData.length - 1 && <div className="w-0.5 h-full bg-slate-200 my-1"></div>}
-                      </div>
-                      <div className="pb-6">
-                        <div className="text-sm font-bold text-ink">{event.status}</div>
-                        <div className="text-xs text-slate-500 mt-1">{formatDateTime(event.timestamp)}</div>
-                        <div className="text-sm text-slate-600 mt-1">{event.description}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end">
-              <Button variant="outline" onClick={() => setTrackingModalOpen(false)}>Close</Button>
-            </div>
+        {filtered.length > PAGE_SIZE ? (
+          <div className="flex justify-center py-3">
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
           </div>
-        </div>
-      )}
+        ) : null}
+      </EditorialSection>
 
-      {/* Confirm Cancel Modal */}
-      {confirmCancelOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/40  ">
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-8 text-center">
-            <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-            </div>
-            <h2 className="text-xl font-bold text-ink mb-2">Cancel Order?</h2>
-            <p className="text-slate-500 text-sm mb-8">Are you sure you want to cancel this order? This action cannot be undone.</p>
-            <div className="flex gap-3 justify-center">
-              <Button variant="outline" onClick={() => setConfirmCancelOpen(false)}>No, Keep it</Button>
-              <Button variant="primary" onClick={handleCancelOrder} className="bg-red-500 hover:bg-red-600">Yes, Cancel Order</Button>
-            </div>
-          </div>
+      <EditorialSection title="Luồng trạng thái đơn" eyebrow="Ch. 8 · State machine">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-ink-soft">
+          {(
+            [
+              'NEW',
+              'UNASSIGNED',
+              'PENDING_PICKUP',
+              'PICKING',
+              'PACKED',
+              'IN_TRANSIT',
+              'OUT_FOR_DELIVERY',
+              'DELIVERED',
+            ] as OrderStatus[]
+          ).map((status, index, list) => (
+            <span key={status} className="inline-flex items-center gap-3">
+              <StatusLabel tone={orderStatusTone(status)}>{orderStatusLabel(status)}</StatusLabel>
+              {index < list.length - 1 ? <span className="text-line-strong">→</span> : null}
+            </span>
+          ))}
+          <span className="text-line-strong">|</span>
+          <span className="text-ink-faint">
+            Nhánh lỗi: Giao thất bại → Yêu cầu trả → Đã trả. Huỷ chỉ từ trạng thái đầu.
+          </span>
         </div>
-      )}
-    </div>
+      </EditorialSection>
+
+      <Modal
+        isOpen={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Tạo đơn hàng"
+        size="full"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setCreateOpen(false)}>
+              Đóng
+            </Button>
+            <Button size="sm" type="submit" form="create-order-form" isLoading={saving}>
+              Tạo đơn
+            </Button>
+          </div>
+        }
+      >
+        <form id="create-order-form" onSubmit={submitCreate} className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Select
+              label="Khách hàng (chủ đơn)"
+              value={form.clientId}
+              onChange={(event) => setForm((current) => ({ ...current, clientId: event.target.value }))}
+              options={clients.map((client) => ({
+                value: client.id,
+                label: `${client.code} · ${client.name}`,
+              }))}
+            />
+            <Select
+              label="Kho nhận hàng"
+              value={form.warehouseId}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, warehouseId: event.target.value }))
+              }
+              options={warehouses.map((warehouse) => ({
+                value: warehouse.id,
+                label: `${warehouse.code} · ${warehouse.name}`,
+              }))}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="Tên người nhận"
+              required
+              value={form.name}
+              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              placeholder="Nguyễn Thị Lan"
+            />
+            <Input
+              label="Số điện thoại"
+              required
+              value={form.phone}
+              onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+              placeholder="0901234567"
+            />
+          </div>
+          <Input
+            label="Địa chỉ"
+            required
+            value={form.address}
+            onChange={(event) => setForm((current) => ({ ...current, address: event.target.value }))}
+            placeholder="Số nhà, đường, phường"
+          />
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Input
+              label="Phường/Xã"
+              value={form.ward}
+              onChange={(event) => setForm((current) => ({ ...current, ward: event.target.value }))}
+              placeholder="Phường 1"
+            />
+            <Select
+              label="Quận/Huyện"
+              value={form.district}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, district: event.target.value }))
+              }
+              options={
+                (PROVINCES.find((row) => row.value === form.province) ?? PROVINCES[0]).districts.map(
+                  (district) => ({ value: district, label: district }),
+                )
+              }
+            />
+            <Select
+              label="Tỉnh/Thành"
+              value={form.province}
+              onChange={(event) => {
+                const province = PROVINCES.find((row) => row.value === event.target.value);
+                setForm((current) => ({
+                  ...current,
+                  province: event.target.value,
+                  district: province?.districts[0] ?? current.district,
+                }));
+              }}
+              options={PROVINCES.map((province) => ({
+                value: province.value,
+                label: province.value,
+              }))}
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <Select
+              label="Dịch vụ"
+              value={form.service}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, service: event.target.value as ServiceLevel }))
+              }
+              options={(['STANDARD', 'EXPRESS', 'SAME_DAY'] as ServiceLevel[]).map((service) => ({
+                value: service,
+                label: SERVICE_LABELS[service],
+              }))}
+            />
+            <Input
+              label="Khối lượng (kg)"
+              type="number"
+              min={0.1}
+              step="0.1"
+              value={form.weightKg}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, weightKg: event.target.value }))
+              }
+            />
+            <Input
+              label="Số món"
+              type="number"
+              min={1}
+              value={form.itemCount}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, itemCount: event.target.value }))
+              }
+            />
+            <Input
+              label="COD (₫)"
+              type="number"
+              min={0}
+              step="1000"
+              value={form.codAmount}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, codAmount: event.target.value }))
+              }
+            />
+            <Input
+              label="Phí giao (₫)"
+              type="number"
+              min={0}
+              step="1000"
+              value={form.shippingFee}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, shippingFee: event.target.value }))
+              }
+            />
+          </div>
+          <Input
+            label="Ghi chú"
+            value={form.notes}
+            onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+            placeholder="Ví dụ: gọi trước 30 phút, giao giờ hành chính"
+          />
+          {formError ? (
+            <p className="border-l-2 border-danger pl-2 text-[12px] text-danger">{formError}</p>
+          ) : null}
+          <p className="text-[11px] text-ink-faint">
+            Backend kiểm tra số điện thoại, kho đang hoạt động và khối lượng trước khi tạo — lỗi
+            trả về hiển thị ngay tại đây.
+          </p>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        title="Nhập đơn hàng loạt"
+        size="full"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setBulkOpen(false)}>
+              Đóng
+            </Button>
+            <Button size="sm" onClick={submitBulk} isLoading={bulkBusy}>
+              Nhập các dòng
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-[12px] leading-6 text-ink-soft">
+            Dán danh sách đơn, mỗi dòng một đơn theo thứ tự:{' '}
+            <span className="font-mono text-[11px] text-ink">
+              tên người nhận, số điện thoại, địa chỉ, quận, COD
+            </span>
+            . Mỗi dòng hợp lệ được tạo thành một đơn thật trong bộ dữ liệu mẫu.
+          </p>
+          <textarea
+            value={bulkText}
+            onChange={(event) => setBulkText(event.target.value)}
+            rows={7}
+            className="w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-[12px] text-ink focus:border-accent focus:outline-none"
+            placeholder={'Trần Văn Hùng, 0908123456, 12 Nguyễn Huệ, Quận 1, 450000\nLê Thị Mai, 0912345678, 88 Cách Mạng Tháng 8, Quận 3, 0'}
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="text-[11px] font-semibold text-accent hover:underline"
+              onClick={() =>
+                setBulkText(
+                  'Trần Văn Hùng, 0908123456, 12 Nguyễn Huệ, Quận 1, 450000\nLê Thị Mai, 0912345678, 88 Cách Mạng Tháng 8, Quận 3, 0\nPhạm Quốc Bảo, 0938111222, 25 Phan Xích Long, Tân Bình, 320000',
+                )
+              }
+            >
+              Dùng dữ liệu mẫu
+            </button>
+            <button
+              type="button"
+              className="text-[11px] font-semibold text-ink-soft hover:text-accent"
+              onClick={() => {
+                setBulkText('');
+                setBulkResult('');
+              }}
+            >
+              Xoá nội dung
+            </button>
+          </div>
+          {bulkResult ? (
+            <p className="border-l-2 border-accent pl-2 text-[12px] text-ink">{bulkResult}</p>
+          ) : (
+            <EmptyNote>
+              Chưa nhập dòng nào. Hệ thống sẽ báo rõ số đơn tạo được và dòng lỗi nếu có.
+            </EmptyNote>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={cancelTarget !== null}
+        onClose={() => setCancelTarget(null)}
+        title="Huỷ đơn hàng"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setCancelTarget(null)}>
+              Giữ đơn
+            </Button>
+            <Button variant="danger" size="sm" onClick={cancel} isLoading={cancelling}>
+              Huỷ đơn
+            </Button>
+          </div>
+        }
+      >
+        {cancelTarget ? (
+          <div className="space-y-2 text-[13px] text-ink-soft">
+            <p>
+              Đơn <span className="font-mono font-semibold text-ink">{cancelTarget.trackingCode}</span>{' '}
+              của {cancelTarget.customer.name} sẽ chuyển sang trạng thái Đã huỷ.
+            </p>
+            <p className="text-[12px] text-ink-faint">
+              Chỉ huỷ được khi đơn chưa soạn hàng. Sau bước soạn, phải tạo yêu cầu trả hàng.
+            </p>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        isOpen={failTarget !== null}
+        onClose={() => setFailTarget(null)}
+        title="Giao thất bại"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setFailTarget(null)}>
+              Giữ lại
+            </Button>
+            <Button variant="danger" size="sm" onClick={failDelivery} isLoading={failing}>
+              Giao thất bại
+            </Button>
+          </div>
+        }
+      >
+        {failTarget ? (
+          <div className="space-y-2 text-[13px] text-ink-soft">
+            <p>
+              Đơn <span className="font-mono font-semibold text-ink">{failTarget.trackingCode}</span>{' '}
+              của {failTarget.customer.name} sẽ chuyển sang trạng thái Giao thất bại.
+            </p>
+            <p className="text-[12px] text-ink-faint">
+              Bắt đầu xử lý yêu cầu trả hàng từ khách.
+            </p>
+          </div>
+        ) : null}
+      </Modal>
+    </>
   );
 }
-

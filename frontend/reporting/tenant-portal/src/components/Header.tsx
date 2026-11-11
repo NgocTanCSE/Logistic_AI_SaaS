@@ -6,6 +6,7 @@ import { Topbar } from 'ui-kit';
 import { data, isMockDataSource } from '@/lib/data';
 import { subscribeNotificationsChanged } from '@/lib/notifications-bus';
 import DemoActions from '@/components/DemoActions';
+import DemoRoleSwitcher from '@/components/DemoRoleSwitcher';
 
 export default function Header() {
   const { user, logout } = useAuth();
@@ -43,7 +44,14 @@ export default function Header() {
       logoutLabel="Đăng xuất"
       notificationsHref="/notifications"
       notificationsLabel={unread > 0 ? `Thông báo (${unread})` : 'Thông báo'}
-      actions={isMockDataSource ? <DemoActions /> : undefined}
+      actions={
+        isMockDataSource ? (
+          <div className="flex items-center gap-2">
+            <DemoActions />
+            <DemoRoleSwitcher />
+          </div>
+        ) : undefined
+      }
       menuLabel="Mở menu"
     />
   );

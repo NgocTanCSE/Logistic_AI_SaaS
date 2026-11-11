@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
 import api from '../lib/api';
@@ -7,7 +7,8 @@ import { postWithOffline } from '../lib/offline-utils';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
-import { NeonButton } from '../components/NeonButton'; // kept for backward compat
+import { NeonButton } from '../components/NeonButton';
+import { SCREEN_NAMES } from '../navigation/SCREEN_NAMES';
 
 export default function TripDetailScreen({ route, navigation }: any) {
   const [stops, setStops] = useState<any[]>([]);
@@ -30,7 +31,6 @@ export default function TripDetailScreen({ route, navigation }: any) {
   const requestLocationPermission = async () => {
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
-      console.warn('Permission to access location was denied');
       return;
     }
 
@@ -43,8 +43,7 @@ export default function TripDetailScreen({ route, navigation }: any) {
       const response = await api.get(`/mobile/trips/${tripId}/stops`);
       setStops(response.data.data || []);
     } catch (error: any) {
-      console.warn("API Error:", error);
-      alert(error.response?.data?.message || 'Unable to load stops. Please check your network.');
+      Alert.alert('Error', error.response?.data?.message || 'Unable to load stops. Please check your network.');
     } finally {
       setLoading(false);
     }
@@ -53,15 +52,14 @@ export default function TripDetailScreen({ route, navigation }: any) {
   const handleCheckIn = async (stopId: string) => {
     try {
       let loc = await Location.getCurrentPositionAsync({});
-await postWithOffline(`driver-app/deliveries/${stopId}/check-in`, {
+      await postWithOffline(`driver-app/deliveries/${stopId}/check-in`, {
           lat: loc.coords.latitude,
           lng: loc.coords.longitude
         });
-      alert('Checked in successfully!');
+      Alert.alert('Checked in successfully!');
       fetchStops();
     } catch (err: any) {
-      console.warn("API Error:", err);
-      alert(err.response?.data?.message || 'Unable to check-in. Please try again.');
+      Alert.alert('Error', err.response?.data?.message || 'Unable to check-in. Please try again.');
     }
   };
 
@@ -77,14 +75,14 @@ await postWithOffline(`driver-app/deliveries/${stopId}/check-in`, {
         <View style={styles.actions}>
           {!item.checkedIn && (
             <NeonButton 
-              title="📍 CHECK-IN GPS" 
+              title="CHECK-IN GPS" 
               onPress={() => handleCheckIn(item.id)}
               style={styles.actionButton}
             />
           )}
           <NeonButton 
             title="ARRIVED & DELIVERY" 
-            onPress={() => navigation.navigate('POD', { stopId: item.id })}
+            onPress={() => navigation.navigate(SCREEN_NAMES.POD, { stopId: item.id })}
             style={styles.actionButton}
             disabled={!item.checkedIn}
           />

@@ -39,13 +39,6 @@ import {
   anomalySeverityTone,
 } from '@/lib/labels';
 
-/** Mức kết quả khớp để làm bộ lọc (nhãn giống `matchStatusLabel`). */
-const COLOR_TAG = {
-  MATCH: 'Khớp',
-  MISMATCH: 'Khác biệt',
-  OVERRIDE: 'Thay thế',
-};
-
 export default function PackLogsPage() {
   // --- Sessions & data ---
   const [sessions, setSessions] = useState<PackSession[]>([]);
@@ -204,7 +197,7 @@ export default function PackLogsPage() {
       <EditorialPageHeader
         eyebrow={
           <>
-            <span>Pack station</span>
+            <span>Trạm đóng gói</span>
             <span className="text-line-strong" aria-hidden="true">/</span>
             <span>Nhật ký</span>
           </>

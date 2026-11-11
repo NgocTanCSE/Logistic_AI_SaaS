@@ -4,7 +4,7 @@ import { postWithOffline } from '../lib/offline-utils';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
-import { NeonButton } from '../components/NeonButton'; // kept for backward compat
+import { NeonButton } from '../components/NeonButton';
 
 export default function RemittanceScreen({ navigation }: any) {
   const [totalCod, setTotalCod] = useState('');
@@ -37,8 +37,8 @@ const response = await postWithOffline('driver-app/remittance', {
       setShowQR(true);
       Alert.alert('Success', 'Remittance request sent. Please present the QR code to the cashier.');
     } catch (e: any) {
-      console.warn('API Error:', e);
-      Alert.alert('Lỗi', e.response?.data?.message || 'Unable to generate reconciliation code. Please try again.');
+      const message = e.response?.data?.message || 'Unable to generate reconciliation code. Please try again.';
+      Alert.alert('Lỗi', message);
     } finally {
       setSubmitting(false);
     }

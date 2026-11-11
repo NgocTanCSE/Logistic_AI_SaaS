@@ -5,7 +5,7 @@ import api from '../lib/api';
 import { OfflineSyncEngine } from '../lib/offline-sync';
 import { typography } from '../theme/typography';
 import { colors } from '../theme/colors';
-import { NeonButton } from '../components/NeonButton'; // kept for backward compat
+import { NeonButton } from '../components/NeonButton';
 import { GlassCard } from '../components/GlassCard';
 
 export default function PODScreen({ navigation, route }: any) {
@@ -56,15 +56,13 @@ export default function PODScreen({ navigation, route }: any) {
         type: 'image/jpeg',
       } as any);
 
-      console.log(` Đang upload POD cho Delivery: ${deliveryId}`);
       await api.post(`/mobile/uploads/pod/${deliveryId}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       setStatus('CAPTURED');
       Alert.alert('Success', 'Proof of delivery uploaded successfully.');
-    } catch (error) {
-      console.error('❌ Upload POD lỗi:', error);
+    } catch {
       // If photo captured, queue for later upload
       if (photo) {
         const payload = {
@@ -112,7 +110,7 @@ export default function PODScreen({ navigation, route }: any) {
         />
       ) : status === 'CAMERA_ACTIVE' ? (
         <NeonButton 
-          title="📸 CHỤP ẢNH & XÁC NHẬN" 
+          title="CHỤP ẢNH & XÁC NHẬN" 
           onPress={handleCaptureAndUpload}
           loading={loading}
         />

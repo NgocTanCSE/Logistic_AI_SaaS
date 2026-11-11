@@ -1,10 +1,16 @@
 'use client';
 
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import type { ErrorInfo, ReactNode } from 'react';
+import { Component } from 'react';
 
 interface Props {
   children: ReactNode;
+  /** thừa `fallback` để trang tự quyết định giao diện phụ. */
   fallback?: ReactNode;
+  /**
+   * Dùng để các trang báo lỗi mà không ném `console.error` ra cửa sổ developer.
+   */
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
 interface State {
@@ -23,7 +29,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, errorInfo);
+    this.props.onError?.(error, errorInfo);
   }
 
   render() {
@@ -33,24 +39,17 @@ export class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] p-8">
-          <div className="text-red-500 mb-4">
-            <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h2>
-          <p className="text-gray-600 text-center mb-4 max-w-md">
-            {this.state.error?.message || 'An unexpected error occurred'}
+        <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+          <h2 className="text-[15px] font-semibold text-ink">Đã có lỗi xảy ra</h2>
+          <p className="max-w-sm text-[13px] leading-6 text-ink-soft">
+            {this.state.error?.message || 'Phát sinh lỗi không mong muốn.'}
           </p>
           <button
-            onClick={() => {
-              this.setState({ hasError: false, error: null });
-              window.location.reload();
-            }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-2 h-9 rounded-md border border-line px-4 text-[12px] font-medium text-ink-soft transition-colors hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
           >
-            Reload Page
+            Tải lại
           </button>
         </div>
       );

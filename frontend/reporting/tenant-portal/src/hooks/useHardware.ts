@@ -11,11 +11,9 @@ export function useScale() {
   useEffect(() => {
     if (typeof navigator !== 'undefined' && 'serial' in navigator) {
       const handleConnect = () => {
-        console.log("🔌 Scale connected!");
         setIsConnected(true);
       };
       const handleDisconnect = () => {
-        console.warn("🔌 Scale disconnected!");
         setIsConnected(false);
         setWeight(null);
         setError("Scale disconnected. Please check USB.");
@@ -57,7 +55,6 @@ export function useScale() {
       
       await reader.cancel(); 
     } catch (err: any) {
-      console.error("Scale reading error:", err);
       setError(err.message || "Failed to connect to scale");
       setIsConnected(false);
     } finally {

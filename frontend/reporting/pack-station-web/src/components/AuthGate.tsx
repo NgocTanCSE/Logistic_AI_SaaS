@@ -26,9 +26,9 @@ export default function AuthGate({ children }: AuthGateProps) {
 
   if (!checked) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-ink">
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
-          <p className="text-sm font-medium text-slate-600">Checking session...</p>
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-ink">
+        <div className="rounded-md border border-line bg-surface px-4 py-3 shadow-sm">
+          <p className="text-[12px] font-medium text-ink-soft">Đang kiểm tra phiên làm việc…</p>
         </div>
       </div>
     );

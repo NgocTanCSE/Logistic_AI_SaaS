@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { postWithOffline } from '../lib/offline-utils';
 import { OfflineSyncEngine } from '../lib/offline-sync';
-import { NetInfo } from '@react-native-community/netinfo';
+import NetInfo from '@react-native-community/netinfo';
 import { initBackgroundLocation } from '../lib/backgroundLocation';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -144,7 +144,7 @@ export default function TelematicsScreen() {
         <View style={styles.cell}>
           <Text style={[typography.caption, { color: colors['ink-soft'] }]}>Vị trí cuối</Text>
           <Text style={[typography.body2, { color: colors['ink-soft'] }]}>
-            {speed.lat === null ? '—' : `${speed.lat.toFixed(4)}, ${speed.lng.toFixed(4)}`}
+            {speed.lat === null || speed.lng === null ? '—' : `${speed.lat.toFixed(4)}, ${speed.lng.toFixed(4)}`}
           </Text>
         </View>
       </SurfaceCard>

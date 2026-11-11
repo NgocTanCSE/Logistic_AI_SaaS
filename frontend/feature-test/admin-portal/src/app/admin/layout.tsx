@@ -19,6 +19,9 @@ const NAV_ITEM_ROLES: Record<string, AdminRole[]> = {
   '/admin/billing': ['SUPER_ADMIN', 'TENANT_ADMIN'],
   '/admin/audit-logs': ['SUPER_ADMIN', 'TENANT_ADMIN'],
   '/admin/ai-models': ['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'LOGISTICS_MANAGER'],
+  '/admin/control-tower': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER'],
+  '/admin/pricing': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER'],
+  '/admin/ai-insights': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER'],
   '/admin/profile': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER', 'DRIVER', 'CUSTOMER_CLIENT', 'TENANT_USER'],
 };
 import { Topbar } from 'ui-kit';
@@ -31,6 +34,7 @@ const adminSections: NavSection[] = [
       { label: 'Dashboard', href: '/admin/dashboard' },
       { label: 'Orders', href: '/admin/orders' },
       { label: 'Shipments', href: '/admin/shipments' },
+      { label: 'Control tower', href: '/admin/control-tower' },
     ],
   },
   {
@@ -38,12 +42,14 @@ const adminSections: NavSection[] = [
     items: [
       { label: 'Tenants', href: '/admin/tenants' },
       { label: 'Billing', href: '/admin/billing' },
+      { label: 'Pricing', href: '/admin/pricing' },
     ],
   },
   {
     title: 'AI',
     items: [
       { label: 'AI Models', href: '/admin/ai-models' },
+      { label: 'AI insights', href: '/admin/ai-insights' },
     ],
   },
   {

@@ -1,6 +1,5 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { useEffect, useState, useMemo } from 'react';
 import { data } from '@/lib/data';
 import {
@@ -20,6 +19,8 @@ import {
   Select,
   TableState,
 } from 'ui-components';
+import MapCanvas from '@/components/demo/MapCanvas';
+import type { LatLng, MapMarker, MapPolyline, MapVehicle } from '@/components/demo/MapCanvas';
 import type { Driver, Trip, TripStatus, Vehicle, SosAlert, Warehouse } from '@/lib/mock';
 import {
   tripStatusLabel,
@@ -52,21 +53,6 @@ const TRIP_LINE_TONE: Record<TripStatus, string> = {
   COMPLETED: '#3f6b4f',
   CANCELLED: '#62665c',
 };
-
-// Leaflet chỉ render phía client, không import module ở server.
-const LeafletMap: any = dynamic(
-  (() =>
-    import('map-components').then((m) => m.LeafletMap).catch(() => () => <div className="h-full w-full bg-surface-alt" />)
-  ) as any,
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-full w-full flex items-center justify-center bg-surface text-ink-faint text-[12px] font-medium">
-        Đang tải bản đồ
-      </div>
-    ),
-  },
-);
 
 /** Trạng thái sắp xếp: role DRIVER thấy toàn bộ chưa assign, not self-filter. */
 const PAGE_SIZE = 10;
@@ -178,6 +164,49 @@ export default function DispatchTowerPage() {
 
   const paged = useMemo(() => sortedTrips.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sortedTrips, page]);
   const totalPages = Math.max(1, Math.ceil(sortedTrips.length / PAGE_SIZE));
+
+  /** Các điểm dừng của chuyến lọc thành marker chuẩn `MapCanvas`. */
+  const mapMarkers = useMemo<MapMarker[]>(() => {
+    const rows: MapMarker[] = [];
+    for (const trip of sortedTrips) {
+      for (const stop of trip.stops) {
+        rows.push({
+          id: `${trip.id}-${stop.id}`,
+          lat: stop.lat,
+          lng: stop.lng,
+          label: `${stop.orderTrackingCode} · ${stop.customerName}`,
+          kind: stop.status === 'DELIVERED' ? 'checkpoint' : 'dropoff',
+          tone: stop.status === 'PENDING' ? 'accent' : 'success',
+        });
+      }
+    }
+    return rows;
+  }, [sortedTrips]);
+
+  /** Lộ trình mỗi chuyến plotted từ toạ độ các điểm dừng. */
+  const mapPolylines = useMemo<MapPolyline[]>(() => {
+    return sortedTrips
+      .filter((t) => t.stops.length > 1)
+      .map((t) => ({
+        id: t.id,
+        points: t.stops.map((s) => [s.lat, s.lng] as LatLng),
+        color: TRIP_LINE_TONE[t.status],
+        width: t.status === 'IN_PROGRESS' ? 3.5 : 2,
+        dashed: t.status !== 'IN_PROGRESS',
+      }));
+  }, [sortedTrips]);
+
+  /** Xe thuộc chuyến đang chạy, hiển thị trên bản đồ. */
+  const mapVehicles = useMemo<MapVehicle[]>(() => {
+    return sortedTrips
+      .filter((t) => t.status === 'IN_PROGRESS' || t.status === 'DISPATCHED')
+      .map((t) => ({
+        id: t.id,
+        label: t.vehiclePlate || t.driverName || t.code,
+        route: t.stops.map((s) => [s.lat, s.lng] as LatLng),
+        tone: 'info',
+      }));
+  }, [sortedTrips]);
 
   const handleAssign = async () => {
     if (!selected) return;
@@ -309,15 +338,13 @@ export default function DispatchTowerPage() {
 
       <EditorialSection title="Bản đồ">
         <div className="flex flex-col lg:flex-row gap-6 h-[560px]">
-          <div className="flex-1 h-[500px] rounded-lg border border-line overflow-hidden">
-            <LeafletMap
-              center={[10.7900, 106.6900]}
-              zoom={11}
-              markers={sortedTrips.flatMap((t) => t.stops.map((s) => ({ id: s.id, lat: s.lat, lng: s.lng, label: `${s.orderTrackingCode} · ${s.customerName}` })))}
-              polylines={sortedTrips.map((t) => ({
-                color: (TRIP_LINE_TONE as Record<TripStatus, string>)[t.status],
-                points: t.stops.map((s) => [s.lat, s.lng]),
-              }))}
+          <div className="flex-1 h-[500px] overflow-hidden">
+            <MapCanvas
+              height={500}
+              markers={mapMarkers}
+              polylines={mapPolylines}
+              vehicles={mapVehicles}
+              ariaLabel="Bản đồ điều phối chuyến xe"
             />
           </div>
           <div className="w-full lg:w-[336px] shrink-0 overflow-auto">

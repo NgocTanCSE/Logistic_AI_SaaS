@@ -9,6 +9,7 @@ import { SurfaceCard } from '../components/SurfaceCard';
 import { auth } from '../lib/auth';
 import { GoogleLoginButton } from '../components/GoogleLoginButton';
 import api from '../lib/api';
+import { SCREEN_NAMES } from '../navigation/SCREEN_NAMES';
 
 export default function LoginScreen({ navigation }: any) {
   const [slug, setSlug] = useState('');
@@ -36,13 +37,13 @@ export default function LoginScreen({ navigation }: any) {
 
       if (res.data && res.data.accessToken) {
         await auth.setToken(res.data.accessToken);
-        navigation.replace('MainTabs');
+        navigation.replace(SCREEN_NAMES.HOME);
       } else {
         throw new Error('Token not received');
       }
     } catch (err: any) {
-      console.warn('Login Error:', err);
-      Alert.alert('Login Error', err.response?.data?.message || 'Unable to login. Please check your credentials.');
+      const message = err.response?.data?.message || 'Unable to login. Please check your credentials.';
+      Alert.alert('Login Error', message);
     } finally {
       setLoading(false);
     }
@@ -89,7 +90,7 @@ export default function LoginScreen({ navigation }: any) {
             <Text style={styles.forgotText}>Forgot password?</Text>
           </TouchableOpacity>
 
-          <GoogleLoginButton onPress={() => navigation.replace('MainTabs')} tenantSlug={slug} />
+          <GoogleLoginButton onPress={() => navigation.replace(SCREEN_NAMES.HOME)} tenantSlug={slug} />
 
           <ActionButton
             title="LOGIN"

@@ -1,253 +1,596 @@
 'use client';
-import { useState } from 'react';
-import {formatDate, formatTime} from '@/lib/date-utils';
-import useSWR from 'swr';
-import api from '@/lib/api';
-import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
 
-const fetcher = (url: string) => api.get(url).then((res) => res.data);
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { data } from '@/lib/data';
+import { useAuth } from '@/lib/auth-context';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import type { EditorialMetric } from 'ui-kit';
+import { Button, DataState, Input, Modal, Select, TableState } from 'ui-components';
+import type {
+  AllocationStrategy,
+  InventoryItem,
+  Order,
+  PickTask,
+  Warehouse,
+  Wave,
+} from '@/lib/mock';
+import {
+  formatDateVN,
+  formatDateTimeVN,
+  formatNumber,
+  orderStatusLabel,
+  orderStatusTone,
+  pickTaskStatusLabel,
+  pickTaskStatusTone,
+  waveStatusLabel,
+  waveStatusTone,
+} from '@/lib/labels';
+
+const STRATEGY_META: Record<
+  AllocationStrategy,
+  { label: string; short: string; description: string }
+> = {
+  FIFO: {
+    label: 'FIFO · Nhập trước xuất trước',
+    short: 'FIFO',
+    description: 'Ưu tiên lô cập nhật sớm nhất — giảm tồn lâu, phù hợp hàng không hạn dùng.',
+  },
+  LIFO: {
+    label: 'LIFO · Nhập sau xuất trước',
+    short: 'LIFO',
+    description: 'Ưu tiên lô mới nhất — dùng cho hàng cần luân chuyển nhanh theo lô.',
+  },
+  FEFO: {
+    label: 'FEFO · Hết hạn trước xuất trước',
+    short: 'FEFO',
+    description: 'Ưu tiên lô gần hạn nhất — bắt buộc với hàng có hạn sử dụng.',
+  },
+};
+
+function sortInventory(items: InventoryItem[], strategy: AllocationStrategy): InventoryItem[] {
+  const rows = [...items];
+  if (strategy === 'FEFO') {
+    return rows.sort((a, b) =>
+      (a.expiryDate || '9999-12-31').localeCompare(b.expiryDate || '9999-12-31'),
+    );
+  }
+  if (strategy === 'LIFO') {
+    return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+  return rows.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+}
 
 export default function WavePickingPage() {
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [search, setSearch] = useState('');
-  const limit = 20;
-  const { data, isLoading, mutate } = useSWR(`/waves?page=${page}&limit=${limit}&search=${search}`, fetcher);
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const { user } = useAuth();
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [waves, setWaves] = useState<Wave[]>([]);
+  const [tasks, setTasks] = useState<PickTask[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
-  const [manifestModalOpen, setManifestModalOpen] = useState(false);
-  const [selectedWaveId, setSelectedWaveId] = useState<string | null>(null);
 
-  const waves = data?.data || [];
-  const meta = data?.meta || { total: 0 };
-  const totalPages = Math.max(1, Math.ceil((meta?.total || 0) / limit));
-  const filteredWaves = waves.filter((wave: any) =>
-    wave.waveNumber?.toLowerCase().includes(search.toLowerCase())
+  const [warehouseId, setWarehouseId] = useState('');
+  const [strategy, setStrategy] = useState<AllocationStrategy>('FEFO');
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  const [activeWaveId, setActiveWaveId] = useState<string>('');
+  const [confirmTask, setConfirmTask] = useState<PickTask | null>(null);
+  const [confirmQty, setConfirmQty] = useState('1');
+  const [confirming, setConfirming] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [warehouseRows, orderRows, inventoryRows, waveRows, taskRows] = await Promise.all([
+        data.warehouses.list(),
+        data.orders.list(),
+        data.inventory.list(),
+        data.waves.list(),
+        data.pickTasks.list(),
+      ]);
+      setWarehouses(warehouseRows);
+      setOrders(orderRows);
+      setInventory(inventoryRows);
+      setWaves(waveRows);
+      setTasks(taskRows);
+      setWarehouseId((current) => current || warehouseRows[0]?.id || '');
+      setActiveWaveId((current) => current || waveRows[0]?.id || '');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không tải được dữ liệu WMS.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const selectedWarehouse = useMemo(
+    () => warehouses.find((warehouse) => warehouse.id === warehouseId),
+    [warehouses, warehouseId],
   );
 
-  const handleCreateWave = async () => {
-     setError('');
-     setCreating(true);
-     try {
-        await api.post('/waves/generate', {
-          warehouseId: "wh_1",
-          orderIds: []
-        });
-        mutate();
-        setIsModalOpen(false);
-     } catch (err) {
-        console.error("Error creating wave", err);
-        setError('Failed to create wave');
-     } finally {
-        setCreating(false);
-     }
+  const allocatableOrders = useMemo(
+    () =>
+      [...orders]
+        .filter(
+          (order) =>
+            order.warehouseId === warehouseId &&
+            ['NEW', 'UNASSIGNED', 'PENDING_PICKUP'].includes(order.status),
+        )
+        .sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+        ),
+    [orders, warehouseId],
+  );
+
+  const pickable = useMemo(
+    () =>
+      inventory.filter(
+        (item) =>
+          item.warehouseId === warehouseId && item.available > 0,
+      ),
+    [inventory, warehouseId],
+  );
+
+  const strategyPreview = useMemo(
+    () =>
+      (['FIFO', 'LIFO', 'FEFO'] as AllocationStrategy[]).map((key) => ({
+        key,
+        rows: sortInventory(pickable, key).slice(0, 4),
+      })),
+    [pickable],
+  );
+
+  const waveTasks = useMemo(
+    () => tasks.filter((task) => task.waveId === activeWaveId),
+    [tasks, activeWaveId],
+  );
+
+  const activeWave = useMemo(
+    () => waves.find((wave) => wave.id === activeWaveId) ?? null,
+    [waves, activeWaveId],
+  );
+
+  const toggleOrder = (orderId: string) => {
+    setSelectedOrderIds((current) =>
+      current.includes(orderId)
+        ? current.filter((id) => id !== orderId)
+        : [...current, orderId],
+    );
   };
 
-  const handleViewManifest = (waveId: string) => {
-    setSelectedWaveId(waveId);
-    setManifestModalOpen(true);
-  };
-
-  const getStatusVariant = (status: string) => {
-    switch(status) {
-      case 'NEW': return 'info';
-      case 'IN_PROGRESS': return 'warning';
-      case 'COMPLETED': return 'success';
-      default: return 'neutral';
+  const createWave = async () => {
+    if (!selectedWarehouse) return;
+    setCreating(true);
+    setNotice('');
+    try {
+      const wave = await data.waves.allocate({
+        warehouseId: selectedWarehouse.id,
+        orderIds: selectedOrderIds,
+        strategy,
+        picker: user?.fullName || 'Bạn (demo)',
+      });
+      setNotice(
+        `Đã tạo wave ${wave.code} theo ${strategy} với ${wave.taskCount} tác vụ soạn hàng.`,
+      );
+      setSelectedOrderIds([]);
+      setActiveWaveId(wave.id);
+      await load();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Không tạo được wave.');
+    } finally {
+      setCreating(false);
     }
   };
 
+  const submitConfirm = async () => {
+    if (!confirmTask) return;
+    setConfirming(true);
+    try {
+      await data.pickTasks.confirm(confirmTask.id, Number(confirmQty) || 0);
+      setConfirmTask(null);
+      await load();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Không xác nhận được tác vụ.');
+    } finally {
+      setConfirming(false);
+    }
+  };
+
+  const metrics: EditorialMetric[] = [
+    {
+      label: 'Đơn chờ gom',
+      value: String(allocatableOrders.length),
+      meta: selectedWarehouse ? `Kho ${selectedWarehouse.code}` : undefined,
+    },
+    {
+      label: 'Tồn khả dụng',
+      value: String(pickable.length),
+      meta: `${formatNumber(pickable.reduce((sum, item) => sum + item.available, 0))} đơn vị`,
+    },
+    {
+      label: 'Wave đang mở',
+      value: String(waves.filter((wave) => wave.status !== 'PICKED' && wave.status !== 'CANCELLED').length),
+    },
+    {
+      label: 'Tác vụ chờ',
+      value: String(tasks.filter((task) => task.status === 'PENDING').length),
+      tone: tasks.some((task) => task.status === 'PENDING') ? 'warning' : 'success',
+    },
+  ];
+
   return (
-    <div className="p-8 max-w-7xl mx-auto ">
-      {error && <ErrorBanner message={error} onRetry={() => mutate()} />}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
-        <div>
-          <h1 className="text-4xl font-bold text-ink tracking-tight">
-            Wave Picking
-          </h1>
-          <p className="text-sm text-inkSoft mt-2 font-medium">Batch and orchestrate outbound orders for efficient fulfillment.</p>
-        </div>
-        <Button variant="primary" size="md" onClick={() => setIsModalOpen(true)} className="gap-2 shadow-lg ">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4"/></svg>
-          Create New Wave
-        </Button>
-      </div>
+    <>
+      <EditorialPageHeader
+        eyebrow="WMS · Ch. 10"
+        title="Wave picking & cấp phát tồn kho"
+        description="Gom đơn thành đợt soạn hàng theo ba chiến lược FIFO, LIFO, FEFO. Bảng so sánh cho thấy rõ bin và lô hàng mà từng chiến lược sẽ chọn."
+      />
 
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
-        <div className="relative w-full max-w-md group">
-          <Input 
-            placeholder="Search wave number..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            icon={<svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
-          />
-        </div>
-      </div>
+      <MetricBand metrics={metrics} />
 
-      <Card className="">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-border">
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Wave Identification</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Current Status</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Volume (Ord/Tsk)</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Initialization</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Control</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Syncing Wave Data...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : filteredWaves.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No active picking waves found.</td>
-                </tr>
-              ) : (
-                filteredWaves.map((wave: any) => (
-                  <tr key={wave.id} className="hover:bg-slate-50/80 transition-all group">
-                    <td className="px-8 py-6">
-                      <div className="font-bold text-ink font-mono tracking-tight">{wave.waveNumber}</div>
-                      <div className="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">Facility ID: {wave.warehouseId?.split('-')[0]}</div>
-                    </td>
-                    <td className="px-8 py-6">
-                       <Badge variant={getStatusVariant(wave.status)}>{wave.status}</Badge>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-3">
-                        <div className="text-center">
-                           <div className="text-sm font-bold text-ink">{wave.totalOrders}</div>
-                           <div className="text-[9px] font-bold text-slate-400 uppercase">Orders</div>
-                        </div>
-                        <div className="w-px h-6 bg-slate-200"></div>
-                        <div className="text-center">
-                           <div className="text-sm font-bold text-ink">{wave.tasks?.length ?? 0}</div>
-                           <div className="text-[9px] font-bold text-slate-400 uppercase">Tasks</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="text-[11px] font-bold text-ink">{formatDate(wave.createdAt)}</div>
-                      <div className="text-[10px] font-medium text-slate-400 mt-0.5">{formatTime(wave.createdAt)}</div>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                       <Button variant="ghost" size="sm" className="font-bold text-primary tracking-widest text-[10px]" onClick={() => handleViewManifest(wave.id)}>
-                          VIEW MANIFEST
-                       </Button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {!isLoading && total > limit && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
-          <span className="text-sm text-slate-500">
-            Page {page} of {totalPages} ({total} waves)
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-              Previous
+      <EditorialSection title="Cấu hình wave" eyebrow="Bước 1">
+        <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+          <div className="space-y-3">
+            <Select
+              label="Kho"
+              value={warehouseId}
+              onChange={(event) => {
+                setWarehouseId(event.target.value);
+                setSelectedOrderIds([]);
+              }}
+              options={warehouses.map((warehouse) => ({
+                value: warehouse.id,
+                label: `${warehouse.code} · ${warehouse.name}`,
+              }))}
+            />
+            <Select
+              label="Chiến lược cấp phát"
+              value={strategy}
+              onChange={(event) => setStrategy(event.target.value as AllocationStrategy)}
+              options={(['FIFO', 'LIFO', 'FEFO'] as AllocationStrategy[]).map((key) => ({
+                value: key,
+                label: STRATEGY_META[key].label,
+              }))}
+            />
+            <p className="text-[11px] leading-relaxed text-ink-faint">
+              {STRATEGY_META[strategy].description}
+            </p>
+            <Button
+              onClick={createWave}
+              isLoading={creating}
+              disabled={selectedOrderIds.length === 0}
+              size="sm"
+            >
+              Tạo wave ({selectedOrderIds.length} đơn)
             </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
-            </Button>
+            {notice ? (
+              <p className="border-l-2 border-accent pl-2 text-[11px] text-ink">{notice}</p>
+            ) : null}
           </div>
-        </div>
-      )}
 
-      {/* Create Wave Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40  animate-in fade-in duration-200">
-          <Card className="w-full max-w-md bg-white border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-             <div className="p-8 border-b border-slate-100">
-                <h2 className="text-2xl font-bold text-ink tracking-tight">Initiate Wave</h2>
-                <p className="text-sm text-inkSoft mt-1 font-medium">Batch pending orders into a new picking cycle.</p>
-             </div>
-
-             <div className="p-8">
-                <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 mb-8">
-                   <div className="flex justify-between items-center mb-4">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Pending Orders</span>
-                      <Badge variant="info">14 Ready</Badge>
-                   </div>
-                   <p className="text-xs text-inkSoft font-medium leading-relaxed">
-                      Our AI engine has identified 14 orders that can be optimized into a single picking wave for Zone A and B.
-                   </p>
-                </div>
-
-                <div className="flex gap-4">
-                  <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="flex-1 font-bold uppercase tracking-widest text-[10px]">
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateWave} isLoading={creating} variant="primary" className="flex-1 font-bold uppercase tracking-widest text-[10px]">
-                    {creating ? 'BATCHING...' : 'CONFIRM WAVE'}
-                  </Button>
-                </div>
-             </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Manifest Modal */}
-      {manifestModalOpen && selectedWaveId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40  ">
-          <Card className="w-full max-w-lg bg-white p-0 overflow-hidden shadow-2xl">
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <div>
-                <h2 className="text-xl font-bold text-ink">Wave Manifest</h2>
-                <p className="text-xs text-inkSoft mt-1">Wave ID: <span className="font-mono">{selectedWaveId}</span></p>
-              </div>
-              <button onClick={() => setManifestModalOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12"/></svg>
+          <div className="border border-line">
+            <div className="flex items-center justify-between border-b border-line px-3 py-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-faint">
+                Đơn có thể gom wave
+              </span>
+              <button
+                type="button"
+                className="text-[11px] font-semibold text-ink-soft hover:text-accent"
+                onClick={() =>
+                  setSelectedOrderIds(
+                    selectedOrderIds.length === allocatableOrders.length
+                      ? []
+                      : allocatableOrders.map((order) => order.id),
+                  )
+                }
+              >
+                {selectedOrderIds.length === allocatableOrders.length ? 'Bỏ chọn' : 'Chọn tất cả'}
               </button>
             </div>
-            <div className="p-8 space-y-4">
-              <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex items-start gap-3">
-                 <svg className="w-5 h-5 text-primary mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                 <div>
-                   <p className="text-sm font-bold text-ink">Manifest Loading Optimized Paths</p>
-                   <p className="text-xs text-inkSoft mt-1">The system is calculating the most efficient picking path for the warehouse staff through VRP Solver. Task details will be grouped by zone automatically.</p>
-                 </div>
-              </div>
-              {/* Dummy List to show UI */}
-              <div className="border border-slate-100 rounded-xl divide-y divide-slate-100">
-                 <div className="p-3 text-xs flex justify-between">
-                   <span className="font-bold text-slate-500">Task #1</span>
-                   <span className="text-slate-400">Zone A - Rack 2</span>
-                 </div>
-                 <div className="p-3 text-xs flex justify-between">
-                   <span className="font-bold text-slate-500">Task #2</span>
-                   <span className="text-slate-400">Zone B - Rack 1</span>
-                 </div>
-              </div>
+            <div className="max-h-64 overflow-auto">
+              {allocatableOrders.length === 0 ? (
+                <div className="p-4">
+                  <EmptyNote>Kho này không còn đơn chờ gom wave.</EmptyNote>
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-line">
+                  <thead className="bg-surface-alt">
+                    <tr>
+                      {['', 'Mã đơn', 'Khách', 'Trạng thái', 'Số món', 'COD'].map((label) => (
+                        <th
+                          key={label}
+                          className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint"
+                        >
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line text-[12px]">
+                    {allocatableOrders.map((order) => (
+                      <tr
+                        key={order.id}
+                        className="cursor-pointer hover:bg-surface-alt"
+                        onClick={() => toggleOrder(order.id)}
+                      >
+                        <td className="px-3 py-1.5">
+                          <input
+                            type="checkbox"
+                            checked={selectedOrderIds.includes(order.id)}
+                            onChange={() => toggleOrder(order.id)}
+                            aria-label={`Chọn đơn ${order.trackingCode}`}
+                          />
+                        </td>
+                        <td className="px-3 py-1.5 font-mono">{order.trackingCode}</td>
+                        <td className="px-3 py-1.5">{order.clientName}</td>
+                        <td className="px-3 py-1.5">
+                          <StatusLabel tone={orderStatusTone(order.status)}>
+                            {orderStatusLabel(order.status)}
+                          </StatusLabel>
+                        </td>
+                        <td className="px-3 py-1.5 tabular-nums">{order.itemCount}</td>
+                        <td className="px-3 py-1.5 tabular-nums">
+                          {formatNumber(order.codAmount)} ₫
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
-            <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setManifestModalOpen(false)}>Close</Button>
-              <Button variant="primary">Print PDF</Button>
-            </div>
-          </Card>
+          </div>
         </div>
-      )}
-    </div>
+      </EditorialSection>
+
+      <EditorialSection
+        title="So sánh ba chiến lược"
+        eyebrow="Bước 2 · Xem trước phân bổ"
+        action={
+          <span className="text-[11px] text-ink-faint">
+            Cùng một lô tồn kho, ba chiến lược chọn bin/lô khác nhau
+          </span>
+        }
+      >
+        <div className="grid gap-4 lg:grid-cols-3">
+          {strategyPreview.map(({ key, rows }) => (
+            <div key={key} className="border border-line">
+              <div className="border-b border-line bg-surface-alt px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ink">
+                    {STRATEGY_META[key].short}
+                  </span>
+                  {key === strategy ? <StatusLabel tone="success">Đang chọn</StatusLabel> : null}
+                </div>
+              </div>
+              {rows.length === 0 ? (
+                <div className="p-3">
+                  <EmptyNote>Không có tồn khả dụng.</EmptyNote>
+                </div>
+              ) : (
+                <table className="min-w-full divide-y divide-line">
+                  <thead>
+                    <tr>
+                      {['SKU', 'Bin', 'SL', 'Hạn'].map((label) => (
+                        <th
+                          key={label}
+                          className="px-2 py-1.5 text-left text-[9px] font-bold uppercase tracking-[0.14em] text-ink-faint"
+                        >
+                          {label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line text-[11px]">
+                    {rows.map((item, index) => (
+                      <tr key={item.id} className={index === 0 ? 'bg-accent-soft/40' : ''}>
+                        <td className="px-2 py-1.5 font-mono">{item.sku}</td>
+                        <td className="px-2 py-1.5">{item.binCode}</td>
+                        <td className="px-2 py-1.5 tabular-nums">{item.available}</td>
+                        <td className="px-2 py-1.5 tabular-nums text-ink-faint">
+                          {item.expiryDate ? formatDateVN(item.expiryDate) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <p className="border-t border-line px-3 py-2 text-[10px] leading-relaxed text-ink-faint">
+                {STRATEGY_META[key].description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </EditorialSection>
+
+      <EditorialSection title="Wave đã tạo" eyebrow="Bước 3">
+        <DataState loading={loading} empty={!loading && waves.length === 0} error={error} onRetry={load}>
+          <div className="overflow-hidden border border-line">
+            <table className="min-w-full divide-y divide-line">
+              <thead className="bg-surface-alt">
+                <tr>
+                  {['Mã wave', 'Kho', 'Chiến lược', 'Đơn', 'Tác vụ', 'Trạng thái', 'Tạo lúc', ''].map(
+                    (label, index) => (
+                      <th
+                        key={`${label}-${index}`}
+                        className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint"
+                      >
+                        {label}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line text-[12px]">
+                <TableState
+                  loading={loading}
+                  empty={!loading && waves.length === 0}
+                  error={error ? new Error(error) : undefined}
+                  onRetry={load}
+                  colSpan={8}
+                  emptyTitle="Chưa có wave"
+                  emptyDescription="Chọn đơn và tạo wave ở bước 1."
+                >
+                  {waves.map((wave) => (
+                    <tr
+                      key={wave.id}
+                      className={wave.id === activeWaveId ? 'bg-accent-soft/40' : 'hover:bg-surface-alt'}
+                    >
+                      <td className="px-3 py-2 font-mono">{wave.code}</td>
+                      <td className="px-3 py-2">{wave.warehouseCode}</td>
+                      <td className="px-3 py-2">{wave.strategy}</td>
+                      <td className="px-3 py-2 tabular-nums">{wave.orderCount}</td>
+                      <td className="px-3 py-2 tabular-nums">{wave.taskCount}</td>
+                      <td className="px-3 py-2">
+                        <StatusLabel tone={waveStatusTone(wave.status)}>
+                          {waveStatusLabel(wave.status)}
+                        </StatusLabel>
+                      </td>
+                      <td className="px-3 py-2 tabular-nums text-ink-soft">
+                        {formatDateTimeVN(wave.createdAt)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          className="text-[11px] font-semibold text-ink-soft hover:text-accent"
+                          onClick={() => setActiveWaveId(wave.id)}
+                        >
+                          Xem tác vụ
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </TableState>
+              </tbody>
+            </table>
+          </div>
+        </DataState>
+      </EditorialSection>
+
+      <EditorialSection
+        title="Tác vụ soạn hàng"
+        eyebrow={activeWave ? `Wave ${activeWave.code}` : 'Chọn wave'}
+        action={
+          activeWave ? (
+            <StatusLabel tone={waveStatusTone(activeWave.status)}>
+              {waveStatusLabel(activeWave.status)}
+            </StatusLabel>
+          ) : null
+        }
+      >
+        {!activeWave ? (
+          <EmptyNote>Chọn một wave ở bảng trên để xem tác vụ.</EmptyNote>
+        ) : (
+          <div className="overflow-hidden border border-line">
+            <table className="min-w-full divide-y divide-line">
+              <thead className="bg-surface-alt">
+                <tr>
+                  {['Thứ tự', 'Đơn', 'SKU', 'Bin', 'SL cần', 'Đã soạn', 'Trạng thái', ''].map(
+                    (label, index) => (
+                      <th
+                        key={`${label}-${index}`}
+                        className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint"
+                      >
+                        {label}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line text-[12px]">
+                {waveTasks.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-3 py-6 text-center text-[12px] text-ink-faint">
+                      Wave này chưa có tác vụ.
+                    </td>
+                  </tr>
+                ) : (
+                  waveTasks.map((task) => (
+                    <tr key={task.id}>
+                      <td className="px-3 py-2 tabular-nums">{task.sequence}</td>
+                      <td className="px-3 py-2 font-mono">{task.orderTrackingCode}</td>
+                      <td className="px-3 py-2">
+                        <div className="font-medium">{task.sku}</div>
+                        <div className="text-[11px] text-ink-faint">{task.productName}</div>
+                      </td>
+                      <td className="px-3 py-2 font-mono">{task.binCode}</td>
+                      <td className="px-3 py-2 tabular-nums">{task.quantity}</td>
+                      <td className="px-3 py-2 tabular-nums">{task.pickedQuantity}</td>
+                      <td className="px-3 py-2">
+                        <StatusLabel tone={pickTaskStatusTone(task.status)}>
+                          {pickTaskStatusLabel(task.status)}
+                        </StatusLabel>
+                      </td>
+                      <td className="px-3 py-2">
+                        {task.status === 'PENDING' ? (
+                          <button
+                            type="button"
+                            className="text-[11px] font-semibold text-ink-soft hover:text-accent"
+                            onClick={() => {
+                              setConfirmTask(task);
+                              setConfirmQty(String(task.quantity));
+                            }}
+                          >
+                            Xác nhận
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-ink-faint">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </EditorialSection>
+
+      <Modal
+        isOpen={confirmTask !== null}
+        onClose={() => setConfirmTask(null)}
+        title="Xác nhận soạn hàng"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setConfirmTask(null)}>
+              Hủy
+            </Button>
+            <Button size="sm" onClick={submitConfirm} isLoading={confirming}>
+              Xác nhận
+            </Button>
+          </div>
+        }
+      >
+        {confirmTask ? (
+          <div className="space-y-3">
+            <p className="text-[13px] text-ink-soft">
+              Tác vụ lấy <strong className="text-ink">{confirmTask.productName}</strong> tại bin{' '}
+              <span className="font-mono">{confirmTask.binCode}</span>. Cần soạn{' '}
+              {confirmTask.quantity}, số lượng nhỏ hơn sẽ ghi nhận thiếu hàng (SHORT).
+            </p>
+            <Input
+              label="Số lượng đã soạn"
+              type="number"
+              min={1}
+              max={confirmTask.quantity}
+              value={confirmQty}
+              onChange={(event) => setConfirmQty(event.target.value)}
+            />
+          </div>
+        ) : null}
+      </Modal>
+    </>
   );
 }
-
-

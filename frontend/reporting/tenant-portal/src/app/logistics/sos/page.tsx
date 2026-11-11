@@ -59,7 +59,6 @@ export default function SosControlCenterPage() {
   const [resolveNote, setResolveNote] = useState('');
   const [noteError, setNoteError] = useState('');
 
-
   const load = async () => {
     setLoading(true);
     setError('');

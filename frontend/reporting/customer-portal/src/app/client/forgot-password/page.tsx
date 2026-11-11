@@ -83,7 +83,7 @@ export default function ClientForgotPassword() {
             id="forgot-email"
             type="email"
             label="Email công ty"
-            placeholder="you@company.com"
+            placeholder="email@doanh nghiep.vn"
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}

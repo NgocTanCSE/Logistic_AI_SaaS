@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl }
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { postWithOffline } from '../lib/offline-utils';
-import { NetInfo } from '@react-native-community/netinfo';
+import NetInfo from '@react-native-community/netinfo';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { SurfaceCard } from '../components/SurfaceCard';

@@ -8,7 +8,7 @@ import { registerForPushNotificationsAsync } from './src/lib/notifications';
 
 export default function App() {
   useEffect(() => {
-    registerForPushNotificationsAsync().then(token => console.log('Init Token:', token));
+    registerForPushNotificationsAsync();
   }, []);
 
   return (

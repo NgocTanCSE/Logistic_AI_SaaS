@@ -1,11 +1,12 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { TouchableOpacity, Text, ActivityIndicator, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { colors } from '../theme/colors';
 
 interface ActionButtonProps {
   title: string;
-  onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'outline';
+  onPress: () => Promise<void> | void;
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger';
+  loading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
   textStyle?: TextStyle;
@@ -15,6 +16,7 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   title,
   onPress,
   variant = 'primary',
+  loading = false,
   disabled = false,
   style,
   textStyle,
@@ -32,20 +34,29 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
       container: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.slate[300] },
       text: { color: colors.ink },
     },
+    danger: {
+      container: { backgroundColor: colors.error },
+      text: { color: colors.white },
+    },
   };
 
   const selected = variantStyle[variant];
+  const spinning = disabled || loading;
 
   return (
     <TouchableOpacity
       onPress={onPress}
-      disabled={disabled}
+      disabled={spinning}
       style={[styles.button, selected.container, style, disabled && { opacity: 0.5 }]}
       activeOpacity={0.8}
     >
-      <Text style={[styles.text, selected.text, textStyle]}>
-        {title}
-      </Text>
+      {loading ? (
+        <ActivityIndicator color={selected.text.color} size="small" />
+      ) : (
+        <Text style={[styles.text, selected.text, textStyle]}>
+          {title}
+        </Text>
+      )}
     </TouchableOpacity>
   );
 };

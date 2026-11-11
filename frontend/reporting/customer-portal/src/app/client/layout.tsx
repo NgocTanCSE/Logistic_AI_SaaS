@@ -65,8 +65,9 @@ function CustomerChrome({ children }: { children: React.ReactNode }) {
           title={pageTitle(pathname)}
           user={{ name: user?.fullName ?? user?.name, email: user?.email, role: user?.role }}
           onLogout={handleLogout}
-          logoutLabel="Logout"
+          logoutLabel="Đăng xuất"
           showNotifications
+          notificationsLabel="Thông báo"
         />
       }
     >

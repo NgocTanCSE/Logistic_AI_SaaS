@@ -3,9 +3,10 @@ import { View, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
-import { NeonButton } from '../components/NeonButton'; // kept for backward compat
+import { NeonButton } from '../components/NeonButton';
 import { auth } from '../lib/auth';
 import api from '../lib/api';
+import { SCREEN_NAMES } from '../navigation/SCREEN_NAMES';
 
 export default function ProfileScreen({ navigation }: any) {
   const [profile, setProfile] = useState<any>(null);
@@ -20,8 +21,8 @@ export default function ProfileScreen({ navigation }: any) {
       const res = await api.get('/driver-app/profile');
       setProfile(res.data);
     } catch (err: any) {
-      console.error('Failed to fetch profile:', err);
-      Alert.alert('Lỗi', err.response?.data?.message || 'Không thể tải thông tin tài xế.');
+      const message = err.response?.data?.message || 'Không thể tải thông tin tài xế.';
+      Alert.alert('Lỗi', message);
     } finally {
       setLoading(false);
     }
@@ -29,7 +30,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   const handleLogout = async () => {
     await auth.removeToken();
-    navigation.replace('Login');
+    navigation.replace(SCREEN_NAMES.LOGIN);
   };
 
   if (loading) {

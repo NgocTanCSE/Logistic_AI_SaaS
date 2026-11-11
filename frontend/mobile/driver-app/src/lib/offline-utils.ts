@@ -25,7 +25,6 @@ export async function requestWithOffline(
       url: `/${endpoint}`,
       data: payload,
     };
-    // @ts-ignore – axios instance accepts these fields
     const response = await api(config);
     return response;
   } catch (err) {

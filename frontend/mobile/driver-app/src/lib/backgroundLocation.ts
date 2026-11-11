@@ -1,62 +1,42 @@
 import * as Location from 'expo-location';
-import * as TaskManager from 'expo-task-manager';
-import api from './api';
-
-const LOCATION_TASK_NAME = 'background-location-task';
+import { postWithOffline } from './offline-utils';
 
 const batchBuffer: { lat: number; lng: number; timestamp: string }[] = [];
+const BATCH_SIZE = 10;
 
 export const initBackgroundLocation = async () => {
   try {
     const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
     if (fgStatus !== 'granted') return;
 
-    const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
-    if (bgStatus !== 'granted') return;
-
-    const hasStarted = await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK_NAME);
-    if (!hasStarted) {
-      await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 60000,
-        distanceInterval: 100,
-        showsBackgroundLocationIndicator: true,
-      });
-    }
-
-    TaskManager.defineTask(LOCATION_TASK_NAME, (result: any) => {
-      if (result.error) {
-        console.error('Background location task error:', result.error);
-        return;
-      }
-      if (result.data) {
-        const { coords } = result.data;
+    await Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.Balanced, timeInterval: 60000, distanceInterval: 100 },
+      (loc) => {
         batchBuffer.push({
-          lat: coords.latitude,
-          lng: coords.longitude,
+          lat: loc.coords.latitude,
+          lng: loc.coords.longitude,
           timestamp: new Date().toISOString(),
         });
 
-        if (batchBuffer.length >= 10) {
-          syncGPSBatch();
+        if (batchBuffer.length >= BATCH_SIZE) {
+          void syncGPSBatch();
         }
       }
-    });
-
-    console.log('Background location tracking started.');
-  } catch (err) {
-    console.error('Failed to init background location', err);
+    );
+  } catch {
+    // Lỗi định vị là không chặn ứng dụng; người dùng báo gọi lại.
   }
 };
 
 async function syncGPSBatch() {
   if (batchBuffer.length === 0) return;
+  const snapshot = [...batchBuffer];
+  batchBuffer.length = 0;
   try {
-    await api.post('/mobile/gps-batch', { points: [...batchBuffer] });
-    batchBuffer.length = 0;
-    console.log('GPS batch synced');
-  } catch (e) {
-    console.warn('GPS Batch sync error', e);
+    await postWithOffline('mobile/gps-batch', { points: snapshot });
+  } catch {
+    // Không gửi được: offline-utils sẽ đính kèm vào hàng đợi đồng bộ.
+    batchBuffer.push(...snapshot);
   }
 }
 
@@ -69,10 +49,10 @@ export const syncCurrentLocation = async () => {
       timestamp: new Date().toISOString(),
     });
 
-    if (batchBuffer.length >= 5) {
+    if (batchBuffer.length >= BATCH_SIZE) {
       await syncGPSBatch();
     }
-  } catch (e) {
-    console.warn('Location sync error', e);
+  } catch {
+    // Người dùng chưa cấp quyền định vị: giữ im lặng chứ không kèm lại.
   }
 };

@@ -4,6 +4,7 @@ import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
 import api from '../lib/api';
+import { SCREEN_NAMES } from '../navigation/SCREEN_NAMES';
 
 export default function TripsScreen({ navigation }: any) {
   const [trips, setTrips] = useState<any[]>([]);
@@ -22,7 +23,6 @@ export default function TripsScreen({ navigation }: any) {
         setTrips(data);
       }
     } catch (error: any) {
-      console.error('Failed to fetch trips', error);
       setTrips([]);
       Alert.alert('Error', error.response?.data?.message || 'Unable to load trip list.');
     } finally {
@@ -31,7 +31,7 @@ export default function TripsScreen({ navigation }: any) {
   };
 
   const renderTrip = ({ item }: { item: any }) => (
-    <TouchableOpacity onPress={() => navigation.navigate('TripDetail', { tripId: item.id })}>
+    <TouchableOpacity onPress={() => navigation.navigate(SCREEN_NAMES.TRIP_DETAIL, { tripId: item.id })}>
       <GlassCard style={styles.tripCard}>
         <View style={styles.tripHeader}>
           <Text style={[typography.h3, { color: colors.text }]}>{item.tripCode}</Text>

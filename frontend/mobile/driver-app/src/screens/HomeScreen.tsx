@@ -9,6 +9,7 @@ import { typography } from '../theme/typography';
 import { SurfaceCard } from '../components/SurfaceCard';
 import { ActionButton } from '../components/ActionButton';
 import { decodeJwt } from '../utils/decodeJwt';
+import { SCREEN_NAMES } from '../navigation/SCREEN_NAMES';
 
 export default function HomeScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
@@ -34,7 +35,6 @@ export default function HomeScreen({ navigation }: any) {
       const cod = Number(walletRes.data?.codAmount || walletRes.data?.data?.codAmount || 0);
       setCodAmount(cod);
     } catch (error: any) {
-      console.error('Fetch trip error:', error);
       if (!refreshing) {
         Alert.alert('Error', error.response?.data?.message || 'Unable to load trip data.');
       }
@@ -61,14 +61,13 @@ export default function HomeScreen({ navigation }: any) {
           const profile = JSON.parse(stored);
           setDriverId(profile.id);
         }
+        const token = await AsyncStorage.getItem('@SmartLogi:driver_token');
+        if (token) {
+          const payload = decodeJwt(token);
+          if (payload?.driverId) setDriverId(payload.driverId);
+        }
       } catch {}
     })();
-
-    const token = await AsyncStorage.getItem('@SmartLogi:driver_token');
-    if (token) {
-      const payload = decodeJwt(token);
-      if (payload?.driverId) setDriverId(payload.driverId);
-    }
   }, []);
 
   useEffect(() => {
@@ -86,8 +85,8 @@ export default function HomeScreen({ navigation }: any) {
               timestamp: Date.now()
             }]
           });
-        } catch (e) {
-          console.warn('GPS sync failed', e);
+        } catch {
+          // Bắt lỗi định vị: tải lại từ mạng hoặc lưu ngoại tuyến (offline-utils).
         }
       }, 30000);
     }
@@ -167,7 +166,7 @@ export default function HomeScreen({ navigation }: any) {
         <Text style={[typography.h1, { color: colors.ink, marginVertical: 12 }]}>{formatCurrency(codAmount)}</Text>
         <ActionButton
           title="Submit Remittance"
-          onPress={() => navigation.navigate('Remittance')}
+          onPress={() => navigation.navigate(SCREEN_NAMES.REMITTANCE)}
           variant="secondary"
           style={styles.remitButton}
         />
@@ -196,7 +195,7 @@ export default function HomeScreen({ navigation }: any) {
             title="Trip Details"
             onPress={() => {
               if (tripData.id) {
-                navigation.navigate('TripDetail', { tripId: tripData.id });
+                navigation.navigate(SCREEN_NAMES.TRIP_DETAIL, { tripId: tripData.id });
               } else {
                 Alert.alert('Error', 'No trip data available.');
               }
@@ -219,7 +218,7 @@ export default function HomeScreen({ navigation }: any) {
 
       <ActionButton
         title="Report Expenses"
-        onPress={() => navigation.navigate('Expense')}
+        onPress={() => navigation.navigate(SCREEN_NAMES.EXPENSE)}
         variant="secondary"
         style={{ marginTop: 12 }}
       />

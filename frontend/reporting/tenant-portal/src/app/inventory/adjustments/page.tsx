@@ -1,201 +1,431 @@
 'use client';
-import { TableState } from 'ui-components';
-import { useState, useEffect } from 'react';
-import {formatDate, formatTime} from '@/lib/date-utils';
-import api from '@/lib/api';
-import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
 
-type Adjustment = {
-  id: string;
-  inventoryId: string;
-  warehouseId: string;
-  quantityChange: number;
-  reasonCode: string;
-  createdAt: string;
-  inventory: {
-    product: { name: string; sku: string };
-  };
-  creator: {
-    fullName: string;
-  };
-};
+import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import type { EditorialMetric } from 'ui-kit';
+import { Button, DataState, Input, Modal, Pagination, Select, TableState } from 'ui-components';
+import type { InventoryItem, StockMovement } from '@/lib/mock';
+import {
+  formatDateTimeVN,
+  formatNumber,
+  movementTypeLabel,
+} from '@/lib/labels';
+
+const PAGE_SIZE = 12;
+
+const REASONS = [
+  'Kiểm kê lệch',
+  'Hàng hỏng / vỡ',
+  'Hết hạn sử dụng',
+  'Mất mát trong kho',
+  'Sai lệch nhập liệu',
+];
 
 export default function InventoryAdjustmentsPage() {
-  const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
+  const [movements, setMovements] = useState<StockMovement[]>([]);
+  const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ inventoryId: '', qtyChange: '', reason: '' });
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const limit = 20;
 
-  useEffect(() => {
-    fetchAdjustments();
-  }, [page]);
+  const [open, setOpen] = useState(false);
+  const [targetId, setTargetId] = useState('');
+  const [quantity, setQuantity] = useState('-1');
+  const [reason, setReason] = useState(REASONS[0]);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
 
-  const fetchAdjustments = async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     setError('');
     try {
-      const res = await api.get('/inventory/adjustments', { params: { page, limit } });
-      setAdjustments((res.data?.data || res.data || []));
-      setTotal(res.data?.meta?.total || 0);
+      const [movementRows, itemRows] = await Promise.all([
+        data.movements.list(),
+        data.inventory.list(),
+      ]);
+      setMovements(movementRows);
+      setItems(itemRows);
+      setTargetId((current) => current || itemRows[0]?.id || '');
     } catch (err) {
-      console.error("Failed to fetch adjustments", err);
-      setError('Failed to fetch adjustments');
+      setError(err instanceof Error ? err.message : 'Không tải được dữ liệu điều chỉnh.');
+      setMovements([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleCreateAdjustment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSaving(true);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const adjustments = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return movements
+      .filter((row) => row.type === 'ADJUST' || row.type === 'CYCLE_COUNT')
+      .filter((row) => {
+        if (!term) return true;
+        return (
+          row.sku.toLowerCase().includes(term) ||
+          row.productName.toLowerCase().includes(term) ||
+          row.reference.toLowerCase().includes(term) ||
+          (row.note ?? '').toLowerCase().includes(term)
+        );
+      })
+      .sort((a, b) => b.at.localeCompare(a.at));
+  }, [movements, search]);
+
+  const totalPages = Math.max(1, Math.ceil(adjustments.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paged = adjustments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const increase = adjustments.filter((row) => row.quantity > 0);
+  const decrease = adjustments.filter((row) => row.quantity < 0);
+
+  const metrics: EditorialMetric[] = [
+    {
+      label: 'Phiếu điều chỉnh',
+      value: formatNumber(adjustments.length),
+      meta: 'Gồm điều chỉnh và kiểm kê',
+    },
+    {
+      label: 'Tăng tồn',
+      value: `+${formatNumber(increase.reduce((sum, row) => sum + row.quantity, 0))}`,
+      meta: `${increase.length} bút toán`,
+      tone: 'success',
+    },
+    {
+      label: 'Giảm tồn',
+      value: formatNumber(decrease.reduce((sum, row) => sum + row.quantity, 0)),
+      meta: `${decrease.length} bút toán`,
+      tone: 'danger',
+    },
+    {
+      label: 'Chênh lệch ròng',
+      value: formatNumber(adjustments.reduce((sum, row) => sum + row.quantity, 0)),
+      meta: 'Đơn vị trên toàn bộ phiếu',
+    },
+  ];
+
+  const target = items.find((item) => item.id === targetId) ?? null;
+  const quantityValue = Number(quantity);
+  const quantityValid = Number.isInteger(quantityValue) && quantityValue !== 0;
+  const resultQuantity = target ? target.quantity + quantityValue : NaN;
+  const wouldGoNegative = target !== null && quantityValid && resultQuantity < 0;
+
+  const submit = async () => {
+    if (!target) return;
+    setBusy(true);
+    setNotice('');
     try {
-      await api.post('/inventory/adjust', {
-        inventoryId: form.inventoryId,
-        qtyChange: Number(form.qtyChange),
-        reason: form.reason
+      if (!quantityValid) {
+        setNotice('Số lượng điều chỉnh phải là số nguyên khác 0.');
+        setBusy(false);
+        return;
+      }
+      if (wouldGoNegative) {
+        setNotice(
+          `Không thể ghi: tồn sau điều chỉnh sẽ âm (${formatNumber(resultQuantity)}).`,
+        );
+        setBusy(false);
+        return;
+      }
+
+      // Optimistic locking: đọc lại bản ghi trước khi ghi, từ chối nếu version đổi.
+      const latest = await data.inventory.get(target.id);
+      if (!latest) {
+        setNotice('Dòng tồn kho không còn tồn tại. Tải lại danh sách để tiếp tục.');
+        await load();
+        setBusy(false);
+        return;
+      }
+      if (latest.version !== target.version) {
+        setNotice(
+          `Xung đột phiên bản (409): bản ghi đã chuyển từ v${target.version} sang v${latest.version}. ` +
+            'Dữ liệu vừa được tải lại, kiểm tra số tồn mới rồi ghi lại.',
+        );
+        await load();
+        setBusy(false);
+        return;
+      }
+      if (latest.quantity + quantityValue < 0) {
+        setNotice(
+          `Không thể ghi: tồn hiện tại ${formatNumber(latest.quantity)} không đủ để trừ ${formatNumber(
+            Math.abs(quantityValue),
+          )}.`,
+        );
+        await load();
+        setBusy(false);
+        return;
+      }
+
+      await data.inventory.adjust({
+        inventoryId: latest.id,
+        quantity: quantityValue,
+        reason,
       });
-      setIsModalOpen(false);
-      setForm({ inventoryId: '', qtyChange: '', reason: '' });
-      fetchAdjustments();
+      setNotice(
+        `Đã điều chỉnh ${target.sku} tại ${target.binCode}: ${quantityValue > 0 ? '+' : ''}${formatNumber(
+          quantityValue,
+        )}.`,
+      );
+      setOpen(false);
+      setQuantity('-1');
+      setReason(REASONS[0]);
+      await load();
     } catch (err) {
-      console.error("Failed to create adjustment", err);
-      setError('Failed to save adjustment. Ensure Inventory ID is correct.');
+      setNotice(err instanceof Error ? err.message : 'Không tạo được phiếu điều chỉnh.');
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-
   return (
-    <div className="p-8 max-w-7xl mx-auto ">
-      {error && <ErrorBanner message={error} onRetry={fetchAdjustments} />}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
-        <div>
-          <h1 className="text-4xl font-bold text-ink tracking-tight">Stock Adjustments</h1>
-          <p className="text-sm text-inkSoft mt-2 font-medium">Audit trail of manual inventory corrections.</p>
-        </div>
-        <Button variant="primary" size="md" onClick={() => setIsModalOpen(true)} className="gap-2 shadow-lg ">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4"/></svg>
-          New Adjustment
-        </Button>
-      </div>
+    <>
+      <EditorialPageHeader
+        eyebrow="WMS · Tồn kho"
+        title="Phiếu điều chỉnh tồn"
+        description="Mỗi điều chỉnh là một bút toán có lý do, người thực hiện và số dư sau ghi. Phiếu không sửa đè tồn kho cũ mà ghi nối tiếp vào sổ phát sinh."
+        meta={`${adjustments.length} bút toán`}
+        actions={
+          <div className="flex items-center gap-2">
+            <Link
+              href="/inventory"
+              className="inline-flex h-8 items-center rounded-md border border-line px-3 text-[11px] font-semibold text-ink transition-colors hover:border-accent hover:text-accent"
+            >
+              Về tồn kho
+            </Link>
+            <Button size="sm" onClick={() => setOpen(true)}>
+              Tạo điều chỉnh
+            </Button>
+          </div>
+        }
+      />
 
-      <Card className="">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-border">
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Date</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Product</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Change</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Reason & Actor</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              <TableState
+      <MetricBand metrics={metrics} />
+
+      {notice ? (
+        <div className="border-l-2 border-accent bg-surface px-3 py-2 text-[12px] text-ink">
+          {notice}
+        </div>
+      ) : null}
+
+      <EditorialSection
+        title="Danh sách phiếu"
+        eyebrow="Sổ điều chỉnh"
+        action={
+          <Input
+            type="search"
+            placeholder="Tìm SKU, chứng từ, lý do"
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
+            className="h-8 w-64"
+          />
+        }
+      >
+        <DataState
           loading={loading}
           empty={!loading && adjustments.length === 0}
           error={error ? new Error(error) : undefined}
-          onRetry={fetchAdjustments}
-          colSpan={6}
-          emptyContent={<tr>
-                  <td colSpan={4} className="px-8 py-20 text-center text-slate-400 font-medium">No adjustment records found.</td>
-                </tr>}
+          onRetry={load}
+          emptyTitle="Chưa có phiếu điều chỉnh"
+          emptyDescription="Tạo phiếu đầu tiên khi phát hiện lệch tồn hoặc hàng hỏng."
         >
-          {adjustments.map(adj => (
-                  <tr key={adj.id} className="hover:bg-slate-50/80 transition-all group">
-                    <td className="px-8 py-6">
-                      <div className="font-bold text-ink">{formatDate(adj.createdAt)}</div>
-                      <div className="text-[10px] font-semibold text-slate-400 mt-1 uppercase">{formatTime(adj.createdAt)}</div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="font-bold text-ink leading-tight">{adj.inventory?.product?.name}</div>
-                      <div className="text-[10px] font-mono font-bold text-primary mt-1">{adj.inventory?.product?.sku}</div>
-                    </td>
-                    <td className="px-8 py-6">
-                       <Badge variant={adj.quantityChange > 0 ? 'success' : 'error'}>
-                        {adj.quantityChange > 0 ? '+' : ''}{adj.quantityChange}
-                      </Badge>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="text-sm font-semibold text-ink italic">"{adj.reasonCode}"</div>
-                      <div className="text-[10px] font-bold text-slate-400 mt-1.5 uppercase flex items-center gap-2">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                        {adj.creator?.fullName}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-        </TableState>
-            </tbody>
-          </table>
-        </div>
-      </Card>
+          <div className="overflow-x-auto border border-line">
+            <table className="min-w-full divide-y divide-line">
+              <thead className="bg-surface-alt">
+                <tr>
+                  {[
+                    'Thời điểm',
+                    'Loại',
+                    'SKU',
+                    'Kho / Bin',
+                    'Thay đổi',
+                    'Số dư sau',
+                    'Chứng từ',
+                    'Người thực hiện',
+                    'Lý do',
+                  ].map((label) => (
+                    <th
+                      key={label}
+                      className="whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint"
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line text-[12px]">
+                <TableState
+                  loading={loading}
+                  empty={!loading && paged.length === 0}
+                  error={error ? new Error(error) : undefined}
+                  onRetry={load}
+                  colSpan={9}
+                  emptyTitle="Không có phiếu khớp tìm kiếm"
+                  emptyDescription="Xoá từ khoá để xem toàn bộ sổ điều chỉnh."
+                >
+                  {paged.map((row) => (
+                    <tr key={row.id} className="hover:bg-surface-alt">
+                      <td className="whitespace-nowrap px-3 py-2 tabular-nums text-ink-soft">
+                        {formatDateTimeVN(row.at)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <StatusLabel tone={row.quantity >= 0 ? 'success' : 'danger'}>
+                          {movementTypeLabel(row.type)}
+                        </StatusLabel>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="font-mono text-[11px] text-ink">{row.sku}</div>
+                        <div className="text-[11px] text-ink-faint">{row.productName}</div>
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[11px] text-ink-soft">
+                        {row.warehouseCode} · {row.binCode}
+                      </td>
+                      <td
+                        className={`px-3 py-2 tabular-nums font-semibold ${
+                          row.quantity >= 0 ? 'text-success' : 'text-danger'
+                        }`}
+                      >
+                        {row.quantity >= 0 ? '+' : ''}
+                        {formatNumber(row.quantity)}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums text-ink">
+                        {formatNumber(row.balanceAfter)}
+                      </td>
+                      <td className="px-3 py-2 font-mono text-[11px] text-ink-faint">
+                        {row.reference}
+                      </td>
+                      <td className="px-3 py-2 text-ink-soft">{row.actor}</td>
+                      <td className="px-3 py-2 text-ink-faint">{row.note ?? '—'}</td>
+                    </tr>
+                  ))}
+                </TableState>
+              </tbody>
+            </table>
+          </div>
+          {adjustments.length > PAGE_SIZE ? (
+            <div className="flex justify-center py-3">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setPage}
+              />
+            </div>
+          ) : null}
+        </DataState>
+      </EditorialSection>
 
-      {!loading && total > limit && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
-          <span className="text-sm text-slate-500">
-            Page {page} of {totalPages} ({total} adjustments)
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
-            </Button>
+      <EditorialSection title="Ảnh hưởng giá trị tồn" eyebrow="Ước tính">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="border border-line p-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-faint">
+              Chênh lệch ròng
+            </div>
+            <div className="mt-1 font-editorial text-2xl text-ink tabular-nums">
+              {formatNumber(adjustments.reduce((sum, row) => sum + row.quantity, 0))} đơn vị
+            </div>
+          </div>
+          <div className="border border-line p-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-faint">
+              Phiếu tăng
+            </div>
+            <div className="mt-1 font-editorial text-2xl text-ink tabular-nums">
+              {increase.length}
+            </div>
+          </div>
+          <div className="border border-line p-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-faint">
+              Phiếu giảm
+            </div>
+            <div className="mt-1 font-editorial text-2xl text-ink tabular-nums">
+              {decrease.length}
+            </div>
           </div>
         </div>
-      )}
+        <EmptyNote>
+          Giá trị tiền tệ của điều chỉnh được tính ở báo cáo tài chính, không ghi trong sổ kho để
+          tránh sai lệch khi đơn giá thay đổi.
+        </EmptyNote>
+      </EditorialSection>
 
-      {/* Adjustment Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40  animate-in fade-in duration-200">
-           <Card className="w-full max-w-md bg-white border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-              <div className="p-8 border-b border-slate-100">
-                <h2 className="text-2xl font-bold text-ink tracking-tight">Record Adjustment</h2>
-                <p className="text-sm text-inkSoft mt-1 font-medium">Explicit inventory correction for auditing.</p>
+      <Modal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        title="Tạo phiếu điều chỉnh"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+              Đóng
+            </Button>
+            <Button size="sm" onClick={submit} isLoading={busy} disabled={!target}>
+              Ghi phiếu
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <Select
+            label="Dòng tồn kho"
+            value={targetId}
+            onChange={(event) => setTargetId(event.target.value)}
+            options={items.map((item) => ({
+              value: item.id,
+              label: `${item.sku} · ${item.binCode} · tồn ${item.quantity}`,
+            }))}
+          />
+          {target ? (
+            <div className="grid grid-cols-3 gap-3 border border-line p-3 text-[12px]">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-ink-faint">Tồn</div>
+                <div className="tabular-nums text-ink">{formatNumber(target.quantity)}</div>
               </div>
-
-              <form onSubmit={handleCreateAdjustment} className="p-8">
-                 <div className="space-y-5">
-                    <Input label="Inventory ID" required value={form.inventoryId} onChange={e => setForm({...form, inventoryId: e.target.value})} placeholder="Paste Inventory UUID here" />
-                    <Input label="Quantity Change (+/-)" type="number" required value={form.qtyChange} onChange={e => setForm({...form, qtyChange: e.target.value})} placeholder="e.g. -5" />
-                    <div className="space-y-1.5">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1">Reason for Correction</label>
-                       <textarea 
-                        required
-                        value={form.reason}
-                        onChange={e => setForm({...form, reason: e.target.value})}
-                        className="w-full bg-white  border border-slate-200 text-ink text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200 h-24 resize-none"
-                        placeholder="Detail the reason for this manual override..."
-                       ></textarea>
-                    </div>
-                 </div>
-
-                 <div className="mt-10 flex gap-4">
-                    <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="flex-1 font-bold uppercase tracking-widest text-[10px]">
-                      Cancel
-                    </Button>
-                    <Button type="submit" isLoading={saving} className="flex-1 font-bold uppercase tracking-widest text-[10px]">
-                      {saving ? 'RECORDING...' : 'COMMIT ADJUSTMENT'}
-                    </Button>
-                 </div>
-              </form>
-           </Card>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-ink-faint">Khả dụng</div>
+                <div className="tabular-nums text-ink">{formatNumber(target.available)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.14em] text-ink-faint">Phiên bản</div>
+                <div className="font-mono text-ink">v{target.version}</div>
+              </div>
+            </div>
+          ) : null}
+          <Input
+            label="Số lượng thay đổi (âm để giảm)"
+            type="number"
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+          />
+          <Select
+            label="Lý do"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            options={REASONS.map((row) => ({ value: row, label: row }))}
+          />
+          {target && quantityValid && resultQuantity < 0 ? (
+            <p className="border-l-2 border-danger pl-2 text-[12px] text-danger">
+              Số lượng sau điều chỉnh sẽ âm ({formatNumber(resultQuantity)}).
+              Backend sẽ từ chối phiếu này.
+            </p>
+          ) : (
+            <p className="text-[11px] text-ink-faint">
+              Số dư dự kiến sau ghi:{' '}
+              {target && quantityValid ? formatNumber(resultQuantity) : '—'} đơn vị
+            </p>
+          )}
         </div>
-      )}
-    </div>
+      </Modal>
+    </>
   );
 }
-

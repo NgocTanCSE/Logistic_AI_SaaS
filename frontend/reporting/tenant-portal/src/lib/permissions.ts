@@ -66,6 +66,7 @@ const ROUTE_ACCESS: Record<AppRole, string[]> = {
   SUPER_ADMIN: ['*'],
   TENANT_ADMIN: ['*'],
   WAREHOUSE_MANAGER: [
+    '/demo',
     '/dashboard',
     '/notifications',
     '/profile',
@@ -78,8 +79,17 @@ const ROUTE_ACCESS: Record<AppRole, string[]> = {
     '/finance/reports',
     '/admin/ai-insights',
   ],
-  WAREHOUSE_STAFF: ['/dashboard', '/notifications', '/profile', '/orders', '/inventory', '/wms'],
+  WAREHOUSE_STAFF: [
+    '/demo',
+    '/dashboard',
+    '/notifications',
+    '/profile',
+    '/orders',
+    '/inventory',
+    '/wms',
+  ],
   LOGISTICS_MANAGER: [
+    '/demo',
     '/dashboard',
     '/notifications',
     '/profile',
@@ -91,10 +101,38 @@ const ROUTE_ACCESS: Record<AppRole, string[]> = {
     '/warehouses',
     '/admin/ai-insights',
   ],
-  DRIVER: ['/dashboard', '/notifications', '/profile', '/drivers/my-trips', '/logistics/sos'],
-  CUSTOMER_CLIENT: ['/dashboard', '/notifications', '/profile', '/orders'],
-  TENANT_USER: ['/dashboard', '/notifications', '/profile', '/orders', '/inventory'],
+  DRIVER: [
+    '/demo',
+    '/dashboard',
+    '/notifications',
+    '/profile',
+    '/drivers/my-trips',
+    '/logistics/sos',
+  ],
+  CUSTOMER_CLIENT: ['/demo', '/dashboard', '/notifications', '/profile', '/orders'],
+  TENANT_USER: ['/demo', '/dashboard', '/notifications', '/profile', '/orders', '/inventory'],
 };
+
+/** Danh sách vai trò theo thứ tự hiển thị trên ma trận phân quyền. */
+export const APP_ROLES: AppRole[] = [
+  'SUPER_ADMIN',
+  'TENANT_ADMIN',
+  'WAREHOUSE_MANAGER',
+  'WAREHOUSE_STAFF',
+  'LOGISTICS_MANAGER',
+  'DRIVER',
+  'CUSTOMER_CLIENT',
+  'TENANT_USER',
+];
+
+/** Toàn bộ hành động ghi, dùng làm cột của ma trận RBAC. */
+export const ALL_WRITE_ACTIONS: PermissionAction[] = ALL_ACTIONS;
+
+/** Ma trận quyền thật đang dùng để ẩn/hiện nút trong UI. */
+export const PERMISSION_MATRIX: Record<AppRole, PermissionAction[]> = MATRIX;
+
+/** Phạm vi route mỗi vai trò được vào, dùng cho mô phỏng truy cập. */
+export const ROLE_ROUTE_ACCESS: Record<AppRole, string[]> = ROUTE_ACCESS;
 
 const normalize = (role: string | undefined | null): AppRole => {
   const value = (role || 'TENANT_USER').toUpperCase();

@@ -4,7 +4,7 @@ import { postWithOffline } from '../lib/offline-utils';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { GlassCard } from '../components/GlassCard';
-import { NeonButton } from '../components/NeonButton'; // kept for backward compat
+import { NeonButton } from '../components/NeonButton';
 
 export default function ExpenseScreen({ navigation }: any) {
   const [amount, setAmount] = useState('');
@@ -28,8 +28,8 @@ await postWithOffline('driver-app/expenses', {
       Alert.alert('Thành công', 'Đã báo cáo chi phí.');
       navigation.goBack();
     } catch (e: any) {
-      console.warn('API Error:', e);
-      Alert.alert('Lỗi', e.response?.data?.message || 'Không thể báo cáo chi phí. Vui lòng kiểm tra kết nối mạng.');
+      const message = e.response?.data?.message || 'Không thể báo cáo chi phí. Vui lòng kiểm tra kết nối mạng.';
+      Alert.alert('Lỗi', message);
     } finally {
       setSubmitting(false);
     }

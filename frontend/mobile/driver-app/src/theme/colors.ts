@@ -41,4 +41,12 @@ export const colors = {
     900: '#0f172a',
   },
   glassBackground: 'rgba(255, 255, 255, 0.9)',
+  // Anh em trực tiếp của các token vận hành; dùng ở giao diện màn hình
+  // để tránh tham chiếu thiếu (text/textMuted/error/warning/success/border).
+  text: '#1e293b', // ink
+  textMuted: '#64748b', // ink-soft
+  border: '#e2e8f0', // surfaceBorder
+  success: '#059669', // emerald.600
+  warning: '#f59e0b', // amber.500
+  error: '#f43f3b', // rose.500
 };

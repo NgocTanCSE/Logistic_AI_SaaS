@@ -7,6 +7,10 @@ import { useRole } from '@/lib/use-role';
 
 const SECTIONS: NavSection[] = [
   {
+    title: 'Demo',
+    items: [{ label: 'Trung tâm demo', href: '/demo' }],
+  },
+  {
     title: 'Vận hành',
     items: [
       { label: 'Tổng quan', href: '/dashboard' },
@@ -16,13 +20,28 @@ const SECTIONS: NavSection[] = [
       { label: 'Tồn kho', href: '/inventory' },
       { label: 'Cất hàng thông minh', href: '/inventory/putaway' },
       { label: 'Cảnh báo tồn kho', href: '/inventory/stock-alerts' },
+      { label: 'Khóa lạc quan', href: '/inventory/locking' },
+      { label: 'Kiểm kê định kỳ', href: '/inventory/cycle-count' },
+      { label: 'Phiếu điều chỉnh', href: '/inventory/adjustments' },
       { label: 'Kho bãi', href: '/warehouses' },
-      { label: 'WMS', href: '/wms', match: '/wms' },
+    ],
+  },
+  {
+    title: 'WMS',
+    items: [
+      { label: 'Tổng quan kho', href: '/wms', exact: true },
+      { label: 'Wave picking', href: '/wms/waves' },
+      { label: 'Tác vụ soạn hàng', href: '/wms/tasks' },
+      { label: 'Đóng gói', href: '/wms/packing' },
+      { label: 'Sản phẩm', href: '/wms/products' },
+      { label: 'Thiết bị', href: '/wms/equipment' },
     ],
   },
   {
     title: 'Vận tải',
     items: [
+      { label: 'Control Tower', href: '/logistics/control-tower' },
+      { label: 'Tối ưu lộ trình', href: '/logistics/optimize' },
       { label: 'Điều phối', href: '/logistics/dispatch' },
       { label: 'Tài xế', href: '/drivers' },
       { label: 'Phương tiện', href: '/logistics/vehicles' },

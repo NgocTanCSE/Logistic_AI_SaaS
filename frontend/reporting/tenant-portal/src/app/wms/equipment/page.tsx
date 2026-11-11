@@ -1,166 +1,342 @@
 'use client';
-import { useState, useEffect } from 'react';
-import {formatDateTime} from '@/lib/date-utils';
-import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
-import api from '@/lib/api';
 
-type Checkout = {
-  id: string;
-  equipmentCode: string;
-  staffName: string;
-  checkedOutAt: string;
-  status: string;
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import type { EditorialMetric } from 'ui-kit';
+import { Button, Input, Select, TableState } from 'ui-components';
+import type { Equipment } from '@/lib/mock';
+import {
+  equipmentStatusLabel,
+  equipmentStatusTone,
+  formatDateTimeVN,
+  formatNumber,
+} from '@/lib/labels';
+
+const TYPE_LABELS: Record<Equipment['type'], string> = {
+  SCANNER: 'Máy quét',
+  LABEL_PRINTER: 'Máy in nhãn',
+  SCALE: 'Cân điện tử',
+  FORKLIFT: 'Xe nâng',
+  PDA: 'PDA cầm tay',
+  CAMERA: 'Camera',
 };
 
-export default function EquipmentCheckoutPage() {
-  const [logs, setLogs] = useState<Checkout[]>([]);
+function batteryTone(value: number | null): 'success' | 'warning' | 'danger' | 'neutral' {
+  if (value === null) return 'neutral';
+  if (value < 20) return 'danger';
+  if (value < 50) return 'warning';
+  return 'success';
+}
+
+export default function EquipmentPage() {
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [form, setForm] = useState({ equipmentCode: '', staffName: '' });
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const limit = 20;
+  const [typeFilter, setTypeFilter] = useState<Equipment['type'] | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<Equipment['status'] | 'ALL'>('ALL');
+  const [search, setSearch] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
 
-  const fetchLogs = async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
     setError('');
     try {
-      const response = await api.get('/inventory/ops/equipment/logs', { params: { page, limit } });
-      setLogs(response.data?.data || response.data || []);
-      setTotal(response.data?.meta?.total || 0);
-    } catch (err: any) {
-      console.error('Failed to fetch equipment logs', err);
-      setError('Failed to fetch equipment logs');
-      setLogs([]);
+      const rows = await data.equipment.list();
+      setEquipment(rows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không tải được danh sách thiết bị.');
+      setEquipment([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchLogs();
-  }, [page]);
+    load();
+  }, [load]);
 
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return equipment
+      .filter((row) => typeFilter === 'ALL' || row.type === typeFilter)
+      .filter((row) => statusFilter === 'ALL' || row.status === statusFilter)
+      .filter((row) => {
+        if (!term) return true;
+        return (
+          row.code.toLowerCase().includes(term) ||
+          row.name.toLowerCase().includes(term) ||
+          row.warehouseCode.toLowerCase().includes(term)
+        );
+      })
+      .sort((a, b) => a.code.localeCompare(b.code));
+  }, [equipment, typeFilter, statusFilter, search]);
 
-  const handleCheckout = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSaving(true);
+  const online = equipment.filter((row) => row.status === 'ONLINE').length;
+  const maintenance = equipment.filter((row) => row.status === 'MAINTENANCE').length;
+  const offline = equipment.filter((row) => row.status === 'OFFLINE').length;
+  const lowBattery = equipment.filter(
+    (row) => row.batteryPct !== null && row.batteryPct < 20,
+  ).length;
+
+  const metrics: EditorialMetric[] = [
+    {
+      label: 'Hoạt động',
+      value: formatNumber(online),
+      meta: `${equipment.length} thiết bị`,
+      tone: 'success',
+    },
+    {
+      label: 'Bảo trì',
+      value: formatNumber(maintenance),
+      meta: 'Không dùng để soạn hàng',
+      tone: maintenance > 0 ? 'warning' : 'default',
+    },
+    {
+      label: 'Mất kết nối',
+      value: formatNumber(offline),
+      meta: 'Cần kiểm tra wifi/sạc',
+      tone: offline > 0 ? 'danger' : 'default',
+    },
+    {
+      label: 'Pin yếu',
+      value: formatNumber(lowBattery),
+      meta: 'Dưới 20%',
+      tone: lowBattery > 0 ? 'warning' : 'success',
+    },
+  ];
+
+  const setStatus = async (row: Equipment, status: Equipment['status']) => {
+    setBusyId(row.id);
+    setNotice('');
     try {
-      await api.post('/inventory/ops/equipment/checkout', form);
-      setIsModalOpen(false);
-      setForm({ equipmentCode: '', staffName: '' });
-      fetchLogs();
+      await data.equipment.update(row.id, {
+        status,
+        lastSeenAt:
+          status === 'ONLINE' ? new Date().toISOString() : row.lastSeenAt,
+      });
+      setNotice(
+        `Thiết bị ${row.code} → ${equipmentStatusLabel(status).toLowerCase()}.`,
+      );
+      await load();
     } catch (err) {
-      console.error("Error processing checkout", err);
-      setError('Failed to process checkout');
+      setNotice(err instanceof Error ? err.message : 'Không cập nhật được thiết bị.');
     } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleReturn = async (id: string) => {
-    setError('');
-    try {
-      await api.patch(`/inventory/ops/equipment/${id}/return`);
-      fetchLogs();
-    } catch (err) {
-      console.error("Error returning equipment", err);
-      setError('Failed to return equipment');
+      setBusyId(null);
     }
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto ">
-      {error && <ErrorBanner message={error} onRetry={fetchLogs} />}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
-        <div>
-          <h1 className="text-4xl font-bold text-ink tracking-tight">Equipment Registry</h1>
-          <p className="text-sm text-inkSoft mt-2 font-medium">Track asset custody for mobile scanners, PDAs, and printers.</p>
-        </div>
-        <Button variant="primary" className="gap-2 shadow-lg " onClick={() => setIsModalOpen(true)}>
-          New Checkout
-        </Button>
-      </div>
+    <>
+      <EditorialPageHeader
+        eyebrow="WMS · Thiết bị"
+        title="Thiết bị kho"
+        description="Máy quét, PDA, cân và xe nâng theo từng kho. Thiết bị đang bảo trì bị loại khỏi danh sách phân công soạn hàng để tránh gián đoạn ca."
+        meta={`${filtered.length} / ${equipment.length} thiết bị`}
+        actions={
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            Làm mới
+          </Button>
+        }
+      />
 
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-border">
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Asset Code</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Current Custodian</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Timestamp</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Custody Status</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
+      <MetricBand metrics={metrics} />
+
+      {notice ? (
+        <div className="border-l-2 border-accent bg-surface px-3 py-2 text-[12px] text-ink">
+          {notice}
+        </div>
+      ) : null}
+
+      <EditorialSection
+        title="Danh sách thiết bị"
+        eyebrow="Theo kho"
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="w-40">
+              <Select
+                className="h-8"
+                aria-label="Lọc theo loại thiết bị"
+                value={typeFilter}
+                onChange={(event) =>
+                  setTypeFilter(event.target.value as Equipment['type'] | 'ALL')
+                }
+                options={[
+                  { value: 'ALL', label: 'Mọi loại' },
+                  ...(Object.keys(TYPE_LABELS) as Equipment['type'][]).map((type) => ({
+                    value: type,
+                    label: TYPE_LABELS[type],
+                  })),
+                ]}
+              />
+            </div>
+            <div className="w-40">
+              <Select
+                className="h-8"
+                aria-label="Lọc theo trạng thái thiết bị"
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as Equipment['status'] | 'ALL')
+                }
+                options={[
+                  { value: 'ALL', label: 'Mọi trạng thái' },
+                  ...(['ONLINE', 'OFFLINE', 'MAINTENANCE'] as Equipment['status'][]).map(
+                    (status) => ({ value: status, label: equipmentStatusLabel(status) }),
+                  ),
+                ]}
+              />
+            </div>
+          </div>
+        }
+      >
+        <div className="mb-3">
+          <Input
+            type="search"
+            placeholder="Tìm mã, tên thiết bị, kho"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="h-9 w-72"
+          />
+        </div>
+
+        <div className="overflow-x-auto border border-line">
+          <table className="min-w-full divide-y divide-line">
+            <thead className="bg-surface-alt">
+              <tr>
+                {['Mã', 'Thiết bị', 'Loại', 'Kho', 'Pin', 'Lần cuối online', 'Trạng thái', ''].map(
+                  (label, index) => (
+                    <th
+                      key={`${label}-${index}`}
+                      className="whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint"
+                    >
+                      {label}
+                    </th>
+                  ),
+                )}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={5} className="px-8 py-10 text-center font-bold uppercase text-[10px] text-slate-400">Loading Registry...</td></tr>
-              ) : logs.map(l => (
-                <tr key={l.id} className="hover:bg-slate-50/80 transition-all">
-                  <td className="px-8 py-6 font-bold text-primary font-mono">{l.equipmentCode}</td>
-                  <td className="px-8 py-6 font-bold text-ink">{l.staffName}</td>
-                  <td className="px-8 py-6 text-xs text-inkSoft font-medium">{formatDateTime(l.checkedOutAt)}</td>
-                  <td className="px-8 py-6">
-                    <Badge variant={l.status === 'OUT' ? 'warning' : 'success'}>{l.status}</Badge>
-                  </td>
-                  <td className="px-8 py-6 text-right">
-                    {l.status === 'OUT' && <Button variant="ghost" size="sm" className="font-bold text-primary tracking-widest text-[10px]" onClick={() => handleReturn(l.id)}>MARK RETURNED</Button>}
-                  </td>
-                </tr>
-              ))}
+            <tbody className="divide-y divide-line text-[12px]">
+              <TableState
+                loading={loading}
+                empty={!loading && filtered.length === 0}
+                error={error ? new Error(error) : undefined}
+                onRetry={load}
+                colSpan={8}
+                emptyTitle="Không có thiết bị"
+                emptyDescription="Đổi bộ lọc hoặc thêm thiết bị cho kho."
+              >
+                {filtered.map((row) => (
+                  <tr key={row.id} className="hover:bg-surface-alt">
+                    <td className="px-3 py-2 font-mono text-[11px] font-medium text-ink">
+                      {row.code}
+                    </td>
+                    <td className="px-3 py-2 text-ink-soft">{row.name}</td>
+                    <td className="px-3 py-2 text-ink-soft">{TYPE_LABELS[row.type]}</td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-ink-soft">
+                      {row.warehouseCode}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums">
+                      {row.batteryPct === null ? (
+                        <span className="text-ink-faint">Nguồn điện</span>
+                      ) : (
+                        <StatusLabel tone={batteryTone(row.batteryPct)}>
+                          {row.batteryPct}%
+                        </StatusLabel>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 tabular-nums text-ink-faint">
+                      {formatDateTimeVN(row.lastSeenAt)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <StatusLabel tone={equipmentStatusTone(row.status)}>
+                        {equipmentStatusLabel(row.status)}
+                      </StatusLabel>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2">
+                      <div className="flex items-center gap-3 text-[11px]">
+                        {row.status !== 'ONLINE' ? (
+                          <button
+                            type="button"
+                            disabled={busyId === row.id}
+                            className="font-semibold text-ink-soft hover:text-accent disabled:opacity-50"
+                            onClick={() => setStatus(row, 'ONLINE')}
+                          >
+                            Kích hoạt
+                          </button>
+                        ) : null}
+                        {row.status !== 'MAINTENANCE' ? (
+                          <button
+                            type="button"
+                            disabled={busyId === row.id}
+                            className="font-semibold text-ink-soft hover:text-accent disabled:opacity-50"
+                            onClick={() => setStatus(row, 'MAINTENANCE')}
+                          >
+                            Bảo trì
+                          </button>
+                        ) : null}
+                        {row.status !== 'OFFLINE' ? (
+                          <button
+                            type="button"
+                            disabled={busyId === row.id}
+                            className="font-semibold text-danger hover:underline disabled:opacity-50"
+                            onClick={() => setStatus(row, 'OFFLINE')}
+                          >
+                            Ngắt
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </TableState>
             </tbody>
           </table>
         </div>
-      </Card>
+      </EditorialSection>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 ">
-          <Card className="w-full max-w-md bg-white p-6">
-            <h2 className="text-xl font-bold mb-4">Equipment Checkout</h2>
-            <form onSubmit={handleCheckout} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold mb-1">Equipment Code</label>
-                <Input required value={form.equipmentCode} onChange={e => setForm({...form, equipmentCode: e.target.value})} placeholder="e.g. SCN-01" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold mb-1">Staff Name</label>
-                <Input required value={form.staffName} onChange={e => setForm({...form, staffName: e.target.value})} placeholder="e.g. John Doe" />
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={saving}>Confirm Checkout</Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
-
-      {!loading && total > limit && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
-          <span className="text-sm text-slate-500">
-            Page {page} of {totalPages} ({total} equipment)
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
-            </Button>
+      <EditorialSection title="Tình trạng theo kho" eyebrow="Tổng hợp">
+        {equipment.length === 0 ? (
+          <EmptyNote>Chưa có thiết bị nào được khai báo.</EmptyNote>
+        ) : (
+          <div className="divide-y divide-line border-y border-line">
+            {Array.from(new Set(equipment.map((row) => row.warehouseCode)))
+              .sort()
+              .map((code) => {
+                const rows = equipment.filter((row) => row.warehouseCode === code);
+                const on = rows.filter((row) => row.status === 'ONLINE').length;
+                return (
+                  <div
+                    key={code}
+                    className="flex flex-wrap items-center justify-between gap-3 py-2 text-[12px]"
+                  >
+                    <span className="font-mono text-[11px] font-semibold text-ink">{code}</span>
+                    <span className="text-ink-soft">
+                      {on}/{rows.length} thiết bị sẵn sàng
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-28 overflow-hidden rounded-full bg-surface-alt">
+                        <div
+                          className="h-full rounded-full bg-accent"
+                          style={{ width: `${rows.length === 0 ? 0 : (on / rows.length) * 100}%` }}
+                        />
+                      </div>
+                      <span className="tabular-nums text-[11px] text-ink-faint">
+                        {rows.length === 0 ? 0 : Math.round((on / rows.length) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </EditorialSection>
+    </>
   );
 }
-

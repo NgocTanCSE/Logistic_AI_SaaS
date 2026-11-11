@@ -1,269 +1,511 @@
 'use client';
-import { useState } from 'react';
-import useSWR from 'swr';
-import api from '@/lib/api';
-import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
-import { Can } from '@/components/auth/Can';
 
-const fetcher = (url: string) => api.get(url).then(res => res.data);
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import type { EditorialMetric } from 'ui-kit';
+import { Button, Input, Modal, Pagination, Select, TableState } from 'ui-components';
+import type { InventoryItem, Product } from '@/lib/mock';
+import { formatCurrency, formatNumber } from '@/lib/labels';
 
-export default function ProductsPage() {
-  const [page, setPage] = useState(1);
+const PAGE_SIZE = 12;
+
+type ProductForm = {
+  id: string | null;
+  sku: string;
+  name: string;
+  barcode: string;
+  category: string;
+  unit: string;
+  weightKg: string;
+  volumeCbm: string;
+  shelfLifeDays: string;
+  reorderPoint: string;
+  unitPrice: string;
+};
+
+const EMPTY_FORM: ProductForm = {
+  id: null,
+  sku: '',
+  name: '',
+  barcode: '',
+  category: 'Hàng tiêu dùng',
+  unit: 'thùng',
+  weightKg: '1',
+  volumeCbm: '0.01',
+  shelfLifeDays: '',
+  reorderPoint: '20',
+  unitPrice: '100000',
+};
+
+export default function WmsProductsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const limit = 15;
+  const [category, setCategory] = useState('ALL');
+  const [page, setPage] = useState(1);
 
-  const { data, isLoading, mutate } = useSWR(
-    `/products?page=${page}&limit=${limit}&search=${search}`,
-    fetcher
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState<ProductForm>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [productRows, inventoryRows] = await Promise.all([
+        data.products.list(),
+        data.inventory.list(),
+      ]);
+      setProducts(productRows);
+      setInventory(inventoryRows);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không tải được danh mục sản phẩm.');
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const categories = useMemo(
+    () => Array.from(new Set(products.map((product) => product.category))).sort(),
+    [products],
   );
 
-  const products = data?.data || [];
-  const meta = data?.meta || { total: 0, totalPages: 0 };
+  const onHandBySku = useMemo(() => {
+    const map = new Map<string, { quantity: number; available: number }>();
+    inventory.forEach((item) => {
+      const current = map.get(item.sku) ?? { quantity: 0, available: 0 };
+      map.set(item.sku, {
+        quantity: current.quantity + item.quantity,
+        available: current.available + item.available,
+      });
+    });
+    return map;
+  }, [inventory]);
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [form, setForm] = useState({ id: '', name: '', sku: '', barcode: '', weightKg: 0, volumeCbm: 0 });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return products
+      .filter((product) => category === 'ALL' || product.category === category)
+      .filter((product) => {
+        if (!term) return true;
+        return (
+          product.sku.toLowerCase().includes(term) ||
+          product.name.toLowerCase().includes(term) ||
+          product.barcode.includes(term)
+        );
+      })
+      .sort((a, b) => a.sku.localeCompare(b.sku));
+  }, [products, category, search]);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paged = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const belowReorder = products.filter((product) => {
+    const onHand = onHandBySku.get(product.sku)?.available ?? 0;
+    return onHand <= product.reorderPoint;
+  }).length;
+
+  const withShelfLife = products.filter((product) => (product.shelfLifeDays ?? 0) > 0).length;
+
+  const catalogValue = products.reduce((sum, product) => sum + product.unitPrice, 0);
+
+  const metrics: EditorialMetric[] = [
+    { label: 'Mã hàng', value: formatNumber(products.length), meta: `${categories.length} nhóm hàng` },
+    {
+      label: 'Dưới định mức',
+      value: formatNumber(belowReorder),
+      meta: 'Cần đặt bổ sung',
+      tone: belowReorder > 0 ? 'warning' : 'success',
+    },
+    {
+      label: 'Có hạn sử dụng',
+      value: formatNumber(withShelfLife),
+      meta: 'Áp dụng FEFO khi cấp phát',
+    },
+    {
+      label: 'Giá trị đơn giá',
+      value: formatCurrency(catalogValue),
+      meta: 'Tổng đơn giá niêm yết',
+    },
+  ];
+
+  const openCreate = () => {
+    setForm(EMPTY_FORM);
+    setFormError('');
+    setOpen(true);
+  };
+
+  const openEdit = (product: Product) => {
+    setForm({
+      id: product.id,
+      sku: product.sku,
+      name: product.name,
+      barcode: product.barcode,
+      category: product.category,
+      unit: product.unit,
+      weightKg: String(product.weightKg),
+      volumeCbm: String(product.volumeCbm),
+      shelfLifeDays: product.shelfLifeDays === null ? '' : String(product.shelfLifeDays),
+      reorderPoint: String(product.reorderPoint),
+      unitPrice: String(product.unitPrice),
+    });
+    setFormError('');
+    setOpen(true);
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setFormError('');
+    if (!form.sku.trim() || !form.name.trim()) {
+      setFormError('Nhập mã SKU và tên sản phẩm.');
+      return;
+    }
+    const existing = products.find((product) => product.id === form.id);
+    const payload = {
+      sku: form.sku.trim().toUpperCase(),
+      name: form.name.trim(),
+      barcode: form.barcode.trim() || form.sku.trim().toUpperCase(),
+      category: form.category,
+      unit: form.unit,
+      weightKg: Number(form.weightKg) || 0,
+      volumeCbm: Number(form.volumeCbm) || 0,
+      shelfLifeDays: form.shelfLifeDays ? Number(form.shelfLifeDays) : null,
+      reorderPoint: Number(form.reorderPoint) || 0,
+      unitPrice: Number(form.unitPrice) || 0,
+      active: existing ? existing.active : true,
+    };
     setSaving(true);
+    const duplicate = products.some(
+      (product) => product.sku === payload.sku && product.id !== form.id,
+    );
+    if (duplicate) {
+      setFormError('SKU đã tồn tại, dùng mã khác.');
+      setSaving(false);
+      return;
+    }
     try {
       if (form.id) {
-        await api.patch(`/products/${form.id}`, form);
+        await data.products.update(form.id, payload);
+        setNotice(`Đã cập nhật ${payload.sku}.`);
       } else {
-        await api.post('/products', form);
+        await data.products.create(payload);
+        setNotice(`Đã thêm ${payload.sku} vào danh mục.`);
       }
-      setIsModalOpen(false);
-      setForm({ id: '', name: '', sku: '', barcode: '', weightKg: 0, volumeCbm: 0 });
-      mutate();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Error saving product');
+      setOpen(false);
+      await load();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Không lưu được sản phẩm.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleEdit = (p: any) => {
-    setForm({
-      id: p.id,
-      name: p.name,
-      sku: p.sku,
-      barcode: p.barcode || '',
-      weightKg: p.weightKg || 0,
-      volumeCbm: p.volumeCbm || 0
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    setError('');
+  const toggleActive = async (product: Product) => {
     try {
-      await api.delete(`/products/${id}`);
-      mutate();
-    } catch (err) { console.error("Error deleting product", err); setError('Failed to delete product'); }
+      await data.products.update(product.id, { active: !product.active });
+      await load();
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Không đổi được trạng thái sản phẩm.');
+    }
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto ">
-      {error && <ErrorBanner message={error} onRetry={() => mutate()} />}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
-        <div>
-          <h1 className="text-4xl font-bold text-ink tracking-tight">
-            Product Catalog
-          </h1>
-          <p className="text-sm text-inkSoft mt-2 font-medium">Manage your organization's SKU master list and specifications.</p>
-        </div>
-        <Can perform="inventory:adjust">
-          <Button variant="primary" onClick={() => {
-            setForm({ id: '', name: '', sku: '', barcode: '', weightKg: 0, volumeCbm: 0 });
-            setIsModalOpen(true);
-          }} className="gap-2 shadow-lg ">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4"/></svg>
-            Add New Product
+    <>
+      <EditorialPageHeader
+        eyebrow="WMS · Danh mục"
+        title="Sản phẩm & định mức tồn"
+        description="Danh mục hàng hoá dùng chung cho nhập kho, putaway, wave picking và tính giá trị tồn. Định mức tồn quyết định cảnh báo đặt hàng lại."
+        meta={`${filtered.length} / ${products.length} SKU`}
+        actions={
+          <Button size="sm" onClick={openCreate}>
+            Thêm sản phẩm
           </Button>
-        </Can>
-      </div>
+        }
+      />
 
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
-        <div className="relative w-full max-w-md group">
-          <Input 
-            placeholder="Search by SKU, Barcode or Name..."
+      <MetricBand metrics={metrics} />
+
+      {notice ? (
+        <div className="border-l-2 border-accent bg-surface px-3 py-2 text-[12px] text-ink">
+          {notice}
+        </div>
+      ) : null}
+
+      <EditorialSection
+        title="Danh mục sản phẩm"
+        eyebrow="SKU"
+        action={
+          <div className="w-52">
+            <Select
+              className="h-8"
+              aria-label="Lọc theo nhóm hàng"
+              value={category}
+              onChange={(event) => {
+                setCategory(event.target.value);
+                setPage(1);
+              }}
+              options={[
+                { value: 'ALL', label: 'Mọi nhóm hàng' },
+                ...categories.map((row) => ({ value: row, label: row })),
+              ]}
+            />
+          </div>
+        }
+      >
+        <div className="mb-3">
+          <Input
+            type="search"
+            placeholder="Tìm SKU, tên hàng, barcode"
             value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
-            icon={<svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
+            className="h-9 w-72"
           />
         </div>
-        <div className="flex items-center gap-2">
-           <Button variant="outline" size="sm" className="font-bold tracking-widest text-[10px]" onClick={() => {
-             const csvContent = 'data:text/csv;charset=utf-8,SKU,Name,Weight,Volume\n' + products.map((p: any) => `${p.sku},${p.name},${p.weightKg || 0},${p.volumeCbm || 0}`).join('\n');
-             const link = document.createElement('a');
-             link.setAttribute('href', encodeURI(csvContent));
-             link.setAttribute('download', 'products_export.csv');
-             document.body.appendChild(link);
-             link.click();
-             document.body.removeChild(link);
-           }}>EXPORT CSV</Button>
-           <Button variant="outline" size="sm" className="font-bold tracking-widest text-[10px]" onClick={() => {
-             const input = document.createElement('input');
-             input.type = 'file';
-             input.accept = '.xlsx,.xls,.csv';
-             input.onchange = async (e: any) => {
-               const file = e.target.files[0];
-               if (!file) return;
-               const formData = new FormData();
-               formData.append('file', file);
-               try {
-                 await api.post('/products/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-                 console.log('Import successful!');
-                  mutate();
-                } catch (err) {
-                  console.error('Import failed', err);
-                  setError('Import failed. Check file format.');
-                }
-             };
-             input.click();
-           }}>IMPORT EXCEL</Button>
-        </div>
-      </div>
 
-      <Card className="">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-border">
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">SKU Identity</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Product Details</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Spec (W/V)</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
+        <div className="overflow-x-auto border border-line">
+          <table className="min-w-full divide-y divide-line">
+            <thead className="bg-surface-alt">
+              <tr>
+                {[
+                  'SKU',
+                  'Tên hàng',
+                  'Nhóm',
+                  'Đơn vị',
+                  'Kg',
+                  'm³',
+                  'Hạn dùng',
+                  'Định mức',
+                  'Khả dụng',
+                  'Đơn giá',
+                  'Trạng thái',
+                  '',
+                ].map((label, index) => (
+                  <th
+                    key={`${label}-${index}`}
+                    className="whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint"
+                  >
+                    {label}
+                  </th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Retrieving Product Master...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : products.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No products found in the catalog.</td>
-                </tr>
-              ) : (
-                products.map((p: any) => (
-                  <tr key={p.id} className="hover:bg-slate-50/80 transition-all group">
-                    <td className="px-8 py-6">
-                      <div className="font-bold text-primary font-mono tracking-tight">{p.sku}</div>
-                      <div className="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">{p.barcode || 'NO BARCODE'}</div>
-                    </td>
-                    <td className="px-8 py-6 font-bold text-ink leading-tight">
-                      {p.name}
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex flex-col gap-1">
-                        <div className="text-[11px] font-bold text-inkSoft uppercase tracking-widest">{p.weightKg || '0.00'} <span className="text-slate-400">KG</span></div>
-                        <div className="text-[11px] font-bold text-inkSoft uppercase tracking-widest">{p.volumeCbm || '0.00'} <span className="text-slate-400">CBM</span></div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                       <Badge variant="success">ACTIVE</Badge>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <Can perform="inventory:adjust">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="p-2 h-9 w-9 rounded-xl text-slate-400 hover:text-primary" onClick={() => handleEdit(p)}>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(p.id)} className="p-2 h-9 w-9 rounded-xl text-slate-400 hover:text-ember">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                          </Button>
+            <tbody className="divide-y divide-line text-[12px]">
+              <TableState
+                loading={loading}
+                empty={!loading && paged.length === 0}
+                error={error ? new Error(error) : undefined}
+                onRetry={load}
+                colSpan={12}
+                emptyTitle="Không có sản phẩm"
+                emptyDescription="Thêm sản phẩm đầu tiên để bắt đầu nhập kho."
+              >
+                {paged.map((product) => {
+                  const available = onHandBySku.get(product.sku)?.available ?? 0;
+                  const low = available <= product.reorderPoint;
+                  return (
+                    <tr key={product.id} className="hover:bg-surface-alt">
+                      <td className="px-3 py-2 font-mono text-[11px] font-medium text-ink">
+                        {product.sku}
+                      </td>
+                      <td className="px-3 py-2 text-ink-soft">{product.name}</td>
+                      <td className="px-3 py-2 text-ink-faint">{product.category}</td>
+                      <td className="px-3 py-2 text-ink-soft">{product.unit}</td>
+                      <td className="px-3 py-2 tabular-nums text-ink-soft">{product.weightKg}</td>
+                      <td className="px-3 py-2 tabular-nums text-ink-soft">{product.volumeCbm}</td>
+                      <td className="px-3 py-2 tabular-nums text-ink-soft">
+                        {product.shelfLifeDays ? `${product.shelfLifeDays} ngày` : '—'}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums text-ink-soft">
+                        {formatNumber(product.reorderPoint)}
+                      </td>
+                      <td className="px-3 py-2 tabular-nums">
+                        <span className={low ? 'font-semibold text-warning' : 'text-ink'}>
+                          {formatNumber(available)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 tabular-nums text-ink">
+                        {formatCurrency(product.unitPrice)}
+                      </td>
+                      <td className="px-3 py-2">
+                        <StatusLabel tone={product.active ? 'success' : 'neutral'}>
+                          {product.active ? 'Đang dùng' : 'Ngừng dùng'}
+                        </StatusLabel>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2">
+                        <div className="flex items-center gap-3 text-[11px]">
+                          <button
+                            type="button"
+                            className="font-semibold text-ink-soft hover:text-accent"
+                            onClick={() => openEdit(product)}
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            className="font-semibold text-ink-soft hover:text-accent"
+                            onClick={() => toggleActive(product)}
+                          >
+                            {product.active ? 'Ngừng' : 'Bật'}
+                          </button>
                         </div>
-                      </Can>
-                    </td>
-                  </tr>
-                ))
-              )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </TableState>
             </tbody>
           </table>
         </div>
 
-        {!isLoading && meta.totalPages > 1 && (
-          <div className="p-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-              Page <span className="text-ink">{page}</span> of <span className="text-ink">{meta.totalPages}</span>
-            </span>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                variant="outline"
-                size="sm"
-                className="font-bold tracking-widest text-[10px]"
-              >
-                PREVIOUS
-              </Button>
-              <Button
-                onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
-                disabled={page === meta.totalPages}
-                variant="outline"
-                size="sm"
-                className="font-bold tracking-widest text-[10px]"
-              >
-                NEXT
-              </Button>
-            </div>
+        {filtered.length > PAGE_SIZE ? (
+          <div className="flex justify-center py-3">
+            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
           </div>
+        ) : (
+          <EmptyNote>
+            Mọi thay đổi ở đây áp dụng ngay cho nhập kho, putaway và wave picking.
+          </EmptyNote>
         )}
-      </Card>
+      </EditorialSection>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 ">
-          <Card className="w-full max-w-md bg-white p-6">
-            <h2 className="text-xl font-bold mb-4">{form.id ? 'Edit Product' : 'Add New Product'}</h2>
-            <form onSubmit={handleSave} className="space-y-4">
-              {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded border border-red-100">{error}</div>}
-              <div>
-                <label className="block text-xs font-bold mb-1">Product Name</label>
-                <Input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Standard Pallet" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold mb-1">SKU</label>
-                  <Input required value={form.sku} onChange={e => setForm({...form, sku: e.target.value})} placeholder="e.g. PLT-01" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold mb-1">Barcode (Opt)</label>
-                  <Input value={form.barcode} onChange={e => setForm({...form, barcode: e.target.value})} placeholder="e.g. 123456789" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold mb-1">Weight (KG)</label>
-                  <Input type="number" step="0.01" value={form.weightKg} onChange={e => setForm({...form, weightKg: parseFloat(e.target.value)})} min={0} />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold mb-1">Volume (CBM)</label>
-                  <Input type="number" step="0.01" value={form.volumeCbm} onChange={e => setForm({...form, volumeCbm: parseFloat(e.target.value)})} min={0} />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={saving}>Save Product</Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
-    </div>
+      <Modal
+        isOpen={open}
+        onClose={() => setOpen(false)}
+        title={form.id ? 'Sửa sản phẩm' : 'Thêm sản phẩm'}
+        size="full"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+              Đóng
+            </Button>
+            <Button size="sm" type="submit" form="product-form" isLoading={saving}>
+              {form.id ? 'Lưu thay đổi' : 'Thêm sản phẩm'}
+            </Button>
+          </div>
+        }
+      >
+        <form id="product-form" onSubmit={submit} className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="SKU"
+              required
+              value={form.sku}
+              onChange={(event) => setForm((current) => ({ ...current, sku: event.target.value }))}
+              placeholder="SKU-0042"
+              disabled={Boolean(form.id)}
+            />
+            <Input
+              label="Tên hàng"
+              required
+              value={form.name}
+              onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              placeholder="Nước mắm cá cơm 500ml"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Input
+              label="Barcode"
+              value={form.barcode}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, barcode: event.target.value }))
+              }
+              placeholder="Để trống sẽ dùng SKU"
+            />
+            <Input
+              label="Nhóm hàng"
+              value={form.category}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, category: event.target.value }))
+              }
+            />
+            <Input
+              label="Đơn vị"
+              value={form.unit}
+              onChange={(event) => setForm((current) => ({ ...current, unit: event.target.value }))}
+              placeholder="thùng"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <Input
+              label="Khối lượng (kg)"
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.weightKg}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, weightKg: event.target.value }))
+              }
+            />
+            <Input
+              label="Thể tích (m³)"
+              type="number"
+              min={0}
+              step="0.001"
+              value={form.volumeCbm}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, volumeCbm: event.target.value }))
+              }
+            />
+            <Input
+              label="Hạn dùng (ngày)"
+              type="number"
+              min={0}
+              value={form.shelfLifeDays}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, shelfLifeDays: event.target.value }))
+              }
+              placeholder="Trống = không hạn"
+            />
+            <Input
+              label="Định mức tồn"
+              type="number"
+              min={0}
+              value={form.reorderPoint}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, reorderPoint: event.target.value }))
+              }
+            />
+            <Input
+              label="Đơn giá (₫)"
+              type="number"
+              min={0}
+              step="1000"
+              value={form.unitPrice}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, unitPrice: event.target.value }))
+              }
+            />
+          </div>
+          {formError ? (
+            <p className="border-l-2 border-danger pl-2 text-[12px] text-danger">{formError}</p>
+          ) : (
+            <EmptyNote>
+              Sản phẩm có hạn dùng sẽ được cấp phát theo FEFO; sản phẩm không hạn dùng mặc định
+              FIFO.
+            </EmptyNote>
+          )}
+        </form>
+      </Modal>
+    </>
   );
 }
-

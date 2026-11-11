@@ -32,13 +32,11 @@ export async function registerForPushNotificationsAsync() {
       finalStatus = status;
     }
     if (finalStatus !== 'granted') {
-      console.warn('Failed to get push token for push notification!');
       return;
     }
     token = (await Notifications.getExpoPushTokenAsync()).data;
-    console.log('Expo Push Token:', token);
   } else {
-    console.warn('Must use physical device for Push Notifications');
+    return;
   }
 
   return token;

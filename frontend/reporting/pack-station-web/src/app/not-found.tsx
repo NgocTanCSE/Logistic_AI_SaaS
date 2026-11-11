@@ -2,18 +2,18 @@ import Link from 'next/link';
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen  bg-white flex items-center justify-center p-8">
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-6 sm:p-8">
       <div className="text-center max-w-md">
-        <div className="w-20 h-20  bg-white rounded-full flex items-center justify-center mx-auto mb-6 text-slate-500">
-          <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </div>
-        <h1 className="text-6xl font-bold text-white mb-4">404</h1>
-        <h2 className="text-xl font-bold text-white mb-2">Page Not Found</h2>
-        <p className="text-slate-400 mb-8">The page you are looking for does not exist.</p>
-        <Link href="/login" className="inline-flex items-center px-6 py-3 bg-primary text-ink font-bold rounded-xl hover:bg-primary-hover transition-colors">
-          Back to Login
+        <h1 className="font-editorial text-[64px] leading-none font-semibold text-ink sm:text-[72px]">404</h1>
+        <h2 className="mt-3 text-[17px] font-semibold text-ink">Chưa tìm thấy trang</h2>
+        <p className="mt-2 text-[13px] leading-6 text-ink-soft">
+          Trang bạn đang tìm không tồn tại hoặc đã được chuyển đến nơi khác.
+        </p>
+        <Link
+          href="/login"
+          className="mt-6 inline-flex h-10 items-center justify-center rounded-md border border-line px-5 text-[12px] font-medium text-ink-soft transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+        >
+          Về trang đăng nhập
         </Link>
       </div>
     </div>

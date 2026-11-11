@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import api from '@/lib/api';
 import { data, isMockDataSource } from '@/lib/data';
 import { roleLabel } from '@/lib/labels';
+import { TableState } from 'ui-components';
 import {
   EditorialPageHeader,
   EditorialSection,
@@ -684,6 +685,55 @@ export default function DashboardPage() {
 
       <MetricBand metrics={metrics} />
 
+      <EditorialSection
+        eyebrow="Trình diễn"
+        title="Năng lực hệ thống có thể bấm chạy"
+        action={
+          <Link
+            href="/demo"
+            className="text-[12px] font-medium text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent"
+          >
+            Mở trung tâm demo
+          </Link>
+        }
+      >
+        <div className="grid gap-px border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            {
+              title: 'Control Tower',
+              desc: 'Xe chạy trên bản đồ, cảnh báo geofence và SOS.',
+              href: '/logistics/control-tower',
+            },
+            {
+              title: 'Tối ưu CVRP',
+              desc: 'So sánh lộ trình trước và sau tối ưu.',
+              href: '/logistics/optimize',
+            },
+            {
+              title: 'FIFO / LIFO / FEFO',
+              desc: 'Ba chiến lược cấp phát trên cùng một lô tồn.',
+              href: '/wms/waves',
+            },
+            {
+              title: 'Đối soát COD',
+              desc: 'Khớp sao kê ngân hàng với phiếu nộp tiền.',
+              href: '/finance/cod',
+            },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="group bg-canvas px-3 py-3 transition-colors hover:bg-surface-alt"
+            >
+              <div className="text-[13px] font-semibold text-ink group-hover:text-accent">
+                {item.title}
+              </div>
+              <p className="mt-1 text-[11px] leading-5 text-ink-faint">{item.desc}</p>
+            </Link>
+          ))}
+        </div>
+      </EditorialSection>
+
       {isMockDataSource && hasLoaded ? (
         <EditorialSection
           eyebrow="Ưu tiên"
@@ -771,34 +821,41 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {queueRows.map((row) => (
-                  <tr
-                    key={row.label}
-                    className="h-[42px] border-b border-line/80 transition-colors hover:bg-surface-alt/60"
-                  >
-                    <td className="pr-3 text-[13px] font-medium text-ink">{row.label}</td>
-                    <td className="px-3 text-right text-[13px] font-semibold tabular-nums text-ink">
-                      {row.value}
-                    </td>
-                    <td className="px-3">
-                      <StatusLabel tone={row.tone}>{row.status}</StatusLabel>
-                    </td>
-                    <td className="pl-3 text-right">
-                      <Link
-                        href={row.href}
-                        className="text-[12px] font-medium text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent"
-                      >
-                        {row.action}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                <TableState
+                  loading={loading}
+                  empty={!loading && queueRows.length === 0}
+                  error={error}
+                  colSpan={4}
+                  onRetry={fetchDashboard}
+                  emptyTitle="Không có việc nào trong ca này"
+                  emptyDescription="Danh sách sẽ hiển thị khi có đơn hàng chờ xử lý."
+                >
+                  {queueRows.map((row) => (
+                    <tr
+                      key={row.label}
+                      className="h-[42px] border-b border-line/80 transition-colors hover:bg-surface-alt/60"
+                    >
+                      <td className="pr-3 text-[13px] font-medium text-ink">{row.label}</td>
+                      <td className="px-3 text-right text-[13px] font-semibold tabular-nums text-ink">
+                        {row.value}
+                      </td>
+                      <td className="px-3">
+                        <StatusLabel tone={row.tone}>{row.status}</StatusLabel>
+                      </td>
+                      <td className="pl-3 text-right">
+                        <Link
+                          href={row.href}
+                          className="text-[12px] font-medium text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent"
+                        >
+                          {row.action}
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </TableState>
               </tbody>
             </table>
           </div>
-          {!hasLoaded && loading ? (
-            <p className="mt-3 text-[12px] text-ink-faint">Đang tải hàng đợi…</p>
-          ) : null}
         </EditorialSection>
 
         <aside className="space-y-5 border-t border-line pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">

@@ -16,7 +16,7 @@ export const auth = {
     try {
       await AsyncStorage.setItem(TOKEN_KEY, token);
     } catch (e) {
-      console.error('Failed to save token', e);
+      return;
     }
   },
   
@@ -28,7 +28,7 @@ export const auth = {
         return payload?.role || 'DRIVER';
       }
     } catch (e) {
-      console.error('Failed to get role', e);
+      return 'DRIVER';
     }
     return 'DRIVER';
   },
@@ -38,7 +38,7 @@ export const auth = {
       await AsyncStorage.removeItem(TOKEN_KEY);
       await AsyncStorage.removeItem('@SmartLogi:driver_role');
     } catch (e) {
-      console.error('Failed to remove token', e);
+      return;
     }
   }
 };

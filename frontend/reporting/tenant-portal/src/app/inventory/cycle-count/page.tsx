@@ -1,247 +1,416 @@
 'use client';
-import { TableState } from 'ui-components';
-import { useState, useEffect } from 'react';
-import {formatDateTime} from '@/lib/date-utils';
-import api from '@/lib/api';
-import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
 
-type Audit = {
-  id: string;
-  status: string;
-  scheduledAt: string;
-  warehouseId: string;
-  warehouse?: { name: string };
-};
-
-type Warehouse = {
-  id: string;
-  name: string;
-};
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import type { EditorialMetric } from 'ui-kit';
+import { Button, DataState, Input, Modal, Select, TableState } from 'ui-components';
+import type { CycleCount, Warehouse } from '@/lib/mock';
+import {
+  cycleCountStatusLabel,
+  cycleCountStatusTone,
+  formatCurrency,
+  formatDateTimeVN,
+  formatNumber,
+} from '@/lib/labels';
 
 export default function CycleCountPage() {
-  const [counts, setCounts] = useState<Audit[]>([]);
+  const [counts, setCounts] = useState<CycleCount[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [completeModalOpen, setCompleteModalOpen] = useState(false);
-  const [selectedCountId, setSelectedCountId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ warehouseId: '', scheduledAt: '' });
   const [error, setError] = useState('');
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const limit = 20;
+  const [warehouseFilter, setWarehouseFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState<CycleCount['status'] | 'ALL'>('ALL');
 
-  useEffect(() => {
-    fetchWarehouses();
-    fetchCounts();
-  }, [page]);
+  const [countTarget, setCountTarget] = useState<CycleCount | null>(null);
+  const [countedLines, setCountedLines] = useState('0');
+  const [variance, setVariance] = useState('0');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState('');
 
-  const fetchWarehouses = async () => {
-    setError('');
-    try {
-      const res = await api.get('/warehouses');
-      setWarehouses(res.data?.data || res.data || []);
-    } catch (err) {
-      console.error("Failed to fetch warehouses", err);
-      setError('Failed to fetch warehouses');
-    }
-  };
-
-  const fetchCounts = async () => {
-    setError('');
+  const load = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
-      const res = await api.get('/inventory/cycle-counts', { params: { page, limit } });
-      setCounts((res.data?.data || res.data || []));
-      setTotal(res.data?.meta?.total || 0);
+      const [countRows, warehouseRows] = await Promise.all([
+        data.cycleCounts.list(),
+        data.warehouses.list(),
+      ]);
+      setCounts(countRows);
+      setWarehouses(warehouseRows);
     } catch (err) {
-      console.error("Failed to fetch cycle counts", err);
-      setError('Failed to fetch cycle counts');
+      setError(err instanceof Error ? err.message : 'Không tải được danh sách kiểm kê.');
+      setCounts([]);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const filtered = useMemo(
+    () =>
+      counts
+        .filter((row) => warehouseFilter === 'ALL' || row.warehouseId === warehouseFilter)
+        .filter((row) => (statusFilter === 'ALL' ? true : row.status === statusFilter))
+        .sort((a, b) => b.startedAt.localeCompare(a.startedAt)),
+    [counts, warehouseFilter, statusFilter],
+  );
+
+  const pendingReview = counts.filter((row) => row.status === 'REVIEW').length;
+  const counting = counts.filter((row) => row.status === 'COUNTING').length;
+  const approved = counts.filter((row) => row.status === 'APPROVED').length;
+  const varianceUnits = counts.reduce((sum, row) => sum + Math.abs(row.varianceUnits), 0);
+
+  const metrics: EditorialMetric[] = [
+    {
+      label: 'Đang đếm',
+      value: formatNumber(counting),
+      meta: 'Phiếu chưa đủ dòng',
+      tone: counting > 0 ? 'warning' : 'default',
+    },
+    {
+      label: 'Chờ duyệt',
+      value: formatNumber(pendingReview),
+      meta: 'Đã đếm đủ, chờ quản lý',
+      tone: pendingReview > 0 ? 'warning' : 'success',
+    },
+    {
+      label: 'Đã duyệt',
+      value: formatNumber(approved),
+      meta: 'Đã khoá sổ',
+    },
+    {
+      label: 'Lệch tuyệt đối',
+      value: formatNumber(varianceUnits),
+      meta: 'Đơn vị trên toàn bộ phiếu',
+      tone: varianceUnits > 0 ? 'danger' : 'success',
+    },
+  ];
+
+  const openCount = (row: CycleCount) => {
+    setCountTarget(row);
+    setCountedLines(String(row.countedLines));
+    setVariance(String(row.varianceUnits));
+    setNotice('');
   };
 
-  const handleCreatePlan = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSaving(true);
+  const submitCount = async () => {
+    if (!countTarget) return;
+    setBusy(true);
     try {
-      await api.post('/inventory/cycle-counts', {
-        warehouseId: form.warehouseId,
-        scheduledAt: form.scheduledAt
-      });
-      setIsModalOpen(false);
-      setForm({ warehouseId: '', scheduledAt: '' });
-      fetchCounts();
+      const updated = await data.cycleCounts.submit(
+        countTarget.id,
+        Number(countedLines),
+        Number(variance),
+      );
+      setNotice(
+        updated.status === 'REVIEW'
+          ? `Phiếu ${updated.code} đã đếm đủ ${updated.lines} dòng, chuyển sang chờ duyệt.`
+          : `Đã ghi ${updated.countedLines}/${updated.lines} dòng cho phiếu ${updated.code}.`,
+      );
+      setCountTarget(null);
+      await load();
     } catch (err) {
-      console.error("Failed to create plan", err);
-      setError('Failed to create count plan');
+      setNotice(err instanceof Error ? err.message : 'Không ghi nhận được kết quả đếm.');
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   };
 
-  const handleLaunch = async (id: string) => {
-    setError('');
+  const approve = async (row: CycleCount) => {
+    setBusy(true);
+    setNotice('');
     try {
-      await api.patch(`/inventory/cycle-counts/${id}/status`, { status: 'IN_PROGRESS' });
-      fetchCounts();
+      await data.cycleCounts.approve(row.id);
+      setNotice(`Đã duyệt phiếu ${row.code}; chênh lệch được ghi vào sổ điều chỉnh.`);
+      await load();
     } catch (err) {
-      console.error("Error starting count", err);
-      setError('Failed to start cycle count');
-    }
-  };
-
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-
-  const getStatusVariant = (status: string) => {
-    switch(status) {
-      case 'PENDING': return 'neutral';
-      case 'IN_PROGRESS': return 'warning';
-      case 'COMPLETED': return 'success';
-      case 'CANCELLED': return 'error';
-      default: return 'neutral';
+      setNotice(err instanceof Error ? err.message : 'Không duyệt được phiếu.');
+    } finally {
+      setBusy(false);
     }
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto ">
-      {error && <ErrorBanner message={error} onRetry={fetchCounts} />}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
-        <div>
-          <h1 className="text-4xl font-bold text-ink tracking-tight">Cycle Counting</h1>
-          <p className="text-sm text-inkSoft mt-2 font-medium">Schedule and manage periodic inventory audits for high precision.</p>
+    <>
+      <EditorialPageHeader
+        eyebrow="WMS · Kiểm kê"
+        title="Kiểm kê định kỳ"
+        description="Phiếu kiểm kê theo kho và khu vực. Hệ thống chỉ cho duyệt khi đã đếm đủ số dòng; chênh lệch sau duyệt được ghi thành bút toán điều chỉnh thay vì sửa tay tồn kho."
+        meta={`${filtered.length} / ${counts.length} phiếu`}
+        actions={
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            Làm mới
+          </Button>
+        }
+      />
+
+      <MetricBand metrics={metrics} />
+
+      {notice ? (
+        <div className="border-l-2 border-accent bg-surface px-3 py-2 text-[12px] text-ink">
+          {notice}
         </div>
-        <Button variant="primary" onClick={() => setIsModalOpen(true)} className="gap-2 shadow-lg ">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4"/></svg>
-          New Count Plan
-        </Button>
-      </div>
+      ) : null}
 
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-border">
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Audit ID</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Target Warehouse</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Scheduled</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              <TableState
-          loading={loading}
-          empty={!loading && counts.length === 0}
-          error={error ? new Error(error) : undefined}
-          onRetry={fetchWarehouses}
-          colSpan={6}
-          emptyContent={<tr><td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-medium">No cycle count plans active.</td></tr>}
-        >
-          {counts.map(c => (
-                <tr key={c.id} className="hover:bg-slate-50/80 transition-all">
-                  <td className="px-8 py-6 font-bold text-ink font-mono text-xs">{c.id}</td>
-                  <td className="px-8 py-6 font-bold text-ink">{c.warehouse?.name || 'Main DC'}</td>
-                  <td className="px-8 py-6 text-xs text-inkSoft font-medium">{c.scheduledAt ? formatDateTime(c.scheduledAt) : 'ASAP'}</td>
-                  <td className="px-8 py-6"><Badge variant={getStatusVariant(c.status)}>{c.status}</Badge></td>
-                  <td className="px-8 py-6 text-right">
-                     {c.status === 'PENDING' && (
-                       <Button variant="ghost" size="sm" className="font-bold text-primary tracking-widest text-[10px]" onClick={() => handleLaunch(c.id)}>LAUNCH AUDIT</Button>
-                     )}
-                     {c.status === 'IN_PROGRESS' && (
-                       <Button variant="ghost" size="sm" className="font-bold text-amber-600 tracking-widest text-[10px]" onClick={() => {
-                         setSelectedCountId(c.id);
-                         setCompleteModalOpen(true);
-                       }}>COMPLETE AUDIT</Button>
-                     )}
-                  </td>
-                </tr>
-              ))}
-        </TableState>
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {!loading && total > limit && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
-          <span className="text-sm text-slate-500">
-            Page {page} of {totalPages} ({total} cycles)
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* New Plan Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40  animate-in fade-in duration-200">
-           <Card className="w-full max-w-md bg-white border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-              <div className="p-8 border-b border-slate-100">
-                <h2 className="text-2xl font-bold text-ink tracking-tight">Create Count Plan</h2>
-                <p className="text-sm text-inkSoft mt-1 font-medium">Schedule a new inventory audit session.</p>
-              </div>
-
-              <form onSubmit={handleCreatePlan} className="p-8">
-                 <div className="space-y-5">
-                    <div className="space-y-1.5">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest ml-1">Select Warehouse</label>
-                       <select 
-                        required
-                        value={form.warehouseId}
-                        onChange={e => setForm({...form, warehouseId: e.target.value})}
-                        className="w-full bg-white  border border-slate-200 text-ink text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all duration-200"
-                       >
-                         <option value="">Choose a facility...</option>
-                         {warehouses.map(wh => (
-                           <option key={wh.id} value={wh.id}>{wh.name}</option>
-                         ))}
-                       </select>
-                    </div>
-                    <Input label="Scheduled Date" type="datetime-local" value={form.scheduledAt} onChange={e => setForm({...form, scheduledAt: e.target.value})} />
-                 </div>
-
-                 <div className="mt-10 flex gap-4">
-                    <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="flex-1 font-bold uppercase tracking-widest text-[10px]">
-                      Cancel
-                    </Button>
-                    <Button type="submit" isLoading={saving} className="flex-1 font-bold uppercase tracking-widest text-[10px]">
-                      {saving ? 'CREATING...' : 'CREATE PLAN'}
-                    </Button>
-                 </div>
-              </form>
-           </Card>
-        </div>
-      )}
-
-      {/* Complete Audit Modal */}
-      {completeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40  ">
-          <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-8 text-center border-t-4 border-t-amber-500">
-            <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-100">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 13l4 4L19 7"/></svg>
+      <EditorialSection
+        title="Danh sách phiếu kiểm kê"
+        eyebrow="Theo kho"
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="w-44">
+              <Select
+                className="h-8"
+                aria-label="Lọc theo kho"
+                value={warehouseFilter}
+                onChange={(event) => setWarehouseFilter(event.target.value)}
+                options={[
+                  { value: 'ALL', label: 'Mọi kho' },
+                  ...warehouses.map((warehouse) => ({
+                    value: warehouse.id,
+                    label: warehouse.code,
+                  })),
+                ]}
+              />
             </div>
-            <h2 className="text-xl font-bold text-ink mb-2">Audit Completed</h2>
-            <p className="text-slate-500 text-sm mb-6">The cycle count results have been reconciled and ledger balances have been updated successfully.</p>
-            <Button variant="primary" className="bg-amber-500 hover:bg-amber-600 w-full" onClick={() => setCompleteModalOpen(false)}>Acknowledge</Button>
+            <div className="w-40">
+              <Select
+                className="h-8"
+                aria-label="Lọc theo trạng thái"
+                value={statusFilter}
+                onChange={(event) =>
+                  setStatusFilter(event.target.value as CycleCount['status'] | 'ALL')
+                }
+                options={[
+                  { value: 'ALL', label: 'Mọi trạng thái' },
+                  ...(['DRAFT', 'COUNTING', 'REVIEW', 'APPROVED', 'CANCELLED'] as CycleCount['status'][]).map(
+                    (status) => ({ value: status, label: cycleCountStatusLabel(status) }),
+                  ),
+                ]}
+              />
+            </div>
+          </div>
+        }
+      >
+        <DataState
+          loading={loading}
+          empty={!loading && filtered.length === 0}
+          error={error}
+          onRetry={load}
+          emptyTitle="Chưa có phiếu kiểm kê"
+          emptyDescription="Đổi bộ lọc hoặc chờ lịch kiểm kê kế tiếp."
+        >
+          <div className="overflow-x-auto border border-line">
+            <table className="min-w-full divide-y divide-line">
+              <thead className="bg-surface-alt">
+                <tr>
+                  {[
+                    'Mã phiếu',
+                    'Kho',
+                    'Khu',
+                    'Phạm vi',
+                    'Tiến độ',
+                    'Lệch',
+                    'Giá trị lệch',
+                    'Trạng thái',
+                    'Bắt đầu',
+                    'Phụ trách',
+                    '',
+                  ].map((label, index) => (
+                    <th
+                      key={`${label}-${index}`}
+                      className="whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint"
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line text-[12px]">
+                <TableState
+                  loading={loading}
+                  empty={!loading && filtered.length === 0}
+                  error={error ? new Error(error) : undefined}
+                  onRetry={load}
+                  colSpan={11}
+                  emptyTitle="Không có phiếu khớp bộ lọc"
+                  emptyDescription="Chọn kho hoặc trạng thái khác."
+                >
+                  {filtered.map((row) => {
+                    const progress =
+                      row.lines === 0 ? 0 : Math.round((row.countedLines / row.lines) * 100);
+                    const canApprove =
+                      row.status === 'REVIEW' && row.countedLines >= row.lines;
+                    return (
+                      <tr key={row.id} className="hover:bg-surface-alt">
+                        <td className="px-3 py-2 font-mono font-semibold text-ink">{row.code}</td>
+                        <td className="px-3 py-2 font-mono text-[11px] text-ink-soft">
+                          {row.warehouseCode}
+                        </td>
+                        <td className="px-3 py-2 text-ink-soft">{row.zone}</td>
+                        <td className="px-3 py-2 text-ink-faint">{row.scope}</td>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-alt">
+                              <div
+                                className="h-full rounded-full bg-accent"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            <span className="tabular-nums text-[11px] text-ink-soft">
+                              {row.countedLines}/{row.lines}
+                            </span>
+                          </div>
+                        </td>
+                        <td
+                          className={`px-3 py-2 tabular-nums font-medium ${
+                            row.varianceUnits === 0
+                              ? 'text-ink-soft'
+                              : row.varianceUnits > 0
+                                ? 'text-success'
+                                : 'text-danger'
+                          }`}
+                        >
+                          {row.varianceUnits > 0 ? '+' : ''}
+                          {formatNumber(row.varianceUnits)}
+                        </td>
+                        <td className="px-3 py-2 tabular-nums text-ink-soft">
+                          {formatCurrency(row.varianceValue)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <StatusLabel tone={cycleCountStatusTone(row.status)}>
+                            {cycleCountStatusLabel(row.status)}
+                          </StatusLabel>
+                        </td>
+                        <td className="px-3 py-2 tabular-nums text-ink-faint">
+                          {formatDateTimeVN(row.startedAt)}
+                        </td>
+                        <td className="px-3 py-2 text-ink-soft">{row.assignee}</td>
+                        <td className="whitespace-nowrap px-3 py-2">
+                          <div className="flex items-center gap-3 text-[11px]">
+                            {row.status === 'DRAFT' || row.status === 'COUNTING' ? (
+                              <button
+                                type="button"
+                                className="font-semibold text-ink-soft hover:text-accent"
+                                onClick={() => openCount(row)}
+                              >
+                                Ghi kết quả
+                              </button>
+                            ) : null}
+                            {canApprove ? (
+                              <button
+                                type="button"
+                                className="font-semibold text-accent hover:underline"
+                                onClick={() => approve(row)}
+                                disabled={busy}
+                              >
+                                Duyệt
+                              </button>
+                            ) : null}
+                            {row.status === 'APPROVED' ? (
+                              <span className="text-ink-faint">
+                                Đóng {formatDateTimeVN(row.closedAt)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </TableState>
+              </tbody>
+            </table>
+          </div>
+        </DataState>
+      </EditorialSection>
+
+      <EditorialSection title="Quy trình kiểm kê" eyebrow="Ch. 10">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="border border-line p-3 text-[12px] text-ink-soft">
+            <div className="font-semibold text-ink">1. Đếm thực tế</div>
+            <p className="mt-1">Thủ kho ghi số dòng đã đếm và chênh lệch so với sổ.</p>
+          </div>
+          <div className="border border-line p-3 text-[12px] text-ink-soft">
+            <div className="font-semibold text-ink">2. Chờ duyệt</div>
+            <p className="mt-1">
+              Chỉ chuyển sang chờ duyệt khi đã đếm đủ dòng — tránh duyệt phiếu dở.
+            </p>
+          </div>
+          <div className="border border-line p-3 text-[12px] text-ink-soft">
+            <div className="font-semibold text-ink">3. Ghi điều chỉnh</div>
+            <p className="mt-1">Duyệt phiếu sinh bút toán điều chỉnh, khoá sổ phiếu.</p>
           </div>
         </div>
-      )}
-    </div>
+        <EmptyNote>
+          Chênh lệch dương nghĩa là đếm được nhiều hơn sổ; âm là thiếu so với sổ.
+        </EmptyNote>
+      </EditorialSection>
+
+      <Modal
+        isOpen={countTarget !== null}
+        onClose={() => setCountTarget(null)}
+        title="Ghi kết quả kiểm kê"
+        footer={
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setCountTarget(null)}>
+              Đóng
+            </Button>
+            <Button size="sm" onClick={submitCount} isLoading={busy}>
+              Ghi kết quả
+            </Button>
+          </div>
+        }
+      >
+        {countTarget ? (
+          <div className="space-y-3">
+            <div className="border border-line p-3 text-[12px] text-ink-soft">
+              <div className="flex justify-between">
+                <span>Phiếu</span>
+                <span className="font-mono text-ink">{countTarget.code}</span>
+              </div>
+              <div className="mt-1 flex justify-between">
+                <span>Phạm vi</span>
+                <span className="text-ink">{countTarget.scope}</span>
+              </div>
+              <div className="mt-1 flex justify-between">
+                <span>Tổng dòng</span>
+                <span className="tabular-nums text-ink">{countTarget.lines}</span>
+              </div>
+              <div className="mt-1 flex justify-between">
+                <span>Đã đếm</span>
+                <span className="tabular-nums text-ink">{countTarget.countedLines}</span>
+              </div>
+            </div>
+            <Input
+              label="Số dòng đã đếm"
+              type="number"
+              min={countTarget.countedLines}
+              max={countTarget.lines}
+              value={countedLines}
+              onChange={(event) => setCountedLines(event.target.value)}
+            />
+            <Input
+              label="Chênh lệch (đơn vị)"
+              type="number"
+              value={variance}
+              onChange={(event) => setVariance(event.target.value)}
+            />
+            <p className="text-[11px] text-ink-faint">
+              Đếm đủ {countTarget.lines} dòng thì phiếu tự chuyển sang Chờ duyệt. Số dòng vượt quá
+              tổng dòng sẽ bị backend từ chối.
+            </p>
+          </div>
+        ) : null}
+      </Modal>
+    </>
   );
 }
-
-

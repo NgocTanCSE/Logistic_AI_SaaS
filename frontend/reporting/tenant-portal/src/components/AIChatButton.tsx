@@ -5,6 +5,10 @@ import api from '@/lib/api';
 
 type ChatMsg = { role: string; content: string; images?: string[] };
 
+/**
+ * Trợ lý AI phân tích. Giao diện floating ngoài cùng được giữ nguyên để không
+ * ảnh hưởng các trang đang dùng, chỉ đổi token sang hệ thống editorial.
+ */
 export default function AIChatButton() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -18,7 +22,6 @@ export default function AIChatButton() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Convert an image file to base64 data URL
   function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -32,7 +35,6 @@ export default function AIChatButton() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
-    // Validate: image only, < 5MB
     if (!file.type.startsWith('image/')) {
       setMessages((m) => [...m, { role: 'assistant', content: 'Vui lòng tải lên file ảnh (jpg, png, gif).' }]);
       return;
@@ -48,7 +50,6 @@ export default function AIChatButton() {
     } catch (err) {
       setMessages((m) => [...m, { role: 'assistant', content: 'Lỗi khi tải ảnh: ' + (err as Error)?.message }]);
     }
-    // Reset the input
     e.target.value = '';
   };
 
@@ -87,7 +88,7 @@ export default function AIChatButton() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-50 h-10 rounded-md border border-accent/30 bg-surface px-3 text-[12px] font-semibold text-accent shadow-floating transition-colors hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+        className="fixed bottom-5 right-5 z-50 h-10 rounded-md border border-line bg-surface px-3 text-[12px] font-semibold text-accent transition-colors hover:bg-accent-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
         aria-label="Mở trợ lý AI phân tích"
         title="Trợ lý AI phân tích logistics"
       >
@@ -97,8 +98,8 @@ export default function AIChatButton() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex h-[580px] w-[420px] flex-col rounded-2xl border border-slate-200 bg-background shadow-floating">
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+    <div className="fixed bottom-6 right-6 z-50 flex h-[580px] w-[420px] flex-col rounded-lg border border-line bg-canvas">
+      <div className="flex items-center justify-between border-b border-line px-4 py-3">
         <span className="text-sm font-semibold text-ink">Trợ lý AI — SmartLogi</span>
         <button
           type="button"
@@ -107,20 +108,21 @@ export default function AIChatButton() {
             setMessages([]);
             setPendingImages([]);
           }}
-          className="rounded-lg p-1 text-ink-soft hover:text-ink hover:bg-surface-alt focus-visible:ring-2 focus-visible:ring-primary outline-none"
+          className="rounded-md p-1.5 text-ink-soft hover:text-ink hover:bg-surface-alt focus-visible:ring-2 focus-visible:ring-accent/30 outline-none"
           aria-label="Đóng"
+          title="Đóng"
         >
           ×
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 no-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {messages.length === 0 ? (
           <div className="space-y-2">
             <p className="text-xs text-ink-soft">
               Xin chào! Tôi là trợ lý AI phân tích logistics. Tôi có thể giúp bạn:
             </p>
-            <ul className="text-xs text-inkSoft space-y-1 list-disc list-inside">
+            <ul className="text-xs text-ink-soft space-y-1">
               <li>Giải thích các chức năng: đơn hàng, tồn kho, vận chuyển, admin</li>
               <li>Phân tích dữ liệu, dự báo nhu cầu & thời gian giao hàng</li>
               <li>Đọc hiểu hình ảnh (tải ảnh lên để phân tích)</li>
@@ -132,8 +134,8 @@ export default function AIChatButton() {
               <div
                 className={
                   m.role === 'user'
-                    ? 'ml-auto max-w-[85%] rounded-2xl bg-primary/5 px-3 py-2 text-sm text-ink'
-                    : 'mr-auto max-w-[85%] rounded-2xl bg-surface-alt px-3 py-2 text-sm text-ink'
+                    ? 'ml-auto max-w-[85%] rounded-lg border border-line bg-surface-alt px-3 py-2 text-sm text-ink'
+                    : 'mr-auto max-w-[85%] rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink'
                 }
               >
                 {m.content}
@@ -145,7 +147,7 @@ export default function AIChatButton() {
                       key={j}
                       src={img}
                       alt="Ảnh tải lên"
-                      className="mt-1 max-w-[120px] max-h-[80px] rounded-lg object-cover border border-slate-200"
+                      className="mt-1 max-w-[120px] max-h-[80px] rounded-lg object-cover border border-line"
                     />
                   ))}
                 </div>
@@ -154,11 +156,9 @@ export default function AIChatButton() {
           ))
         )}
         {loading && (
-          <div className="mr-auto max-w-[85%] rounded-2xl bg-surface-alt px-3 py-2 text-sm text-inkSoft">
-            <span className="inline-flex items-center gap-1">
-              <span className="animate-bounce">•</span>
-              <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>•</span>
-              <span className="animate-bounce" style={{ animationDelay: '0.4s' }}>•</span>
+          <div className="mr-auto max-w-[85%] rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-ink-soft" />
               Đang phân tích
             </span>
           </div>
@@ -166,15 +166,15 @@ export default function AIChatButton() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="border-t border-slate-200 p-3">
+      <div className="border-t border-line p-3">
         {pendingImages.length > 0 && (
-          <div className="mb-2 flex gap-2 overflow-x-auto no-scrollbar">
+          <div className="mb-2 flex gap-2 overflow-x-auto">
             {pendingImages.map((img, i) => (
               <img
                 key={i}
                 src={img}
                 alt="Preview"
-                className="h-16 w-16 rounded-lg object-cover border border-slate-200"
+                className="h-16 w-16 rounded-lg object-cover border border-line"
               />
             ))}
           </div>
@@ -193,16 +193,14 @@ export default function AIChatButton() {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={loading || pendingImages.length >= 3}
-            className="rounded-xl border border-slate-200 bg-surface-alt p-2 text-ink-soft hover:text-ink hover:bg-surface focus-visible:ring-2 focus-visible:ring-primary outline-none disabled:opacity-50"
-            aria-label="Tải ảnh"
+            className="h-9 rounded-md border border-line bg-surface-alt px-2.5 text-[12px] font-medium text-ink-soft transition-colors hover:border-line-strong hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:opacity-50"
+            aria-label="Tải ảnh lên"
             title="Quét mã / tải ảnh lên để AI phân tích"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 9c.75 0 1.53.16 2.24.46A5.94 5.94 0 0112 3.96c1.42 0 2.73.5 3.76 1.34A5.99 5.99 0 0121 9c0 .6-.09 1.17-.26 1.71A3 3 0 0119 15h-2.24A5.95 5.95 0 0112 20.04c-2.56 0-4.75-1.66-5.5-4.04A6.01 6.01 0 013 15V9z" />
-            </svg>
+            Tải ảnh
           </button>
           <input
-            className="flex-1 rounded-xl border border-slate-200 bg-surface-alt px-3 py-2 text-sm text-ink placeholder-inkSoft/60 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="flex-1 rounded-md border border-line bg-surface-alt px-3 py-2 text-sm text-ink placeholder-ink-faint focus:outline-none focus:ring-2 focus:ring-accent/20"
             placeholder="Hỏi về đơn hàng, tồn kho, vận chuyển..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -213,7 +211,7 @@ export default function AIChatButton() {
             type="button"
             onClick={send}
             disabled={loading || (!input.trim() && pendingImages.length === 0)}
-            className="rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-white hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-primary outline-none disabled:opacity-50"
+            className="h-9 rounded-md bg-accent px-3 text-[12px] font-medium text-surface hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:opacity-50"
           >
             {loading ? '…' : 'Gửi'}
           </button>
