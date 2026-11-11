@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import api from '@/lib/api';
+import { data, isMockDataSource } from '@/lib/data';
+import { roleLabel } from '@/lib/labels';
 import {
   EditorialPageHeader,
   EditorialSection,
@@ -27,6 +29,10 @@ type DashboardStats = {
   activeWaves: number;
   activeTrips: number;
   unassignedOrders: number;
+  lateOrders: number;
+  sosOpen: number;
+  disputedCod: number;
+  cycleCountDue: number;
   fleetUtilization: string;
   onTimeDelivery: string;
   inventoryAccuracy: string;
@@ -44,19 +50,14 @@ const INITIAL_STATS: DashboardStats = {
   activeWaves: 0,
   activeTrips: 0,
   unassignedOrders: 0,
+  lateOrders: 0,
+  sosOpen: 0,
+  disputedCod: 0,
+  cycleCountDue: 0,
   fleetUtilization: '—',
   onTimeDelivery: '—',
   inventoryAccuracy: '—',
   health: 'unknown',
-};
-
-const ROLE_LABELS: Record<string, string> = {
-  TENANT_ADMIN: 'Quản trị tenant',
-  WAREHOUSE_MANAGER: 'Quản lý kho',
-  WAREHOUSE_STAFF: 'Nhân viên kho',
-  LOGISTICS_MANAGER: 'Quản lý vận chuyển',
-  DRIVER: 'Tài xế',
-  TENANT_USER: 'Người dùng tenant',
 };
 
 const PERMISSION_LABELS: Record<string, string> = {
@@ -67,10 +68,6 @@ const PERMISSION_LABELS: Record<string, string> = {
   DRIVER: 'Tài xế',
   TENANT_USER: 'Chỉ xem',
 };
-
-function roleLabel(role: string) {
-  return ROLE_LABELS[role] ?? role.replace(/_/g, ' ').toLowerCase();
-}
 
 function permissionLabel(role: string) {
   return PERMISSION_LABELS[role] ?? 'Theo vai trò';
@@ -148,6 +145,55 @@ export default function DashboardPage() {
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
     setError('');
+
+    if (isMockDataSource) {
+      try {
+        const [summary, orderRows, userRows, productRows, warehouseRows, alerts, remittances, counts] =
+          await Promise.all([
+            data.dashboard(),
+            data.orders.list(),
+            data.users.list(),
+            data.products.list(),
+            data.warehouses.list(),
+            data.sosAlerts.list(),
+            data.remittances.list(),
+            data.cycleCounts.list(),
+          ]);
+        setStats({
+          ...INITIAL_STATS,
+          activeUsers: userRows.filter((row) => row.status === 'ACTIVE').length,
+          pendingInvites: userRows.filter((row) => row.status === 'INVITED').length,
+          totalOrders: orderRows.length,
+          openOrders: summary.openOrders,
+          totalSkus: productRows.length,
+          outOfStockSkus: summary.outOfStockSkus,
+          warehouseCount: warehouseRows.length,
+          activeWaves: summary.activeWaves,
+          activeTrips: summary.activeTrips,
+          unassignedOrders: summary.unassignedOrders,
+          lateOrders: summary.lateOrders,
+          sosOpen: alerts.filter((alert) => alert.status !== 'RESOLVED').length,
+          disputedCod: remittances.filter((row) => row.status === 'DISPUTED').length,
+          cycleCountDue: counts.filter((row) => ['COUNTING', 'REVIEW'].includes(row.status)).length,
+          fleetUtilization: `${summary.fleetUtilization}%`,
+          onTimeDelivery: `${summary.onTimeRate}%`,
+          inventoryAccuracy: `${summary.inventoryAccuracy}%`,
+          health: 'operational',
+        });
+        setHasLoaded(true);
+        setLastUpdated(
+          new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(
+            new Date(),
+          ),
+        );
+      } catch (err: any) {
+        setError(err?.message || 'Không tải được dữ liệu mẫu.');
+        setStats(INITIAL_STATS);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     const requests: Array<{ key: string; request: Promise<any>; optional?: boolean }> = [];
     const add = (key: string, request: Promise<any>, optional = false) =>
@@ -357,10 +403,14 @@ export default function DashboardPage() {
                 meta: 'Theo vai trò được cấp',
               },
               {
-                label: 'Trạng thái API',
-                value: stats.health === 'operational' ? 'Ổn định' : 'Chưa rõ',
-                meta: 'Kết nối dịch vụ',
-                tone: stats.health === 'operational' ? 'success' : 'default',
+                label: isMockDataSource ? 'Nguồn dữ liệu' : 'Trạng thái API',
+                value: isMockDataSource
+                  ? 'Dữ liệu mẫu'
+                  : stats.health === 'operational'
+                    ? 'Ổn định'
+                    : 'Chưa rõ',
+                meta: isMockDataSource ? 'Lưu trên trình duyệt' : 'Kết nối dịch vụ',
+                tone: isMockDataSource || stats.health === 'operational' ? 'success' : 'default',
               },
             ];
 
@@ -531,6 +581,37 @@ export default function DashboardPage() {
             { label: 'Kho', caption: 'Danh sách kho và vị trí', href: '/warehouses' },
           ];
 
+  const urgentRows = [
+    {
+      label: 'Cảnh báo SOS chưa đóng',
+      value: stats.sosOpen,
+      tone: 'danger' as StatusTone,
+      href: '/logistics/sos',
+      action: 'Mở SOS',
+    },
+    {
+      label: 'Phiếu COD đang lệch',
+      value: stats.disputedCod,
+      tone: 'warning' as StatusTone,
+      href: '/finance/cod',
+      action: 'Đối soát',
+    },
+    {
+      label: 'Đơn quá hạn giao',
+      value: stats.lateOrders,
+      tone: 'warning' as StatusTone,
+      href: '/orders',
+      action: 'Xem đơn',
+    },
+    {
+      label: 'Phiếu kiểm kê chờ duyệt',
+      value: stats.cycleCountDue,
+      tone: 'info' as StatusTone,
+      href: '/inventory/cycle-count',
+      action: 'Duyệt phiếu',
+    },
+  ].filter((row) => row.value > 0);
+
   const roleNote =
     role === 'TENANT_ADMIN'
       ? 'Kiểm tra lời mời và quyền truy cập trước khi bàn giao ca. Chỉ cấp quyền theo vai trò đã được phê duyệt.'
@@ -553,13 +634,25 @@ export default function DashboardPage() {
           </>
         }
         title="Bàn giao ca"
-        description={`Chào ${firstName}. Đây là các chỉ số cần nắm trước khi bắt đầu ca, lấy trực tiếp từ API vận hành của tenant.`}
+        description={`Chào ${firstName}. Đây là các chỉ số cần nắm trước khi bắt đầu ca, ${
+          isMockDataSource
+            ? 'lấy từ bộ dữ liệu mẫu lưu trên trình duyệt'
+            : 'lấy trực tiếp từ API vận hành của tenant'
+        }.`}
         meta={
           <>
             <p>{lastUpdated ? `Cập nhật lúc ${lastUpdated}` : 'Đang đồng bộ số liệu'}</p>
             <p className="mt-0.5">
-              <StatusLabel tone={stats.health === 'operational' ? 'success' : 'neutral'}>
-                {stats.health === 'operational' ? 'API ổn định' : 'Chưa xác định trạng thái API'}
+              <StatusLabel
+                tone={
+                  isMockDataSource || stats.health === 'operational' ? 'success' : 'neutral'
+                }
+              >
+                {isMockDataSource
+                  ? 'Dữ liệu mẫu sẵn sàng'
+                  : stats.health === 'operational'
+                    ? 'API ổn định'
+                    : 'Chưa xác định trạng thái API'}
               </StatusLabel>
             </p>
           </>
@@ -590,6 +683,46 @@ export default function DashboardPage() {
       ) : null}
 
       <MetricBand metrics={metrics} />
+
+      {isMockDataSource && hasLoaded ? (
+        <EditorialSection
+          eyebrow="Ưu tiên"
+          title="Cần xử lý ngay"
+          action={
+            <span className="text-[11px] text-ink-faint">
+              {urgentRows.length === 0 ? 'Không có việc khẩn' : `${urgentRows.length} nhóm việc`}
+            </span>
+          }
+        >
+          {urgentRows.length === 0 ? (
+            <EmptyNote>Không có cảnh báo SOS, lệch COD, đơn trễ hạn hay phiếu kiểm kê tồn.</EmptyNote>
+          ) : (
+            <div className="divide-y divide-line border-y border-line">
+              {urgentRows.map((row) => (
+                <div
+                  key={row.label}
+                  className="flex min-h-[42px] flex-wrap items-center justify-between gap-3 py-2"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <StatusLabel tone={row.tone}>{row.label}</StatusLabel>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-[13px] font-semibold tabular-nums text-ink">
+                      {row.value}
+                    </span>
+                    <Link
+                      href={row.href}
+                      className="text-[12px] font-medium text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent"
+                    >
+                      {row.action}
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </EditorialSection>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
         <EditorialSection
@@ -664,7 +797,7 @@ export default function DashboardPage() {
             </table>
           </div>
           {!hasLoaded && loading ? (
-            <p className="mt-3 text-[12px] text-ink-faint">Đang tải hàng đợi từ API…</p>
+            <p className="mt-3 text-[12px] text-ink-faint">Đang tải hàng đợi…</p>
           ) : null}
         </EditorialSection>
 
@@ -725,10 +858,20 @@ export default function DashboardPage() {
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink-faint">Kết nối API</dt>
+                <dt className="text-ink-faint">
+                  {isMockDataSource ? 'Nguồn dữ liệu' : 'Kết nối API'}
+                </dt>
                 <dd>
-                  <StatusLabel tone={stats.health === 'operational' ? 'success' : 'neutral'}>
-                    {stats.health === 'operational' ? 'Ổn định' : 'Chưa xác định'}
+                  <StatusLabel
+                    tone={
+                      isMockDataSource || stats.health === 'operational' ? 'success' : 'neutral'
+                    }
+                  >
+                    {isMockDataSource
+                      ? 'Dữ liệu mẫu'
+                      : stats.health === 'operational'
+                        ? 'Ổn định'
+                        : 'Chưa xác định'}
                   </StatusLabel>
                 </dd>
               </div>
@@ -736,8 +879,9 @@ export default function DashboardPage() {
           </div>
 
           <EmptyNote>
-            Số liệu được lấy trực tiếp từ API vận hành. Độ trễ đồng bộ có thể khác nhau giữa đơn
-            hàng, tồn kho và vận chuyển.
+            {isMockDataSource
+              ? 'Số liệu lấy từ bộ dữ liệu mẫu trong trình duyệt. Dùng nút Đặt lại ở thanh trên để trả về trạng thái ban đầu.'
+              : 'Số liệu được lấy trực tiếp từ API vận hành. Độ trễ đồng bộ có thể khác nhau giữa đơn hàng, tồn kho và vận chuyển.'}
           </EmptyNote>
         </aside>
       </div>

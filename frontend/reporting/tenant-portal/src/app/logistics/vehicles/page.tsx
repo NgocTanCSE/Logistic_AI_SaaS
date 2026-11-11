@@ -1,179 +1,300 @@
 'use client';
-import { useState } from 'react';
-import useSWR from 'swr';
-import api from '@/lib/api';
-import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
 
-const fetcher = (url: string) => api.get(url).then(res => res.data);
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import { Button, DataState, Input, Pagination, Select, TableState } from 'ui-components';
+import type { ReportFleetVehicle, Vehicle } from '@/lib/mock';
+import {
+  formatCurrency,
+  formatDateVN,
+  formatNumber,
+  vehicleStatusLabel,
+  vehicleStatusTone,
+} from '@/lib/labels';
+
+const PAGE_SIZE = 12;
+
+const PERIOD = new Date().toISOString().slice(0, 7);
+
+function costPerKm(vehicle?: ReportFleetVehicle) {
+  return vehicle && vehicle.distanceKm > 0
+    ? Math.round(vehicle.fuelCost / vehicle.distanceKm)
+    : 0;
+}
+
+/** Xe ghi nhận chi phí/km cao hơn trung bình đội 125% thì đánh dấu nhiệt. */
+function thermalOf(fleet: ReportFleetVehicle[], vehicle: ReportFleetVehicle) {
+  if (!vehicle || vehicle.fuelCost <= 0) return null;
+  const avg = fleet.length === 0 ? 0 : Math.round(fleet.reduce((s, v) => s + costPerKm(v), 0) / Math.max(1, fleet.length));
+  return costPerKm(vehicle) > avg * 1.25 ? 'Trên định mức' : 'Đưới định mức';
+}
 
 export default function VehiclesPage() {
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
+  const router = useRouter();
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [fleet, setFleet] = useState<ReportFleetVehicle[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const limit = 15;
+  const [filter, setFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<Vehicle['status'] | 'ALL'>('ALL');
+  const [page, setPage] = useState(1);
 
-  const { data, isLoading, mutate } = useSWR(
-    `/vehicles?page=${page}&limit=${limit}&search=${search}`,
-    fetcher
-  );
-
-  const vehicles = data?.data || [];
-  const meta = data?.meta || { total: 0, totalPages: 0 };
-
-  const handleAdd = async () => {
-    const plateNumber = prompt("Plate Number:");
-    if (!plateNumber) return;
+  const load = async () => {
+    setLoading(true);
+    setError('');
     try {
-      await api.post('/vehicles', { plateNumber, type: 'TRUCK_1T' });
-      mutate();
-    } catch (err) { console.error("Error adding asset", err); setError('Failed to add asset'); }
-  };
-
-  const handleDelete = async (id: string) => {
-    
-    try {
-      await api.delete(`/vehicles/${id}`);
-      mutate();
-    } catch (err) { console.error("Error deleting vehicle", err); setError('Failed to delete vehicle'); }
-  };
-
-  const handleEdit = async (vehicle: any) => {
-    const newPlate = prompt("Edit Plate Number:", vehicle.plateNumber);
-    if (!newPlate) return;
-    try {
-      await api.patch(`/vehicles/${vehicle.id}`, { plateNumber: newPlate });
-      mutate();
-    } catch (err) { console.error("Error updating vehicle", err); setError('Failed to update vehicle'); }
-  };
-
-  const getStatusVariant = (status: string) => {
-    switch(status) {
-      case 'ACTIVE': return 'success';
-      case 'MAINTENANCE': return 'warning';
-      case 'INACTIVE': return 'error';
-      default: return 'neutral';
+      const [vehiclesRes, fleetRes] = await Promise.all([
+        data.vehicles.list(),
+        data.reports.fleet({ period: PERIOD }),
+      ]);
+      setVehicles(vehiclesRes);
+      setFleet(fleetRes.byVehicle);
+    } catch (err: any) {
+      const msg = err?.message || 'Không tải được dữ liệu đội xe.';
+      setError(msg);
+      setVehicles([]);
+      setFleet([]);
+    } finally {
+      setLoading(false);
     }
   };
 
+  useEffect(() => {
+    load();
+  }, []);
+
+  const sortedVehicles = useMemo(() => {
+    const rows = vehicles.slice();
+    const term = filter.toLowerCase().trim();
+    const filtered = statusFilter === 'ALL' ? rows : rows.filter((v) => v.status === statusFilter);
+    if (term) {
+      return filtered.filter((v) => v.plate.toLowerCase().includes(term));
+    }
+    return filtered;
+  }, [vehicles, filter, statusFilter]);
+
+  const paged = useMemo(
+    () => sortedVehicles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [sortedVehicles, page],
+  );
+  const totalPages = Math.max(1, Math.ceil(sortedVehicles.length / PAGE_SIZE));
+
+  const metrics = [
+    { label: 'Đang vận hành', value: vehicles.filter((v) => v.status === 'IN_USE').length, meta: 'xe trên đường' },
+    { label: 'Sẵn sàng', value: vehicles.filter((v) => v.status === 'AVAILABLE').length, meta: 'chờ chuyến' },
+    { label: 'Bảo trì', value: vehicles.filter((v) => v.status === 'MAINTENANCE').length, meta: 'ngừng xe', tone: undefined },
+    { label: 'Vượt hạn bảo hiểm', value: formatNumber(vehicles.filter((v) => new Date(v.insuranceExpiry).getTime() < new Date().getTime()).length), meta: 'so với hôm nay' },
+  ];
+
   return (
-    <div className="p-8 max-w-7xl mx-auto ">
-      {error && <ErrorBanner message={error} onRetry={() => mutate()} />}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
-        <div>
-          <h1 className="text-4xl font-bold text-ink tracking-tight">
-            Fleet Assets
-          </h1>
-          <p className="text-sm text-inkSoft mt-2 font-medium">Manage your transport equipment, technical specifications, and service logs.</p>
-        </div>
-        <Button variant="primary" onClick={handleAdd} className="gap-2 shadow-lg ">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4"/></svg>
-          Register Asset
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <EditorialPageHeader
+        eyebrow="Vận tải"
+        title="Phương tiện"
+        description="Theo dõi đội xe, ghi nhận bảo trì, lưu lượng nhiên liệu và chi phí vận hành trên mỗi chuyến."
+        meta={`${vehicles.length} phương tiện`}
+        actions={
+          <Button variant="outline" size="sm" className="text-[11px] font-medium" onClick={load} disabled={loading}>
+            Làm mới
+          </Button>
+        }
+      />
 
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8">
-        <div className="relative w-full max-w-md group">
-          <Input 
-            placeholder="Search by plate number or model..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
-            icon={<svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
-          />
-        </div>
-      </div>
+      {error ? <p className="border-l-2 border-danger py-1 pl-3 text-[12px] text-danger">{error}</p> : null}
 
-      <Card className="">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/50 border-b border-border">
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Plate Identity</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Asset Type</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Max Load (KG)</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">Operation Status</th>
-                <th className="px-8 py-5 text-[11px] font-bold text-slate-500 uppercase tracking-widest text-right">Actions</th>
+      <MetricBand metrics={metrics} />
+
+      <EditorialSection
+        title="Phân tích chi phí theo xe"
+        eyebrow={`Tháng ${PERIOD}`}
+        action={
+          <Button variant="ghost" size="sm" className="text-[11px] font-medium" onClick={load} disabled={loading}>
+            Làm mới
+          </Button>
+        }
+      >
+        <DataState loading={loading} empty={!loading && fleet.length === 0}>
+          <table className="min-w-full divide-y divide-line text-[13px]">
+            <thead className="bg-surface-alt">
+              <tr>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Biển số
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Loại
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                  Chuyến
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                  Quãng đường
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                  Nhiên liệu
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                  Bảo trì
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Định mức
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Syncing Fleet Registry...</span>
-                    </div>
-                  </td>
-                </tr>
-              ) : vehicles.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center text-slate-400 font-bold uppercase tracking-widest text-xs">No vehicles registered in the fleet.</td>
-                </tr>
-              ) : (
-                vehicles.map((v: any) => (
-                  <tr key={v.id} className="hover:bg-slate-50/80 transition-all group">
-                    <td className="px-8 py-6">
-                      <div className="font-bold text-ink font-mono tracking-tight">{v.plateNumber}</div>
-                      <div className="text-[10px] text-slate-400 mt-1 font-bold uppercase tracking-wider">VIN: {v.id.split('-')[0]}</div>
-                    </td>
-                    <td className="px-8 py-6">
-                       <Badge variant="info">{v.type.replace('_', ' ')}</Badge>
-                    </td>
-                    <td className="px-8 py-6">
-                       <div className="text-sm font-bold text-ink">{v.capacityKg?.toLocaleString() || '0'} <span className="text-slate-400 font-medium">KG</span></div>
-                    </td>
-                    <td className="px-8 py-6">
-                       <Badge variant={getStatusVariant(v.status)}>{v.status}</Badge>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" className="p-2 h-9 w-9 rounded-xl text-slate-400 hover:text-primary" onClick={() => handleEdit(v)}>
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </Button>
-                        <Button variant="ghost" size="sm" className="p-2 h-9 w-9 rounded-xl text-slate-400 hover:text-red-500" onClick={() => handleDelete(v.id)}>
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </Button>
-                      </div>
+            <tbody className="divide-y divide-line">
+              <TableState
+                loading={loading}
+                empty={!loading && fleet.length === 0}
+                onRetry={load}
+                colSpan={7}
+                emptyContent={
+                  <tr>
+                    <td colSpan={7} className="px-3 py-8 text-center text-ink-faint">
+                      Chưa có dữ liệu phân tích nào cho tháng {PERIOD}.
                     </td>
                   </tr>
-                ))
-              )}
+                }
+                error={error ? new Error(error) : undefined}
+              >
+                {fleet.map((vehicle) => (
+                  <tr
+                    key={vehicle.id}
+                    className="hover:bg-surface-alt cursor-pointer"
+                    onClick={() => router.push(`/logistics/vehicles/${vehicle.id}/fuel`)}
+                  >
+                    <td className="px-3 py-2 font-medium text-ink">{vehicle.plate}</td>
+                    <td className="px-3 py-2 text-ink-soft">{vehicle.type}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatNumber(vehicle.trips)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatNumber(vehicle.distanceKm)} km</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(vehicle.fuelCost)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(vehicle.maintenanceCost)}</td>
+                    <td className="px-3 py-2">
+                      {thermalOf(fleet, vehicle) ? (
+                        <StatusLabel tone={thermalOf(fleet, vehicle) === 'Trên định mức' ? 'warning' : 'success'}>
+                          {thermalOf(fleet, vehicle)}
+                        </StatusLabel>
+                      ) : (
+                        <StatusLabel tone="neutral">Chưa ghi nhận</StatusLabel>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </TableState>
             </tbody>
           </table>
-        </div>
+        </DataState>
+      </EditorialSection>
 
-        {!isLoading && meta.totalPages > 1 && (
-          <div className="p-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-             <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
-              Asset Registry Page <span className="text-ink">{page}</span> of <span className="text-ink">{meta.totalPages}</span>
-            </span>
-            <div className="flex gap-2">
-              <Button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                variant="outline"
-                size="sm"
-                className="font-bold tracking-widest text-[10px]"
+      <EditorialSection title="Danh sách xe">
+        <div className="flex flex-wrap items-end gap-2 mb-3">
+          <Input
+            type="search"
+            placeholder="Tìm biển số xe"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(1);
+            }}
+            className="w-64 h-9"
+          />
+          <Select
+            className="h-9 min-w-[11rem]"
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as Vehicle['status'] | 'ALL');
+              setPage(1);
+            }}
+            options={[
+              { value: 'ALL', label: 'Tất cả trạng thái' },
+              { value: 'AVAILABLE', label: vehicleStatusLabel('AVAILABLE') },
+              { value: 'IN_USE', label: vehicleStatusLabel('IN_USE') },
+              { value: 'MAINTENANCE', label: vehicleStatusLabel('MAINTENANCE') },
+            ]}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-[11px] font-medium"
+            onClick={() => {
+              setFilter('');
+              setStatusFilter('ALL');
+            }}
+          >
+            Xóa bộ lọc
+          </Button>
+        </div>
+        <DataState loading={loading} empty={!loading && sortedVehicles.length === 0}>
+          <table className="min-w-full divide-y divide-line text-[13px]">
+            <thead className="bg-surface-alt">
+              <tr>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Biển số
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Loại xe
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Dung tích
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Tình trạng
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                  Km đồng hồ
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Hạn bảo hiểm
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              <TableState
+                loading={loading}
+                empty={!loading && paged.length === 0}
+                onRetry={load}
+                colSpan={6}
+                emptyContent={
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-ink-faint">
+                      Không tìm thấy xe.
+                    </td>
+                  </tr>
+                }
+                error={error ? new Error(error) : undefined}
               >
-                PREVIOUS
-              </Button>
-              <Button
-                onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
-                disabled={page === meta.totalPages}
-                variant="outline"
-                size="sm"
-                className="font-bold tracking-widest text-[10px]"
-              >
-                NEXT
-              </Button>
-            </div>
+                {paged.map((v) => (
+                  <tr
+                    key={v.id}
+                    className="hover:bg-surface-alt cursor-pointer"
+                    onClick={() => router.push(`/logistics/vehicles/${v.id}/fuel`)}
+                  >
+                    <td className="px-3 py-2 font-medium text-ink">{v.plate}</td>
+                    <td className="px-3 py-2 text-ink-soft">{v.type}</td>
+                    <td className="px-3 py-2 text-ink-soft">
+                      {formatNumber(v.capacityKg)} kg · {formatNumber(v.capacityCbm)} m³
+                    </td>
+                    <td className="px-3 py-2">
+                      <StatusLabel tone={vehicleStatusTone(v.status)}>{vehicleStatusLabel(v.status)}</StatusLabel>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatNumber(v.odometerKm)} km</td>
+                    <td className="px-3 py-2">{formatDateVN(v.insuranceExpiry)}</td>
+                  </tr>
+                ))}
+              </TableState>
+            </tbody>
+          </table>
+          <div className="flex justify-center py-3">
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
           </div>
-        )}
-      </Card>
+        </DataState>
+      </EditorialSection>
     </div>
   );
 }
-

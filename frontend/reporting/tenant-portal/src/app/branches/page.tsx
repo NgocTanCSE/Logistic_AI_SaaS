@@ -1,230 +1,186 @@
 'use client';
-import { DataState } from 'ui-components';
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/auth-context';
-import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Can } from '@/components/auth/Can';
-import api from '@/lib/api';
 
-type Branch = {
-  id: string;
-  name: string;
-  code: string;
-  type: string;
-  address: string;
-  status: string;
-};
+import { useEffect, useState } from 'react';
+import { EditorialPageHeader, EditorialSection, MetricBand, StatusLabel } from 'ui-kit';
+import { TableState, Input } from 'ui-components';
+import { data } from '@/lib/data';
+import type { Warehouse } from '@/lib/mock';
+import { warehouseStatusLabel, warehouseStatusTone, formatNumber } from '@/lib/labels';
 
 export default function BranchesPage() {
-  const { token } = useAuth();
-  const [branches, setBranches] = useState<Branch[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Modal states
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [form, setForm] = useState({ id: '', name: '', code: '', type: 'HUB', address: '', status: 'ACTIVE' });
   const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const limit = 20;
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
-  useEffect(() => {
-    fetchBranches();
-  }, [token, page]);
-
-  const fetchBranches = async () => {
+  const load = async () => {
+    setLoading(true);
     setError('');
     try {
-      const res = await api.get('/tenant/branches', { params: { page, limit } });
-      setBranches(res.data?.data || res.data || []);
-      setTotal(res.data?.meta?.total || 0);
-    } catch (err) {
-      console.error('Failed to fetch branches', err);
-      setError('Failed to fetch branches');
+      const all = await data.warehouses.list();
+      setWarehouses(all.sort((a, b) => b.code.localeCompare(a.code)));
+    } catch (err: any) {
+      setError(err?.message ?? 'Không tải được danh sách chi nhánh.');
     } finally {
       setLoading(false);
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  useEffect(() => {
+    load();
+  }, []);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSaving(true);
-    try {
-      if (form.id) {
-        await api.patch(`/tenant/branches/${form.id}`, form);
-      } else {
-        await api.post('/tenant/branches', form);
-      }
-      setIsModalOpen(false);
-      setForm({ id: '', name: '', code: '', type: 'HUB', address: '', status: 'ACTIVE' });
-      fetchBranches();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Network error');
-    } finally {
-      setSaving(false);
+  const visible = warehouses.filter((row) => {
+    if (filterStatus && row.status !== filterStatus) return false;
+    if (search) {
+      const term = search.toLowerCase();
+      return (
+        row.name.toLowerCase().includes(term) ||
+        row.code.toLowerCase().includes(term) ||
+        row.address.toLowerCase().includes(term) ||
+        row.province.toLowerCase().includes(term)
+      );
     }
-  };
+    return true;
+  });
 
-  const handleEdit = (br: Branch) => {
-    setForm({
-      id: br.id,
-      name: br.name,
-      code: br.code,
-      type: br.type,
-      address: br.address,
-      status: br.status || 'ACTIVE'
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = async (id: string) => {
-    
-    try {
-      await api.delete(`/tenant/branches/${id}`);
-      fetchBranches();
-    } catch (err) { console.error("Error deleting branch", err); setError('Failed to delete branch'); }
-  };
+  const active = warehouses.filter((row) => row.status === 'ACTIVE').length;
+  const maintenance = warehouses.filter((row) => row.status === 'MAINTENANCE').length;
+  const totalBins = warehouses.reduce((sum, row) => sum + (row.binCount || 0), 0);
+  const usedCapacity = warehouses.reduce((sum, row) => sum + row.usedCbm, 0);
+  const totalCapacity = warehouses.reduce((sum, row) => sum + row.capacityCbm, 0);
+  const capacityPct = totalCapacity === 0 ? 0 : Math.round((usedCapacity / totalCapacity) * 100);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto ">
-      {error && <ErrorBanner message={error} onRetry={fetchBranches} />}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-10">
-        <div>
-          <h1 className="text-4xl font-bold text-ink tracking-tight">Branch Registry</h1>
-          <p className="text-sm text-inkSoft mt-2 font-medium">Manage corporate offices, distribution hubs, and cross-docking points.</p>
+    <div className="space-y-6">
+      <EditorialPageHeader
+        eyebrow="Quản trị"
+        title="Chi nhánh"
+        description="Danh sách chi nhánh, kho trung tâm và điểm giao nhận. Dữ liệu kho được dùng làm cơ sở cho tất cả các nghiệp vụ lấy hàng."
+      />
+
+      {error ? (
+        <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas px-4 py-3">
+          <StatusLabel tone="danger">Lỗi dữ liệu</StatusLabel>
+          <span className="text-[12px] text-ink-soft">{error}</span>
+          <button type="button" onClick={load} className="ml-auto text-[11px] font-medium text-accent hover:underline">
+            Thử lại
+          </button>
         </div>
-        <Can perform="settings:manage">
-          <Button variant="primary" className="gap-2 shadow-lg " onClick={() => {
-            setForm({ id: '', name: '', code: '', type: 'HUB', address: '', status: 'ACTIVE' });
-            setIsModalOpen(true);
-          }}>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4"/></svg>
-            Register Branch
-          </Button>
-        </Can>
-      </div>
+      ) : null}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <DataState
-          loading={loading}
-        >
-          {branches.map((br) => (
-            <Card key={br.id} className="p-8 group hover:border-primary/30 transition-all">
-              <div className="flex justify-between items-start mb-6">
-                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-primary/5 text-primary flex items-center justify-center border border-primary/10">
-                       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-                    </div>
-                    <div>
-                       <h3 className="text-xl font-bold text-ink leading-tight">{br.name}</h3>
-                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">{br.code}</span>
-                    </div>
-                 </div>
-                 <Badge variant="success">{br.status}</Badge>
-              </div>
-              <div className="space-y-4 mb-8">
-                 <div className="flex items-center gap-3 text-sm font-medium text-inkSoft">
-                    <Badge variant="neutral" className="text-[8px]">{br.type}</Badge>
-                 </div>
-                 <p className="text-sm text-inkSoft font-medium flex items-start gap-2">
-                    <svg className="w-4 h-4 text-slate-300 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
-                    {br.address}
-                 </p>
-              </div>
-              <div className="pt-6 border-t border-slate-50 flex gap-2">
-                 <Can perform="settings:manage">
-                   <Button variant="outline" size="sm" className="w-full font-bold uppercase tracking-widest text-[10px]" onClick={() => handleEdit(br)}>Edit Details</Button>
-                   <Button variant="outline" size="sm" className="w-full font-bold uppercase tracking-widest text-[10px] text-ember border-ember/20 hover:bg-ember/5" onClick={() => handleDelete(br.id)}>Deactivate</Button>
-                 </Can>
-              </div>
-            </Card>
-          ))}
-        </DataState>
-      </div>
+      <MetricBand
+        metrics={[
+          { label: 'Chi nhánh', value: formatNumber(warehouses.length) },
+          {
+            label: 'Đang hoạt động',
+            value: formatNumber(active),
+            meta: `${maintenance} đang bảo trì`,
+          },
+          { label: 'Vị trí hàng', value: formatNumber(totalBins) },
+          {
+            label: 'Sử dụng kho',
+            value: `${capacityPct}%`,
+            meta: `${formatNumber(usedCapacity)}/${formatNumber(totalCapacity)} m³`,
+          },
+        ]}
+      />
 
-      {!loading && total > limit && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
-          <span className="text-sm text-slate-500">
-            Page {page} of {totalPages} ({total} branches)
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
-            </Button>
+      <EditorialSection title="Danh sách chi nhánh" eyebrow="Điểm giao nhận">
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <Input
+              type="search"
+              placeholder="Tìm theo mã, tên, thành phố, địa chỉ..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full"
+            />
+          </div>
+          <select
+            aria-label="Lọc trạng thái"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-8 border border-line bg-white px-2 text-[11px] text-ink-soft outline-none hover:border-line-strong"
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="ACTIVE">Hoạt động</option>
+            <option value="MAINTENANCE">Bảo trì</option>
+          </select>
+        </div>
+
+        <div className="rounded-xl border border-line bg-canvas">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left" cellPadding={0} cellSpacing={0}>
+              <thead>
+                <tr className="border-b border-line">
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                    Mã
+                  </th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                    Tên chi nhánh
+                  </th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                    Thành phố
+                  </th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                    Địa chỉ
+                  </th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                    Trạng thái
+                  </th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                    Vị trí
+                  </th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                    Người quản lý
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <TableState
+                  loading={loading}
+                  empty={!loading && visible.length === 0}
+                  error={error ? new Error(error) : undefined}
+                  onRetry={load}
+                  colSpan={7}
+                  emptyTitle="Chưa có chi nhánh nào"
+                  emptyDescription="Dữ liệu chi nhánh sẽ hiển thị khi có kho được tạo."
+                >
+                  {visible.map((row) => (
+                    <tr key={row.id} className="group border-b border-line last:border-b-0 transition-colors hover:bg-surface-alt">
+                      <td className="px-4 py-2">
+                        <span className="text-[12px] font-medium text-ink">{row.code}</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="text-[12px] font-medium text-ink">{row.name}</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="text-[11px] text-ink-faint">{row.province}</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="text-[11px] text-ink-soft">{row.address}</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <StatusLabel tone={warehouseStatusTone(row.status)}>
+                          {warehouseStatusLabel(row.status)}
+                        </StatusLabel>
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        <span className="tabular-nums text-[12px] text-ink">{formatNumber(row.binCount)}</span>
+                      </td>
+                      <td className="px-4 py-2">
+                        <span className="text-[11px] text-ink-faint">{row.manager}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </TableState>
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
-
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40  animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-6 border-b border-slate-100">
-              <h2 className="text-xl font-bold text-slate-900">{form.id ? 'Edit Branch' : 'Register New Branch'}</h2>
-              <p className="text-sm text-slate-500 mt-1">Provide details for the corporate office, distribution hub, or cross-docking point.</p>
-            </div>
-            
-            <form onSubmit={handleCreate} className="p-6">
-              {error && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-xl border border-red-100">{error}</div>}
-              
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Branch Name</label>
-                    <input required type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" placeholder="e.g., Ho Chi Minh Hub" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Branch Code</label>
-                    <input required type="text" value={form.code} onChange={e => setForm({...form, code: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" placeholder="e.g., SGN-HUB" />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Type</label>
-                    <select required value={form.type} onChange={e => setForm({...form, type: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm bg-white">
-                      <option value="HUB">Distribution Hub</option>
-                      <option value="CROSS_DOCK">Cross-Dock</option>
-                      <option value="OFFICE">Corporate Office</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Status</label>
-                    <select required value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm bg-white">
-                      <option value="ACTIVE">Active</option>
-                      <option value="INACTIVE">Inactive</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">Full Address</label>
-                  <input required type="text" value={form.address} onChange={e => setForm({...form, address: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm" placeholder="123 Street Name, City" />
-                </div>
-              </div>
-
-              <div className="mt-8 flex gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
-                  Cancel
-                </button>
-                <button type="submit" disabled={saving} className="flex-1 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm  disabled:opacity-50">
-                  {saving ? 'Saving...' : (form.id ? 'Update Branch' : 'Register Branch')}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      </EditorialSection>
     </div>
   );
 }
-

@@ -1,160 +1,197 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/lib/auth-context';
-import api from '@/lib/api';
-import { AIModel, initStore, fetchFromStoreOrAPI, getAll, update } from '@/lib/local-store';
+import { Button, TableState } from 'ui-components';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+} from 'ui-kit';
+import { formatDateTime, formatNumber } from '@/lib/format';
+import {
+  AIModel,
+  fetchFromStoreOrAPI,
+  getAll,
+  initStore,
+  update,
+  remove,
+} from '@/lib/local-store';
+
+function showToast(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') {
+  window.dispatchEvent(new CustomEvent('show-toast', { detail: { message, type } }));
+}
 
 export default function AIModelsPage() {
-  const { token } = useAuth();
   const [models, setModels] = useState<AIModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchModels = async () => {
-    if (!token) return;
+    setLoading(true);
+    setError(null);
     try {
-      setError(null);
       initStore();
       const data = await fetchFromStoreOrAPI<AIModel[]>('aiModels', '/ai/v1/models');
       setModels(Array.isArray(data) ? data : []);
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Failed to load AI models');
+      setError(err?.message || 'Failed to load AI models');
       setModels(getAll<AIModel[]>('aiModels'));
     } finally {
       setLoading(false);
     }
   };
 
-  const activateModel = async (modelId: string) => {
+  const activateModel = (modelId: string) => {
     try {
-      setError(null);
       setModels((prev) => prev.map((m) => ({ ...m, is_current: m.id === modelId })));
-      await api.patch(`/ai/v1/models/${modelId}/activate`);
       update('aiModels', modelId, { is_current: true });
-    } catch (err: any) {
-      // Local state updated optimistically; backend sync best-effort.
-      setError(err?.response?.data?.message || err.message || 'Failed to activate model');
+      showToast('Model activated successfully.', 'success');
+    } catch {
+      setError('Failed to activate model');
+      fetchModels();
     }
   };
 
-  const retrainModel = async (type: string) => {
+  const retrainModel = (modelId: string) => {
+    const model = models.find((m) => m.id === modelId);
+    if (!model) return;
     try {
-      setError(null);
-      const payload = { tenant_id: '__system__', schema_name: 'tenant' };
-      await api.post(`/ai/v1/train/${type}`, payload);
-      alert(`Training job started for ${type}`);
-    } catch (err: any) {
-      // AI worker unavailable — simulate locally.
       setModels((prev) =>
         prev.map((m) =>
-          m.type === type ? { ...m, trained_at: new Date().toISOString(), accuracy: Math.min(1, (m.accuracy ?? 0) + 0.02) } : m,
+          m.id === modelId
+            ? { ...m, trained_at: new Date().toISOString(), accuracy: Math.min(1, (m.accuracy ?? 0) + 0.02) }
+            : m,
         ),
       );
-      alert(`Training started for ${type} (offline simulation).`);
+      update('aiModels', modelId, {
+        trained_at: new Date().toISOString(),
+        accuracy: Math.min(1, (model.accuracy ?? 0) + 0.02),
+      });
+      showToast(`Training job started for ${model.name}.`, 'success');
+    } catch {
+      setError('Failed to start training job.');
+    }
+  };
+
+  const deleteModel = (modelId: string) => {
+    if (remove('aiModels', modelId)) {
+      setModels((prev) => prev.filter((m) => m.id !== modelId));
+      showToast('Model removed.', 'success');
     }
   };
 
   useEffect(() => {
     void fetchModels();
-  }, [token]);
-
-  if (loading) {
-    return (
-      <div className="p-6 space-y-4">
-        <div className="h-8 w-48 bg-surface/50 rounded animate-pulse" />
-        <div className="h-64 bg-surface/50 rounded animate-pulse" />
-      </div>
-    );
-  }
+  }, []);
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-ink">AI Model Management</h1>
-          <p className="text-sm text-inkSoft mt-1">
-            View, activate, and retrain AI models used across the platform.
-          </p>
-        </div>
-        <button
-          onClick={fetchModels}
-          className="text-xs px-3 py-1 rounded border border-border hover:bg-surface transition-colors"
-        >
-          Refresh
-        </button>
-      </div>
+    <div>
+      <EditorialPageHeader
+        eyebrow="AI & analytics"
+        title="Model management"
+        description="View, activate, retrain, and remove the AI models used across the platform."
+        meta={
+          <div className="text-[11px] leading-5">
+            {models.length > 0 ? `${models.length} models registered` : 'No models registered'}
+          </div>
+        }
+        actions={
+          <Button variant="outline" size="sm" onClick={fetchModels}>
+            Refresh
+          </Button>
+        }
+      />
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-          {error} — showing local data.
-        </div>
-      )}
+      <MetricBand
+        metrics={[
+          { label: 'Active models', value: formatNumber(models.filter((m) => m.is_current).length), meta: 'Currently deployed' },
+          { label: 'Inactive models', value: formatNumber(models.filter((m) => !m.is_current).length), meta: 'Available to deploy' },
+          { label: 'Highest accuracy', value: `${models.length > 0 ? `${Math.round(Math.max(...(models.map((m) => m.accuracy ?? 0)) * 100))}%` : '—'}`, meta: 'Accuracy of all models' },
+          { label: 'Trained recently', value: formatNumber(models.filter((m) => new Date(m.trained_at).getTime() > Date.now() - 7 * 24 * 60 * 60 * 1000).length), meta: 'Trained in the last 7 days' },
+        ]}
+      />
 
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-border/50 text-sm text-inkSoft uppercase">
-              <th className="py-3 pr-4">Name</th>
-              <th className="py-3 pr-4">Version</th>
-              <th className="py-3 pr-4">Type</th>
-              <th className="py-3 pr-4">Accuracy</th>
-              <th className="py-3 pr-4">Status</th>
-              <th className="py-3 pr-4">Trained At</th>
-              <th className="py-3 pr-4">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {models.length === 0 && (
-              <tr>
-                <td colSpan={7} className="py-8 text-center text-inkSoft">
-                  No AI models found. Train a model first.
-                </td>
+      <EditorialSection eyebrow="Models" title="All models">
+        {/* Data table */}
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-left">
+            <caption className="sr-only">All registered AI models</caption>
+            <thead>
+              <tr className="border-b border-line">
+                <th scope="col" className="h-8 pr-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Name</th>
+                <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Version</th>
+                <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Type</th>
+                <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Accuracy</th>
+                <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Status</th>
+                <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Trained at</th>
+                <th scope="col" className="h-8 pl-3 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Actions</th>
               </tr>
-            )}
-            {models.map((model) => (
-              <tr key={model.id} className="border-b border-border/30 hover:bg-surface/30 transition-colors">
-                <td className="py-3 pr-4 font-medium">{model.name}</td>
-                <td className="py-3 pr-4">{model.version}</td>
-                <td className="py-3 pr-4">
-                  <span className="capitalize px-2 py-0.5 rounded-full text-xs font-medium bg-accent/10 text-accent">
-                    {model.type}
-                  </span>
-                </td>
-                <td className="py-3 pr-4">
-                  {model.accuracy != null ? `${(model.accuracy * 100).toFixed(1)}%` : 'N/A'}
-                </td>
-                <td className="py-3 pr-4">
-                  {model.is_current ? (
-                    <span className="text-moss text-xs font-semibold">ACTIVE</span>
-                  ) : (
-                    <span className="text-inkSoft text-xs">Inactive</span>
-                  )}
-                </td>
-                <td className="py-3 pr-4 text-sm text-inkSoft">
-                  {new Date(model.trained_at).toLocaleDateString()}
-                </td>
-                <td className="py-3 pr-4 flex gap-2">
-                  {!model.is_current && (
-                    <button
-                      onClick={() => activateModel(model.id)}
-                      className="text-xs px-3 py-1 rounded border border-border hover:bg-surface transition-colors"
-                    >
-                      Activate
-                    </button>
-                  )}
-                  <button
-                    onClick={() => retrainModel(model.type)}
-                    className="text-xs px-3 py-1 rounded border border-border hover:bg-surface transition-colors"
-                  >
-                    Retrain
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              <TableState
+                loading={loading}
+                empty={!loading && models.length === 0}
+                error={error ? new Error(error) : undefined}
+                onRetry={fetchModels}
+                colSpan={7}
+                emptyTitle="No AI models found"
+                emptyDescription="Models trained by the platform will appear here."
+              >
+                {models.map((model) => (
+                  <tr key={model.id} className="h-[42px] border-b border-line/80 transition-colors hover:bg-surface-alt/60">
+                    <td className="pr-3 text-[12px] font-medium text-ink">{model.name}</td>
+                    <td className="px-3 text-[12px] tabular-nums text-ink-soft">{model.version}</td>
+                    <td className="px-3 text-[12px]">
+                      <StatusLabel tone={model.type === 'demand' || model.type === 'anomaly' ? 'info' : model.type === 'churn' ? 'warning' : 'neutral'}>
+                        {model.type ?? '—'}
+                      </StatusLabel>
+                    </td>
+                    <td className="px-3 text-[12px] tabular-nums text-ink-soft">
+                      {model.accuracy != null ? `${(model.accuracy * 100).toFixed(1)}%` : '—'}
+                    </td>
+                    <td className="px-3">
+                      <StatusLabel tone={model.is_current ? 'success' : 'neutral'}>
+                        {model.is_current ? 'Active' : 'Inactive'}
+                      </StatusLabel>
+                    </td>
+                    <td className="px-3 text-[12px] tabular-nums text-ink-soft">
+                      {model.trained_at ? formatDateTime(model.trained_at) : '—'}
+                    </td>
+                    <td className="pl-3 text-right">
+                      <div className="flex justify-end gap-2">
+                        {!model.is_current && (
+                          <button
+                            type="button"
+                            onClick={() => activateModel(model.id)}
+                            className="text-[11px] font-medium text-ink-soft underline decoration-ink-faint/30 underline-offset-2 hover:text-accent hover:decoration-accent"
+                          >
+                            Activate
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => retrainModel(model.id)}
+                          className="text-[11px] font-medium text-ink-soft underline decoration-ink-faint/30 underline-offset-2 hover:text-accent hover:decoration-accent"
+                        >
+                          Retrain
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteModel(model.id)}
+                          className="text-[11px] font-medium text-ink-soft underline decoration-ink-faint/30 underline-offset-2 hover:text-danger hover:decoration-danger"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </TableState>
+            </tbody>
+          </table>
+        </div>
+      </EditorialSection>
     </div>
   );
 }

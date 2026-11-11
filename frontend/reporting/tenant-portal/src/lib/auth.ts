@@ -33,7 +33,13 @@ export const getToken = (): string | null => {
 export const getUser = () => {
   if (!isBrowser()) return null;
   const raw = window.localStorage.getItem(USER_KEY);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    window.localStorage.removeItem(USER_KEY);
+    return null;
+  }
 };
 
 export const setSession = (token: string) => {
@@ -42,6 +48,7 @@ export const setSession = (token: string) => {
   const user = {
     id: payload.sub || payload.userId || "",
     email: payload.email || "",
+    fullName: payload.fullName || payload.name || undefined,
     role: payload.role || "TENANT_USER",
     tenantId: payload.tenant_id || payload.tenantId,
     slug: payload.tenant_slug || "",

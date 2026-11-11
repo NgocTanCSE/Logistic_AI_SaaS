@@ -1,12 +1,14 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { GoogleLoginButton } from '@/components/ui/GoogleLoginButton';
+import { Button } from 'ui-components';
+import { EditorialPageHeader, EmptyNote } from 'ui-kit';
 import { useAuth } from '@/lib/auth-context';
 import { DEMO_TOKEN, createDemoToken } from '@/lib/auth';
 import { AdminRole, ROLE_LABELS } from '@/lib/rbac';
 import api from '@/lib/api';
+import { GoogleLoginButton } from '@/components/ui/GoogleLoginButton';
 
 export default function AdminLogin() {
   const [loading, setLoading] = useState(false);
@@ -16,6 +18,10 @@ export default function AdminLogin() {
   const router = useRouter();
   const { login } = useAuth();
   const [selectedDemoRole, setSelectedDemoRole] = useState<AdminRole>('SUPER_ADMIN');
+
+  // Google Sign-In requires a configured client ID; fall back to the demo
+  // account (or password login) when it is not set up yet.
+  const showGoogle = typeof window !== 'undefined' && !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +41,10 @@ export default function AdminLogin() {
         login(DEMO_TOKEN);
         router.push('/admin/dashboard');
       } else {
-        setError(err?.response?.data?.message || 'Unable to sign in. Use "Demo Login" if no backend is available.');
+        setError(
+          err?.response?.data?.message ||
+            'Unable to sign in. Use "Try the demo account" if no backend is available.',
+        );
       }
     } finally {
       setLoading(false);
@@ -64,110 +73,105 @@ export default function AdminLogin() {
     setError(errorMessage);
   };
 
+  const handleDemoLogin = () => {
+    login(createDemoToken(selectedDemoRole));
+    router.push('/admin/dashboard');
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-alt p-6">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25H6.75a2.25 2.25 0 01-2.25-2.25V6.75a2.25 2.25 0 012.25-2.25h10.5a2.25 2.25 0 012.25 2.25z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 12.75h.008v.008H12v-.008zM12 9.75h.008v.008H12V9.75z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-ink">Admin Portal</h1>
-          <p className="mt-2 text-sm text-ink-soft">Sign in to manage SmartLogi tenants and billing</p>
-        </div>
-
-        {error && (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handlePasswordLogin} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-ink mb-1">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@smartlogi.vn"
-              className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20"
-              required
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-ink mb-1">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter password"
-              className="w-full rounded-xl border border-border bg-white px-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20"
-              required
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 transition-colors"
-          >
-            {loading ? 'Signing in…' : 'Sign In'}
-          </button>
-        </form>
-
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border"></div>
-          </div>
-          <div className="relative flex justify-center text-xs text-ink-soft">
-            <span className="bg-surface-alt px-2">Or continue with Google</span>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <GoogleLoginButton
-            onSuccess={handleGoogleSuccess}
-            onError={handleError}
-            loading={loading}
+    <div className="min-h-screen bg-canvas p-6">
+      <div className="mx-auto grid max-w-[72rem] gap-8 md:grid-cols-2">
+        <div className="self-center space-y-6">
+          <EditorialPageHeader
+            title="Admin portal"
+            description="Manage SmartLogi tenants, orders and billing from a single dashboard."
           />
+          <EmptyNote>
+            Demo data only. The "Try the demo account" session is local and does not
+            modify any backend data.
+          </EmptyNote>
         </div>
 
-        <div className="pt-4">
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-ink mb-1">Demo Role</label>
-            <select
-              value={selectedDemoRole}
-              onChange={(e) => setSelectedDemoRole(e.target.value as AdminRole)}
-              className="w-full rounded-xl border border-border bg-surface-alt px-4 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              {(Object.keys(ROLE_LABELS) as AdminRole[]).map((role) => (
-                <option key={role} value={role}>{ROLE_LABELS[role]}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              login(createDemoToken(selectedDemoRole));
-              router.push('/admin/dashboard');
-            }}
-            className="mt-2 w-full rounded-xl border border-border bg-surface-alt px-4 py-2.5 text-sm font-medium text-ink hover:bg-surface transition-colors"
-          >
-            Demo Login as {ROLE_LABELS[selectedDemoRole]}
-          </button>
-        </div>
+        <div className="self-center">
+          <form onSubmit={handlePasswordLogin} className="space-y-5">
+            {error && (
+              <div className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-[12px] text-danger">
+                {error}
+              </div>
+            )}
 
-        <div className="text-center text-xs text-ink-soft">
-          By signing in, you agree to the SmartLogi Terms of Service.
+            <label className="block">
+              <span className="text-[11px] font-medium text-ink-soft">Email</span>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@smartlogi.vn"
+                required
+                className="mt-1 h-9 w-full rounded-md border border-line bg-white px-3 text-[13px] outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-[11px] font-medium text-ink-soft">Password</span>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                required
+                className="mt-1 h-9 w-full rounded-md border border-line bg-white px-3 text-[13px] outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+              />
+            </label>
+
+            <Button type="submit" variant="primary" className="h-11 w-full" disabled={loading}>
+              {loading ? 'Signing in...' : 'Sign in'}
+            </Button>
+
+            <Button type="button" variant="secondary" className="h-11 w-full" onClick={handleDemoLogin}>
+              Try the demo account
+            </Button>
+
+            {showGoogle && (
+              <div className="mt-6">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-line" />
+                  </div>
+                  <div className="relative flex justify-center text-[11px] text-ink-faint">
+                    <span className="bg-canvas px-2">Or continue with Google</span>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <GoogleLoginButton
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleError}
+                    loading={loading}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="mt-6">
+              <span className="text-[11px] font-medium text-ink-faint">Demo role</span>
+              <select
+                value={selectedDemoRole}
+                onChange={(e) => setSelectedDemoRole(e.target.value as AdminRole)}
+                className="mt-1 h-9 w-full rounded-md border border-line bg-white px-3 text-[13px] outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+              >
+                {(Object.keys(ROLE_LABELS) as AdminRole[]).map((role) => (
+                  <option key={role} value={role}>
+                    {ROLE_LABELS[role]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </form>
         </div>
       </div>
     </div>

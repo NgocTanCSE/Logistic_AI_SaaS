@@ -1,158 +1,376 @@
 'use client';
-import { DataState } from 'ui-components';
-import { useState, useEffect } from 'react';
-import {formatDateTime} from '@/lib/date-utils';
-import api from '@/lib/api';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
 
-type SosAlert = {
-  id: string;
-  driverId: string;
-  tripId: string;
-  message: string;
-  status: string;
-  createdAt: string;
-  driver: {
-    user: { fullName: string; email: string };
-  };
+import { useEffect, useState, useMemo } from 'react';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import type { EditorialMetric } from 'ui-kit';
+import {
+  Button,
+  DataState,
+  Input,
+  Modal,
+  Pagination,
+  Select,
+} from 'ui-components';
+import type { SosAlert } from '@/lib/mock';
+import {
+  sosAlertStatusLabel,
+  sosAlertStatusTone,
+  sosAlertKindLabel,
+  sosAlertSeverityTone,
+  formatDateTimeVN,
+} from '@/lib/labels';
+
+/** Toast chỉ là kết nối vào `ToastHost` mount ở root layout. */
+const toast = (message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') =>
+  window.dispatchEvent(new CustomEvent('show-toast', { detail: { message, type } }));
+
+const ALERT_KINDS: SosAlert['kind'][] = ['PANIC', 'GEOFENCE_BREACH', 'OFF_ROUTE', 'IDLE_TOO_LONG'];
+
+/** Thứ tự ưu tiên: mở trước, đã tiếp nhận giữa, đã đóng sau; thời gian mới nhất nhất trên đầu. */
+const ALERT_STATUS_ORDER: Record<SosAlert['status'], number> = {
+  OPEN: 0,
+  ACKNOWLEDGED: 1,
+  RESOLVED: 2,
 };
+
+const PAGE_SIZE = 10;
+
+/** Trạng thái vừa đóng modal giải quyết, ẩn sau khi hoàn tác. */
+type ResolveForm = { id: string; code: string };
 
 export default function SosControlCenterPage() {
   const [alerts, setAlerts] = useState<SosAlert[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dispatchModalOpen, setDispatchModalOpen] = useState(false);
-  const [selectedDriverName, setSelectedDriverName] = useState('');
+  const [error, setError] = useState('');
+  const [mutating, setMutating] = useState<string>('');
+
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<SosAlert['status'] | 'ALL'>('ALL');
+  const [kindFilter, setKindFilter] = useState<SosAlert['kind'] | 'ALL'>('ALL');
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const limit = 20;
+  const [resolveForm, setResolveForm] = useState<ResolveForm | null>(null);
+  const [resolveNote, setResolveNote] = useState('');
+  const [noteError, setNoteError] = useState('');
 
-  useEffect(() => {
-    fetchAlerts();
-    const interval = setInterval(fetchAlerts, 10000);
-    return () => clearInterval(interval);
-  }, [page]);
 
-  const fetchAlerts = async () => {
+  const load = async () => {
+    setLoading(true);
+    setError('');
     try {
-      const res = await api.get('/logistics/finance/sos', { params: { status: 'OPEN', page, limit } });
-      setAlerts(res.data?.data || res.data || []);
-      setTotal(res.data?.meta?.total || 0);
-    } catch (err) {
-      console.error("Failed to fetch SOS alerts", err);
+      const list = await data.sosAlerts.list();
+      setAlerts(list);
+    } catch (err: any) {
+      setError(err?.message || 'Không tải được dữ liệu cảnh báo.');
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResolve = async (id: string) => {
+  useEffect(() => {
+    load();
+  }, []);
+
+  const metrics = useMemo<EditorialMetric[]>(() => {
+    const open = alerts.filter((a) => a.status === 'OPEN');
+    const acknowledged = alerts.filter((a) => a.status === 'ACKNOWLEDGED');
+    const resolved = alerts.filter((a) => a.status === 'RESOLVED');
+    const criticalOpen = open.filter((a) => a.severity === 'CRITICAL' || a.severity === 'HIGH');
+    return [
+      {
+        label: 'Mở',
+        value: open.length,
+        tone: open.length > 0 ? 'danger' : 'success',
+        meta: open.length > 0 ? 'cần xử lý ngay' : 'không có yêu cầu mở',
+      },
+      { label: 'Đã tiếp nhận', value: acknowledged.length, meta: 'chờ đóng cảnh báo' },
+      { label: 'Đã đóng', value: resolved.length, meta: `${resolved.length} cảnh báo đã xử lý xong` },
+      {
+        label: 'Năng trọng',
+        value: criticalOpen.length,
+        tone: criticalOpen.length > 0 ? 'danger' : 'success',
+        meta: 'CRITICAL hoặc HIGH còn mở',
+      },
+    ];
+  }, [alerts]);
+
+  // Lọc và sắp xếp: trạng thái cụm hành vi dùng trước, thời gian giảm dần.
+  const filtered = useMemo(() => {
+    const rows = alerts.slice();
+    rows.sort((a, b) => {
+      const ka = ALERT_STATUS_ORDER[a.status];
+      const kb = ALERT_STATUS_ORDER[b.status];
+      if (ka !== kb) return ka - kb;
+      return b.createdAt > a.createdAt ? -1 : 1;
+    });
+    const term = search.toLowerCase().trim();
+    return rows.filter((a) => {
+      const matchStatus = statusFilter === 'ALL' || a.status === statusFilter;
+      const matchKind = kindFilter === 'ALL' || a.kind === kindFilter;
+      const matchSearch = term
+        ? a.driverName.toLowerCase().includes(term) ||
+          a.code.toLowerCase().includes(term) ||
+          a.tripCode.toLowerCase().includes(term) ||
+          (a.note ? a.note.toLowerCase().includes(term) : false)
+        : true;
+      return matchStatus && matchKind && matchSearch;
+    });
+  }, [alerts, search, statusFilter, kindFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
+
+  const openResolveModal = (alert: SosAlert) => {
+    setResolveForm({ id: alert.id, code: alert.code });
+    setResolveNote(alert.note ?? '');
+    setNoteError('');
+  };
+  const closeResolveModal = () => {
+    setResolveForm(null);
+    setResolveNote('');
+    setNoteError('');
+  };
+
+  const handleAcknowledge = async (alert: SosAlert) => {
+    setMutating(alert.id);
     try {
-      await api.patch(`/logistics/finance/sos/${id}/resolve`, { status: 'RESOLVED' });
-      fetchAlerts();
-    } catch (err) {
-      console.log("Failed to resolve alert");
+      await data.sosAlerts.acknowledge(alert.id);
+      setAlerts((prev) => prev.map((a) => (a.id === alert.id ? { ...a, status: 'ACKNOWLEDGED', acknowledgedBy: 'Bạn (demo)' } : a)));
+      toast(`Tiếp nhận ${alert.code} thành công.`, 'success');
+    } catch (err: any) {
+      toast(err?.message || 'Không thể tiếp nhận cảnh báo.', 'error');
+    } finally {
+      setMutating('');
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const handleResolve = async () => {
+    if (!resolveForm) return;
+    if (!resolveNote.trim()) {
+      setNoteError('Vui lòng nhập ghi chú xử lý để đóng cảnh báo.');
+      return;
+    }
+    setMutating(resolveForm.id);
+    try {
+      const alert = await data.sosAlerts.resolve(resolveForm.id, resolveNote);
+      setAlerts((prev) => prev.map((a) => (a.id === resolveForm.id ? alert : a)));
+      toast(`Đóng ${resolveForm.code} thành công.`, 'success');
+      closeResolveModal();
+    } catch (err: any) {
+      setNoteError(err?.message || 'Không thể đóng cảnh báo.');
+    } finally {
+      setMutating('');
+    }
+  };
+
+  const handleReset = async () => {
+    try {
+      await data.controls({ reset: true });
+      load();
+      toast('Đã khôi phục dữ liệu demo.', 'success');
+    } catch (err: any) {
+      toast(err?.message || 'Không tải lại dữ liệu demo.', 'error');
+    }
+  };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto ">
-      <div className="flex justify-between items-center mb-10">
-        <div>
-          <h1 className="text-4xl font-bold text-rose-600 tracking-tight flex items-center gap-4">
-            <span className="relative flex h-4 w-4">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500"></span>
-            </span>
-            SOS Control Center
-          </h1>
-          <p className="text-sm text-inkSoft mt-2 font-medium">Real-time emergency monitoring and crisis response.</p>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <EditorialPageHeader
+        eyebrow="Vận tải · An toàn"
+        title="Trung tâm cảnh báo SOS"
+        description="Theo dõi yêu cầu SOS từ tài xế: tiếp nhận, xử lý và đóng cảnh báo theo đúng trình tự. Chỉ những cảnh báo đã tiếp nhận mới được đóng."
+        meta={`${alerts.length} cảnh báo · ${filtered.length} khớp bộ lọc`}
+        actions={
+          <Button variant="outline" size="sm" className="text-[11px] font-medium" onClick={handleReset}>
+            Khôi phục dữ liệu
+          </Button>
+        }
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      {error ? (
+        <p className="border-l-2 border-danger py-1 pl-3 text-[12px] text-danger">{error}</p>
+      ) : null}
+
+      <MetricBand metrics={metrics} />
+
+      <EditorialSection title="Danh sách cảnh báo" eyebrow="Lọc + tìm">
+        <div className="flex flex-wrap items-end gap-2">
+          <Input
+            type="search"
+            placeholder="Tìm mã cảnh báo, tài xế, chuyến"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="w-64 h-9"
+          />
+          <Select
+            className="h-9 min-w-[9rem]"
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as SosAlert['status'] | 'ALL');
+              setPage(1);
+            }}
+            options={[
+              { value: 'ALL', label: 'Tất cả trạng thái' },
+              { value: 'OPEN', label: sosAlertStatusLabel('OPEN') },
+              { value: 'ACKNOWLEDGED', label: sosAlertStatusLabel('ACKNOWLEDGED') },
+              { value: 'RESOLVED', label: sosAlertStatusLabel('RESOLVED') },
+            ]}
+          />
+          <Select
+            className="h-9 min-w-[10rem]"
+            value={kindFilter}
+            onChange={(e) => {
+              setKindFilter(e.target.value as SosAlert['kind'] | 'ALL');
+              setPage(1);
+            }}
+            options={[
+              { value: 'ALL', label: 'Tất cả loại' },
+              ...ALERT_KINDS.map((k) => ({ value: k, label: sosAlertKindLabel(k) })),
+            ]}
+          />
+        </div>
+      </EditorialSection>
+
+      <EditorialSection title="Bảng cảnh báo">
         <DataState
           loading={loading}
-          empty={!loading && alerts.length === 0}
-          
-          onRetry={fetchAlerts}
-          emptyContent={<div className="md:col-span-2 py-20 text-center bg-emerald-50 rounded-3xl border-2 border-emerald-100/50">
-             <svg className="w-12 h-12 text-emerald-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-             <p className="font-bold text-emerald-800">No active SOS alerts</p>
-             <p className="text-sm text-emerald-600 mt-1">All fleet operations are currently safe.</p>
-          </div>}
+          empty={!loading && filtered.length === 0}
+          error={error || undefined}
+          onRetry={load}
+          emptyTitle="Không có cảnh báo nào khớp bộ lọc."
+          emptyDescription="Thử bớt bộ lọc hoặc tắt thanh điều chỉnh thời gian."
+          loadingRows={5}
         >
-          {alerts.map(alert => (
-            <Card key={alert.id} className="border-rose-200 bg-rose-50/30 overflow-hidden group">
-              <div className="p-8">
-                <div className="flex justify-between items-start mb-6">
-                   <div>
-                     <div className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-1">Emergency Signal</div>
-                     <div className="text-xl font-bold text-ink">{alert.driver?.user?.fullName}</div>
-                   </div>
-                   <Badge variant="error" className="animate-pulse">CRITICAL</Badge>
-                </div>
-                
-                <div className="bg-white rounded-2xl p-5 border border-rose-100 mb-8">
-                  <p className="text-sm font-bold text-ink italic">"{alert.message || 'No message provided'}"</p>
-                  <p className="text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-wide">
-                    {formatDateTime(alert.createdAt)}
-                  </p>
-                </div>
-
-                <div className="flex gap-3">
-                   <Button variant="primary" className="flex-1 bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-200" onClick={() => handleResolve(alert.id)}>
-                      MARK AS RESOLVED
-                   </Button>
-                   <Button variant="outline" className="flex-1 border-rose-200 text-rose-600 hover:bg-rose-50" onClick={() => {
-                     setSelectedDriverName(alert.driver?.user?.fullName || 'Unknown Driver');
-                     setDispatchModalOpen(true);
-                   }}>
-                      DISPATCH HELP
-                   </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+          <table className="min-w-full divide-y divide-line text-[13px]">
+            <thead className="bg-surface-alt">
+              <tr>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Cảnh báo</th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Tài xế</th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Loại</th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Trạng thái</th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Chuyến</th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Ghi chú</th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Hành động</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {paged.map((a) => (
+                <tr
+                  key={a.id}
+                  className={`transition-colors hover:bg-surface-alt ${a.status === 'OPEN' ? 'border-l-2 border-danger bg-surface-alt' : 'border-l-2 border-transparent'}`}
+                >
+                  <td className="pr-3 py-2">
+                    <p className="font-medium text-ink">{a.code}</p>
+                    <p className="font-mono text-[11px] text-ink-faint">{a.tripCode}</p>
+                    <p className="text-[11px] text-ink-faint">{formatDateTimeVN(a.createdAt)}</p>
+                  </td>
+                  <td className="pr-3 py-2">{a.driverName}</td>
+                  <td className="pr-3 py-2">
+                    <StatusLabel tone={sosAlertSeverityTone(a.severity)}>{sosAlertKindLabel(a.kind)}</StatusLabel>
+                  </td>
+                  <td className="pr-3 py-2">
+                    <StatusLabel tone={sosAlertStatusTone(a.status)}>{sosAlertStatusLabel(a.status)}</StatusLabel>
+                  </td>
+                  <td className="pr-3 py-2">
+                    <p className="text-[12px] text-ink-soft truncate" title={a.lat == null ? '' : `${a.lat}, ${a.lng}`}>
+                      {a.lat == null ? '—' : `${a.lat.toFixed(4)}, ${a.lng.toFixed(4)}`}
+                    </p>
+                  </td>
+                  <td className="pr-3 py-2">
+                    <p className="text-[12px] text-ink-soft truncate" title={a.note ?? ''}>
+                      {a.status === 'RESOLVED' ? a.note : (a.note ? a.note.slice(0, 40) + '…' : '—')}
+                    </p>
+                  </td>
+                  <td className="py-2">
+                    {a.status === 'OPEN' ? (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        className="text-[11px] font-medium bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:pointer-events-none"
+                        disabled={mutating === a.id}
+                        onClick={() => handleAcknowledge(a)}
+                      >
+                        Tiếp nhận
+                      </Button>
+                    ) : a.status === 'ACKNOWLEDGED' ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-[11px] font-medium border-line-strong text-ink hover:bg-surface-alt disabled:opacity-50 disabled:pointer-events-none"
+                        disabled={mutating === a.id}
+                        onClick={() => openResolveModal(a)}
+                      >
+                        Đóng
+                      </Button>
+                    ) : (
+                      <span className="text-[11px] text-ink-faint">{a.acknowledgedBy ?? '—'}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </DataState>
-      </div>
-
-      {!loading && total > limit && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
-          <span className="text-sm text-slate-500">
-            Page {page} of {totalPages} ({total} alerts)
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
-            </Button>
-          </div>
+        <div className="flex justify-center py-3">
+          <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
         </div>
-      )}
+      </EditorialSection>
 
-      {/* Dispatch Help Modal */}
-      {dispatchModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40  ">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-8 text-center border-t-4 border-t-rose-500">
-            <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-100">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+      <Modal
+        isOpen={!!resolveForm}
+        onClose={closeResolveModal}
+        title="Đóng cảnh báo"
+        size="sm"
+        footer={
+          <>
+            <Button size="sm" variant="outline" className="text-[11px] font-medium" onClick={closeResolveModal}>
+              Huỷ
+            </Button>
+            <Button size="sm" variant="primary" className="text-[11px] font-medium bg-accent hover:bg-accent-hover" onClick={handleResolve} disabled={mutating === resolveForm?.id}>
+              Đóng cảnh báo
+            </Button>
+          </>
+        }
+      >
+        {resolveForm ? (
+          <div className="space-y-3">
+            <div className="p-3 border border-line bg-surface">
+              <p className="text-[11px] font-medium text-ink-faint uppercase">Mã cảnh báo</p>
+              <p className="text-[15px] font-semibold text-ink">{resolveForm.code}</p>
             </div>
-            <h2 className="text-2xl font-bold text-ink mb-2">Help Dispatched</h2>
-            <p className="text-slate-500 text-sm mb-6">
-              Emergency responders and the nearest available fleet supervisor have been dispatched for <b>{selectedDriverName}</b>.
-            </p>
-            <div className="flex justify-center">
-              <Button variant="primary" className="bg-rose-600 hover:bg-rose-700 w-full" onClick={() => setDispatchModalOpen(false)}>Acknowledge</Button>
-            </div>
+            {noteError ? <p className="text-[12px] text-danger">{noteError}</p> : null}
+            <label htmlFor="sos-note" className="text-[12px] font-medium text-ink-soft">
+              Ghi chú xử lý
+            </label>
+            <textarea
+              id="sos-note"
+              rows={3}
+              className="w-full resize-none rounded-lg border border-line bg-surface text-[13px] p-3 text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+              value={resolveNote}
+              onChange={(e) => {
+                setResolveNote(e.target.value);
+                setNoteError('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.metaKey) handleResolve();
+              }}
+            />
+            <EmptyNote>
+              Ghi chú bắt buộc khi đóng cảnh báo. Tài xế sẽ được thông báo kết quả xử lý.
+            </EmptyNote>
           </div>
-        </div>
-      )}
+        ) : null}
+      </Modal>
     </div>
   );
 }
-

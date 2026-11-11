@@ -1,159 +1,272 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from 'react';
-import api from '@/lib/api';
-import { Search, RotateCcw, ArrowLeft } from '@/components/icons';
-import { formatVnd } from '@/lib/format';
+import { useCallback, useEffect, useState } from 'react';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  StatusLabel,
+} from 'ui-kit';
+import { TableState, Select, Input, Modal, Button } from 'ui-components';
+import {
+  formatCurrency,
+  formatDateVN,
+  formatDateTimeVN,
+  returnStatusLabel,
+  returnStatusTone,
+  returnReasonLabel,
+  listSummary,
+} from '@/lib/labels';
+import type { ReturnReason } from '@/lib/mock';
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  PENDING: { label: 'Pending Approval', color: 'text-yellow-600 bg-yellow-400/10' },
-  APPROVED: { label: 'Approved', color: 'text-blue-600 bg-blue-400/10' },
-  PICKUP_SCHEDULED: { label: 'Pickup Scheduled', color: 'text-purple-400 bg-purple-400/10' },
-  PICKED_UP: { label: 'Picked Up', color: 'text-orange-400 bg-orange-400/10' },
-  INSPECTED: { label: 'Inspected', color: 'text-cyan-400 bg-cyan-400/10' },
-  REFUNDED: { label: 'Refunded', color: 'text-green-600 bg-green-400/10' },
-  REJECTED: { label: 'Rejected', color: 'text-red-600 bg-red-400/10' },
-  CLOSED: { label: 'Closed', color: 'text-ink-soft bg-zinc-400/10' },
-};
+/** Yêu cầu trả hàng của khách: danh sách, theo dõi trạng thái, tạo yêu cầu từ đơn đã giao. */
 
-export default function ClientReturnsPage() {
+const RETURN_STATUS_OPTIONS = [
+  { value: '', label: 'Tất cả trạng thái' },
+  { value: 'REQUESTED', label: 'Chờ duyệt' },
+  { value: 'APPROVED', label: 'Đã duyệt' },
+  { value: 'IN_TRANSIT', label: 'Đang về kho' },
+  { value: 'INSPECTING', label: 'Đang kiểm định' },
+  { value: 'REFUNDED', label: 'Đã hoàn tiền' },
+  { value: 'REJECTED', label: 'Từ chối' },
+  { value: 'CLOSED', label: 'Đã đóng' },
+];
+
+export default function ClientReturns() {
   const [returns, setReturns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<any>(null);
+  const [error, setError] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [formResult, setFormResult] = useState('');
+  const [orderCode, setOrderCode] = useState('');
+  const [reason, setReason] = useState<ReturnReason | ''>('');
+  const [note, setNote] = useState('');
 
-  useEffect(() => {
-    fetchReturns();
-  }, []);
-
-  const fetchReturns = async () => {
+  const fetchReturns = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError('');
     try {
-      const token = localStorage.getItem('smartlogi_customer_token');
-      const res = await api.get('/client/returns', { headers: { Authorization: `Bearer ${token}` } });
-      setReturns(Array.isArray(res.data) ? res.data : []);
+      const rows = await data.returns.list();
+      setReturns(rows);
     } catch (err: any) {
-      console.error('Failed to fetch returns:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to load returns');
-      setReturns([]);
+      setError(err.message);
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    void fetchReturns();
+  }, [fetchReturns]);
+
+  const filtered = returns
+    .filter((row) => !statusFilter || row.status === statusFilter)
+    .filter((row) => !searchQuery || `${row.returnCode} ${row.orderTrackingCode}`.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const openForm = () => {
+    setFormOpen(true);
+    setFormError('');
+    setFormResult('');
   };
 
+  const closeForm = () => {
+    setFormOpen(false);
+    setFormError('');
+    setFormResult('');
+    setOrderCode('');
+    setReason('');
+    setNote('');
+  };
+
+  const handleSubmit = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault();
+    setFormError('');
+    setFormResult('');
+
+    if (!orderCode.trim()) {
+      setFormError('Vui lòng nhập mã vận đơn.');
+      return;
+    }
+    if (!reason) {
+      setFormError('Vui lòng chọn lý do trả hàng.');
+      return;
+    }
+
+    setFormLoading(true);
+    try {
+      await data.returns.requestReturn({ orderTrackingCode: orderCode, reason, note: note || undefined });
+      setFormResult('Đã gửi yêu cầu trả hàng.');
+      setOrderCode('');
+      setReason('');
+      setNote('');
+      await fetchReturns();
+      setTimeout(closeForm, 800);
+    } catch (err: any) {
+      setFormError(err.message);
+    } finally {
+      setFormLoading(false);
+    }
+  }, [orderCode, reason, note, fetchReturns]);
+
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-ink">Returns & Refunds</h1>
-          <p className="text-ink-soft mt-1">Track your return requests and refunds</p>
-        </div>
-      </div>
-
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-soft" />
-            <input type="text" placeholder="Search by RMA code..." className="w-full bg-white border border-slate-200 rounded-lg py-2 pl-9 pr-4 text-sm text-ink focus:outline-none focus:border-primary/50" />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-white">
-              <tr>
-                <th className="text-left py-3 px-6 text-[10px] font-bold text-ink-soft uppercase tracking-widest">RMA Code</th>
-                <th className="text-left py-3 px-6 text-[10px] font-bold text-ink-soft uppercase tracking-widest">Order</th>
-                <th className="text-left py-3 px-6 text-[10px] font-bold text-ink-soft uppercase tracking-widest">Type</th>
-                <th className="text-center py-3 px-6 text-[10px] font-bold text-ink-soft uppercase tracking-widest">Status</th>
-                <th className="text-right py-3 px-6 text-[10px] font-bold text-ink-soft uppercase tracking-widest">Created</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {loading ? (
-                <tr><td colSpan={5} className="text-center py-12 text-ink-soft">Loading...</td></tr>
-              ) : error ? (
-                <tr><td colSpan={5} className="text-center py-12">
-                  <p className="text-red-600 mb-2">{error}</p>
-                  <button onClick={fetchReturns} className="text-xs text-red-600 hover:text-red-300 underline">Try again</button>
-                </td></tr>
-              ) : returns.length === 0 ? (
-                <tr><td colSpan={5} className="text-center py-12">
-                  <RotateCcw className="w-8 h-8 text-ink-soft mx-auto mb-3" />
-                  <p className="text-ink-soft">No return requests yet</p>
-                </td></tr>
-              ) : returns.map((r: any) => {
-                const status = statusConfig[r.status] || { label: r.status, color: 'text-ink-soft bg-zinc-400/10' };
-                return (
-                  <tr
-                    key={r.id}
-                    onClick={() => setSelected(selected?.id === r.id ? null : r)}
-                    className="hover:bg-surface-alt cursor-pointer transition-colors"
-                  >
-                    <td className="py-4 px-6 font-mono text-xs text-ink">{r.returnCode}</td>
-                    <td className="py-4 px-6">
-                      <span className="font-mono text-xs text-ink-soft">{r.order?.trackingCode || '-'}</span>
-                    </td>
-                    <td className="py-4 px-6 text-xs text-ink-soft">{r.returnType}</td>
-                    <td className="py-4 px-6 text-center">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${status.color}`}>{status.label}</span>
-                    </td>
-                    <td className="py-4 px-6 text-right text-xs text-ink-soft">{r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : '-'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {selected && (
-        <>
-            <div className="flex items-center gap-3 mb-6">
-              <button onClick={() => setSelected(null)} className="text-ink-soft hover:text-ink transition-colors">
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <h2 className="text-xl font-bold text-ink">{selected.returnCode}</h2>
-              <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${(statusConfig[selected.status] || { color: 'text-ink-soft bg-zinc-400/10' }).color}`}>
-                {(statusConfig[selected.status] || { label: selected.status }).label}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-[10px] font-bold text-ink-soft uppercase tracking-widest mb-1">Order</p>
-                <p className="text-sm text-slate-900 font-mono">{selected.order?.trackingCode}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-ink-soft uppercase tracking-widest mb-1">Type</p>
-                <p className="text-sm text-ink">{selected.returnType}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-ink-soft uppercase tracking-widest mb-1">Reason</p>
-                <p className="text-sm text-ink">{selected.reasonNote || selected.reason?.name || '-'}</p>
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-ink-soft uppercase tracking-widest mb-1">Items</p>
-                <p className="text-sm text-ink">{selected.items?.length || 0} item(s)</p>
-              </div>
-            </div>
-
-            {selected.refunds && selected.refunds.length > 0 && (
-              <div className="mt-6 pt-6 border-t border-slate-200">
-                <p className="text-[10px] font-bold text-ink-soft uppercase tracking-widest mb-3">Refunds</p>
-                {selected.refunds.map((ref: any) => (
-                  <div key={ref.id} className="flex justify-between items-center py-2">
-                    <span className="text-sm text-ink">{formatVnd(ref.amount)}</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${ref.status === 'PROCESSED' ? 'text-green-600 bg-green-400/10' : 'text-yellow-600 bg-yellow-400/10'}`}>
-                      {ref.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+    <div className="space-y-4">
+      <EditorialPageHeader
+        eyebrow={
+          <>
+            <span>Khách hàng</span>
+            <span className="text-line-strong" aria-hidden="true">/</span>
+            <span>Trả hàng</span>
           </>
-        )}
+        }
+        title="Trả hàng"
+        description="Theo dõi yêu cầu trả hàng và hoàn tiền. Tạo yêu cầu từ đơn hàng đã giao."
+      />
+
+      <EditorialSection eyebrow="Lọc" title="Bộ lọc">
+        <div className="flex flex-wrap items-end gap-3">
+          <Select
+            label="Trạng thái"
+            options={RETURN_STATUS_OPTIONS}
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            className="min-w-[160px]"
+          />
+          <Input
+            type="text"
+            label="Tìm yêu cầu"
+            placeholder="RET-xxxx"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            className="min-w-[200px]"
+          />
+          <Button type="button" variant="primary" onClick={openForm} className="h-10 rounded-lg text-[12px] font-medium">
+            Yêu cầu trả hàng
+          </Button>
+          <button
+            type="button"
+            onClick={fetchReturns}
+            className="h-10 rounded-md border border-line px-3 text-[12px] font-medium text-ink-soft transition-colors hover:border-accent hover:text-accent"
+          >
+            Làm mới
+          </button>
+        </div>
+      </EditorialSection>
+
+      <EditorialSection eyebrow="Danh sách" title={listSummary(filtered.length, 'yêu cầu trả hàng')}>
+        <TableState
+          loading={loading}
+          empty={!filtered.length}
+          error={error || undefined}
+          colSpan={6}
+          emptyTitle="Chưa có yêu cầu"
+          emptyDescription="Yêu cầu trả hàng từ các đơn đã giao sẽ hiển thị ở đây."
+          retryLabel="Thử lại"
+          onRetry={fetchReturns}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-left">
+              <caption className="sr-only">Bảng yêu cầu trả hàng của công ty</caption>
+              <thead>
+                <tr className="border-b border-line">
+                  <th scope="col" className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Mã trả hàng
+                  </th>
+                  <th scope="col" className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Đơn hàng
+                  </th>
+                  <th scope="col" className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Lý do
+                  </th>
+                  <th scope="col" className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Trạng thái
+                  </th>
+                  <th scope="col" className="h-9 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Hoàn tiền dự kiến
+                  </th>
+                  <th scope="col" className="h-9 pl-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Ngày tạo
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row) => (
+                  <tr key={row.id} className="h-[42px] border-b border-line/80 hover:bg-surface-alt/60">
+                    <td className="pr-3 font-mono text-[12px] font-medium text-ink">{row.returnCode}</td>
+                    <td className="px-3 font-mono text-[12px] text-ink-soft">{row.orderTrackingCode}</td>
+                    <td className="px-3 text-[12px] text-ink-soft">{returnReasonLabel(row.reason)}</td>
+                    <td className="px-3">
+                      <StatusLabel tone={returnStatusTone(row.status)}>{returnStatusLabel(row.status)}</StatusLabel>
+                    </td>
+                    <td className="px-3 text-right text-[12px] font-medium tabular-nums text-ink">
+                      {formatCurrency(row.estimatedRefund)}
+                    </td>
+                    <td className="px-3 text-[12px] text-ink-soft">{formatDateVN(row.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </TableState>
+      </EditorialSection>
+
+      <Modal
+        isOpen={formOpen}
+        onClose={closeForm}
+        title="Yêu cầu trả hàng"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {formError ? (
+            <p className="text-[12px] text-danger">{formError}</p>
+          ) : null}
+          {formResult ? (
+            <p className="text-[12px] text-success">{formResult}</p>
+          ) : null}
+          <Input
+            type="text"
+            label="Mã vận đơn"
+            placeholder="SLG-20261101-AB12CD"
+            value={orderCode}
+            onChange={(event) => setOrderCode(event.target.value)}
+            required
+            disabled={formLoading}
+          />
+          <Select
+            label="Lý do"
+            options={[
+              { value: '', label: 'Chọn lý do' },
+              { value: 'DAMAGED', label: 'Hàng hỏng' },
+              { value: 'WRONG_ITEM', label: 'Sai mặt hàng' },
+              { value: 'REFUSED', label: 'Từ chối' },
+              { value: 'NOT_DELIVERED', label: 'Chưa giao' },
+              { value: 'OTHER', label: 'Khác' },
+            ]}
+            value={reason}
+            onChange={(event) => setReason(event.target.value as ReturnReason)}
+            required
+            disabled={formLoading}
+          />
+          <Input
+            type="text"
+            label="Ghi chú"
+            placeholder="Chi tiết trả hàng (nếu có)"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            disabled={formLoading}
+          />
+          <div className="flex items-center justify-end gap-2 rounded-md border-t border-line pt-3">
+            <Button type="button" variant="secondary" onClick={closeForm} className="h-10 rounded-lg text-[12px] font-medium">
+              Hủy
+            </Button>
+            <Button type="submit" variant="primary" disabled={formLoading} className="h-10 rounded-lg text-[12px] font-medium">
+              {formLoading ? 'Đang gửi…' : 'Gửi yêu cầu'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

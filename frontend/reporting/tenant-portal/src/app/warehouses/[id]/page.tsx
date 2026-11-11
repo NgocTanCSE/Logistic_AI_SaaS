@@ -1,291 +1,225 @@
 'use client';
-import { DataState } from 'ui-components';
-import { useState, useEffect } from 'react';
+
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/auth-context';
-import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
-import { Can } from '@/components/auth/Can';
-import api from '@/lib/api';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import type { EditorialMetric } from 'ui-kit';
+import { Button, DataState, Select, TableState } from 'ui-components';
+import type { Bin, Warehouse } from '@/lib/mock';
+import {
+  formatNumber,
+  warehouseStatusLabel,
+  warehouseStatusTone,
+} from '@/lib/labels';
 
-type Zone = {
-  id: string;
-  code: string;
-  type: string;
-  racks: Rack[];
-};
+const ZONE_OPTIONS = [
+  { value: 'ALL', label: 'Tất cả khu vực' },
+  { value: 'A', label: 'Khu A' },
+  { value: 'B', label: 'Khu B' },
+  { value: 'C', label: 'Khu C' },
+  { value: 'D', label: 'Khu D' },
+];
 
-type Rack = {
-  id: string;
-  code: string;
-  aisle: string;
-  bins: Bin[];
-};
-
-type Bin = {
-  id: string;
-  barcode: string;
-  status?: string;
-};
-
-export default function WarehouseStructurePage() {
+export default function WarehouseDetailPage() {
   const { id } = useParams();
+  const warehouseId = Array.isArray(id) ? id[0] : id;
   const router = useRouter();
-  const { token } = useAuth();
+
+  const [warehouse, setWarehouse] = useState<Warehouse | null>(null);
+  const [bins, setBins] = useState<Bin[]>([]);
   const [loading, setLoading] = useState(true);
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [warehouseName, setWarehouseName] = useState('Loading...');
-
-  // Modals state
-  const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
-  const [zoneForm, setZoneForm] = useState({ code: '', type: 'PICKING' });
-
-  const [isRackModalOpen, setIsRackModalOpen] = useState(false);
-  const [rackForm, setRackForm] = useState({ zoneId: '', code: '', aisle: '', rows: 1, levels: 1 });
-
-  const [isBinModalOpen, setIsBinModalOpen] = useState(false);
-  const [binForm, setBinForm] = useState({ rackId: '', barcode: '', rowIndex: 1, levelIndex: 1 });
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [zoneFilter, setZoneFilter] = useState<Bin['zone'] | 'ALL'>('ALL');
 
-  useEffect(() => {
-    if (token) fetchStructure();
-  }, [id, token]);
-
-  const fetchStructure = async () => {
+  const load = async () => {
+    if (!warehouseId) return;
+    setLoading(true);
     setError('');
     try {
-      setLoading(true);
-      const res = await api.get(`/warehouses/${id}`);
-      setWarehouseName(res.data?.name || 'Unknown Warehouse');
-      
-      const fetchedZones = res.data?.zones || [];
-      // Calculate derived bin statuses if inventory present
-      const processedZones = fetchedZones.map((z: any) => ({
-        ...z,
-        racks: (z.racks || []).map((r: any) => ({
-          ...r,
-          bins: (r.bins || []).map((b: any) => ({
-            ...b,
-            status: b.inventory && b.inventory.length > 0 ? 'FULL' : 'EMPTY'
-          }))
-        }))
-      }));
-      setZones(processedZones);
-    } catch (err) {
-      console.error('Failed to fetch warehouse structure', err);
-      setError('Failed to load warehouse structure');
+      const [warehouseRes, binsRes] = await Promise.all([
+        data.warehouses.get(warehouseId),
+        data.bins.list(),
+      ]);
+      if (!warehouseRes) throw new Error('Không tìm thấy kho.');
+      setWarehouse(warehouseRes);
+      setBins(binsRes);
+    } catch (err: any) {
+      const msg = err?.message || 'Không tải được thông tin kho.';
+      setError(msg);
+      setWarehouse(null);
+      setBins([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateZone = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.post('/locations/zones', { ...zoneForm, warehouseId: id });
-      setIsZoneModalOpen(false);
-      setZoneForm({ code: '', type: 'PICKING' });
-      fetchStructure();
-    } catch (err) { console.error('Failed to add zone', err); setError('Failed to add zone'); } finally { setSaving(false); }
+  useEffect(() => {
+    load();
+  }, [warehouseId]);
+
+  const zoneBins = useMemo(() => {
+    const rows = bins.filter((b) => b.warehouseId === warehouseId);
+    return zoneFilter === 'ALL' ? rows : rows.filter((b) => b.zone === zoneFilter);
+  }, [bins, warehouseId, zoneFilter]);
+
+  const usedBins = zoneBins.filter(
+    (b) => b.usedVolumeCbm >= b.maxVolumeCbm * 0.9,
+  );
+
+  const utilization = (bin: Bin) => {
+    const pct = bin.maxVolumeCbm > 0 ? bin.usedVolumeCbm / bin.maxVolumeCbm : 0;
+    return Math.round(pct * 100);
   };
 
-  const handleCreateRack = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.post('/locations/racks', rackForm);
-      setIsRackModalOpen(false);
-      setRackForm({ zoneId: '', code: '', aisle: '', rows: 1, levels: 1 });
-      fetchStructure();
-    } catch (err) { console.error('Failed to add rack', err); setError('Failed to add rack'); } finally { setSaving(false); }
+  const weights = (bin: Bin) => {
+    const pct = bin.maxWeightKg > 0 ? bin.usedWeightKg / bin.maxWeightKg : 0;
+    return Math.round(pct * 100);
   };
 
-  const handleCreateBin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await api.post('/locations/bins', { ...binForm, warehouseId: id, maxWeightKg: 1000, maxVolumeCbm: 1.5 });
-      setIsBinModalOpen(false);
-      setBinForm({ rackId: '', barcode: '', rowIndex: 1, levelIndex: 1 });
-      fetchStructure();
-    } catch (err) { console.error('Failed to add bin', err); setError('Failed to add bin'); } finally { setSaving(false); }
+  const weightRemaining = (bin: Bin) => {
+    const maxWeightKg = bin.maxWeightKg > 0 ? bin.maxWeightKg : 0;
+    const usedWeightKg = bin.usedWeightKg > 0 ? bin.usedWeightKg : 0;
+    return Math.max(0, maxWeightKg - usedWeightKg);
   };
+
+  const metrics: EditorialMetric[] = [
+    { label: 'Khối lượng', value: warehouse ? `${Math.round(warehouse.usedCbm / Math.max(1, warehouse.capacityCbm) * 100)}%` : '—', meta: warehouse ? `${formatNumber(warehouse.usedCbm)}/${formatNumber(warehouse.capacityCbm)} m³` : '' },
+    { label: 'Ngăn xếp', value: warehouse ? formatNumber(warehouse.binCount) : '—', meta: 'điểm nhận hàng' },
+    { label: 'Ngăn đầy', value: formatNumber(usedBins.length), meta: 'trên 90% khối lượng' },
+  ];
 
   return (
-    <div className="p-8 max-w-7xl mx-auto ">
-      {error && <ErrorBanner message={error} onRetry={fetchStructure} />}
-      <div className="mb-10 flex items-center gap-4">
-        <Button variant="ghost" onClick={() => router.back()} className="p-2 h-10 w-10 rounded-full">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" /></svg>
-        </Button>
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-             <Badge variant="info" className="text-[8px] py-0">STRUCTURE MGMT</Badge>
-             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Facility Layout</span>
-          </div>
-          <h1 className="text-3xl font-bold text-ink tracking-tight">{warehouseName}</h1>
-        </div>
-        <div className="ml-auto">
-          <Can perform="warehouses:manage">
-            <Button variant="primary" size="sm" className="gap-2 font-bold tracking-widest text-[10px] uppercase" onClick={() => setIsZoneModalOpen(true)}>
-              + Add Zone
+    <div className="space-y-6">
+      <EditorialPageHeader
+        eyebrow="Kho bãi"
+        title={warehouse ? `${warehouse.name} (${warehouse.code})` : 'Kho hàng'}
+        description={warehouse ? warehouse.address : ''}
+        meta={
+          warehouse && (
+            <StatusLabel tone={warehouseStatusTone(warehouse.status)}>
+              {warehouseStatusLabel(warehouse.status)}
+            </StatusLabel>
+          )
+        }
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="text-[11px] font-medium" onClick={() => router.back()}>
+              Trở về
             </Button>
-          </Can>
-        </div>
-      </div>
+            <Button variant="outline" size="sm" className="text-[11px] font-medium" onClick={load} disabled={loading}>
+              Làm mới
+            </Button>
+          </div>
+        }
+      />
 
-      <div className="grid grid-cols-1 gap-8">
-        <DataState
-          loading={loading}
-        >
-          {zones.map((zone) => (
-            <div key={zone.id} className="space-y-4">
-              <div className="flex items-center justify-between px-2">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-bold text-ink">{zone.code}</h2>
-                  <Badge variant="neutral">{zone.type}</Badge>
-                </div>
-                <Can perform="warehouses:manage">
-                  <Button variant="outline" size="sm" className="text-[10px] font-bold tracking-widest uppercase" onClick={() => {
-                    setRackForm(prev => ({ ...prev, zoneId: zone.id }));
-                    setIsRackModalOpen(true);
-                  }}>Add Rack</Button>
-                </Can>
-              </div>
+      {error ? <p className="border-l-2 border-danger py-1 pl-3 text-[12px] text-danger">{error}</p> : null}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {zone.racks.map((rack) => (
-                  <Card key={rack.id} className="p-6 bg-white border-slate-200">
-                    <div className="flex justify-between items-start mb-6">
-                      <div>
-                        <h3 className="font-bold text-ink">{rack.code}</h3>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Aisle {rack.aisle}</p>
-                      </div>
-                      <Can perform="warehouses:manage">
-                        <Button variant="ghost" size="sm" className="text-primary font-bold text-[10px] tracking-widest" onClick={() => {
-                          setBinForm(prev => ({ ...prev, rackId: rack.id }));
-                          setIsBinModalOpen(true);
-                        }}>+ ADD BIN</Button>
-                      </Can>
-                    </div>
+      {warehouse ? (
+        <MetricBand metrics={metrics} />
+      ) : (
+        <EditorialSection title="Chưa chọn kho">
+          <EmptyNote>Không có kho nào được chọn. Mở `/warehouses/[id]`.</EmptyNote>
+        </EditorialSection>
+      )}
 
-                    <div className="grid grid-cols-4 gap-2">
-                      {rack.bins.map((bin) => (
-                        <div 
-                          key={bin.id} 
-                          title={bin.barcode}
-                          className={`
-                            h-10 rounded-lg border flex items-center justify-center text-[8px] font-bold transition-all cursor-pointer
-                            ${bin.status === 'EMPTY' ? 'bg-slate-50 border-slate-200 text-slate-400' : 
-                              bin.status === 'FULL' ? 'bg-primary/10 border-primary/30 text-primary' : 
-                              'bg-amber-50 border-amber-200 text-amber-600'}
-                          `}
-                        >
-                          {bin.barcode.split('-').pop()}
-                        </div>
-                      ))}
-                      {rack.bins.length === 0 && <div className="text-[10px] text-slate-400 font-medium col-span-4">No bins configured.</div>}
-                    </div>
-                  </Card>
+      <EditorialSection
+        title="Ngăn xếp"
+        eyebrow="Theo khu vực"
+        action={
+          <Select
+            className="h-9 min-w-[9rem]"
+            value={zoneFilter}
+            onChange={(e) => setZoneFilter(e.target.value as Bin['zone'] | 'ALL')}
+            options={ZONE_OPTIONS}
+          />
+        }
+      >
+        <DataState loading={loading} empty={!loading && zoneBins.length === 0}>
+          <table className="min-w-full divide-y divide-line text-[13px]">
+            <thead className="bg-surface-alt">
+              <tr>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Mã
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Khu vực
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                  Khối lượng
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                  Tải trọng
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                  Thể tích
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              <TableState
+                loading={loading}
+                empty={!loading && zoneBins.length === 0}
+                onRetry={load}
+                colSpan={5}
+                emptyContent={
+                  <tr>
+                    <td colSpan={5} className="px-3 py-8 text-center text-ink-faint">
+                      Kho này chưa có ngăn xếp nào.
+                    </td>
+                  </tr>
+                }
+                error={error ? new Error(error) : undefined}
+              >
+                {zoneBins.map((bin) => (
+                  <tr key={bin.id} className="hover:bg-surface-alt">
+                    <td className="px-3 py-2">
+                      <p className="text-[13px] font-medium text-ink">{bin.code}</p>
+                      <p className="text-[11px] text-ink-faint">{bin.id}</p>
+                    </td>
+                    <td className="px-3 py-2">
+                      <StatusLabel tone={zoneFilter === bin.zone ? 'info' : 'neutral'}>
+                        {bin.zone}
+                      </StatusLabel>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <p className="text-[13px] font-medium text-ink tabular-nums">
+                        {bin.usedWeightKg} / {bin.maxWeightKg} kg
+                      </p>
+                      <p className="text-[11px] text-ink-faint tabular-nums">
+                        {weights(bin)}%
+                      </p>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <p className="text-[13px] font-medium text-ink tabular-nums">
+                        {formatNumber(weightRemaining(bin))}
+                      </p>
+                      <p className="text-[11px] text-ink-faint tabular-nums">
+                        kg tải trọng còn lại
+                      </p>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <p className="text-[13px] font-medium text-ink tabular-nums">
+                        {Math.round(bin.usedVolumeCbm * 100) / 100} / {bin.maxVolumeCbm} m³
+                      </p>
+                      <p className="text-[11px] text-ink-faint tabular-nums">
+                        {utilization(bin)}%
+                      </p>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </div>
-          ))}
+              </TableState>
+            </tbody>
+          </table>
         </DataState>
-      </div>
-
-      {/* Modals */}
-      {isZoneModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 ">
-          <Card className="w-full max-w-md bg-white p-6">
-            <h2 className="text-xl font-bold mb-4">Add Zone</h2>
-            <form onSubmit={handleCreateZone} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold mb-1">Zone Code</label>
-                <Input required value={zoneForm.code} onChange={e => setZoneForm({...zoneForm, code: e.target.value})} placeholder="e.g. ZONE-A" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold mb-1">Type</label>
-                <select className="w-full border rounded-xl p-2.5 text-sm" value={zoneForm.type} onChange={e => setZoneForm({...zoneForm, type: e.target.value})}>
-                  <option value="PICKING">PICKING</option>
-                  <option value="BULK">BULK</option>
-                  <option value="RECV">RECEIVING</option>
-                  <option value="DISP">DISPATCH</option>
-                </select>
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button type="button" variant="ghost" onClick={() => setIsZoneModalOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={saving}>Save Zone</Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
-
-      {isRackModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 ">
-          <Card className="w-full max-w-md bg-white p-6">
-            <h2 className="text-xl font-bold mb-4">Add Rack</h2>
-            <form onSubmit={handleCreateRack} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold mb-1">Rack Code</label>
-                <Input required value={rackForm.code} onChange={e => setRackForm({...rackForm, code: e.target.value})} placeholder="e.g. RACK-01" />
-              </div>
-              <div>
-                <label className="block text-xs font-bold mb-1">Aisle</label>
-                <Input required value={rackForm.aisle} onChange={e => setRackForm({...rackForm, aisle: e.target.value})} placeholder="e.g. A1" />
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-bold mb-1">Rows</label>
-                  <Input type="number" required value={rackForm.rows} onChange={e => setRackForm({...rackForm, rows: parseInt(e.target.value)})} min={1} />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-bold mb-1">Levels</label>
-                  <Input type="number" required value={rackForm.levels} onChange={e => setRackForm({...rackForm, levels: parseInt(e.target.value)})} min={1} />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button type="button" variant="ghost" onClick={() => setIsRackModalOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={saving}>Save Rack</Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
-
-      {isBinModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 ">
-          <Card className="w-full max-w-md bg-white p-6">
-            <h2 className="text-xl font-bold mb-4">Add Bin</h2>
-            <form onSubmit={handleCreateBin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold mb-1">Bin Barcode</label>
-                <Input required value={binForm.barcode} onChange={e => setBinForm({...binForm, barcode: e.target.value})} placeholder="e.g. BIN-A1-01" />
-              </div>
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-bold mb-1">Row Index</label>
-                  <Input type="number" required value={binForm.rowIndex} onChange={e => setBinForm({...binForm, rowIndex: parseInt(e.target.value)})} min={1} />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-xs font-bold mb-1">Level Index</label>
-                  <Input type="number" required value={binForm.levelIndex} onChange={e => setBinForm({...binForm, levelIndex: parseInt(e.target.value)})} min={1} />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <Button type="button" variant="ghost" onClick={() => setIsBinModalOpen(false)}>Cancel</Button>
-                <Button type="submit" disabled={saving}>Save Bin</Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-      )}
+      </EditorialSection>
     </div>
   );
 }

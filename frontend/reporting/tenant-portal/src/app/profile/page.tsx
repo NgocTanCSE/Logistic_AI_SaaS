@@ -1,183 +1,268 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import api from '@/lib/api';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Card } from '@/components/ui/Card';
+import { EditorialPageHeader, EditorialSection, StatusLabel } from 'ui-kit';
+import { Modal, Button, Input } from 'ui-components';
+import { data } from '@/lib/data';
+import type { UserAccount, TenantSettings } from '@/lib/mock';
+import {
+  accountStatusLabel,
+  accountStatusTone,
+  formatDateTimeVN,
+  roleLabel,
+} from '@/lib/labels';
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [row, setRow] = useState<UserAccount | null>(null);
+  const [settings, setSettings] = useState<TenantSettings | null>(null);
+  const [matched, setMatched] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [savedAt, setSavedAt] = useState('');
 
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [passwordMsg, setPasswordMsg] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [confirmId, setConfirmId] = useState<null | 'profile' | 'contact'>(null);
 
-  useEffect(() => {
-    if (user) {
-      setFullName(user.fullName || '');
-      loadProfile();
-    }
-  }, [user]);
-
-  const loadProfile = async () => {
+  const load = async () => {
+    setLoading(true);
+    setError('');
     try {
-      const res = await api.get('/tenant/auth/profile');
-      if (res.data) {
-        setFullName(res.data.fullName || '');
-        setPhone(res.data.phone || '');
-      }
-    } catch {}
+      const [users, currentSettings] = await Promise.all([
+        data.users.list(),
+        data.settings.get(),
+      ]);
+      setSettings(currentSettings);
+      const target = user?.email?.toLowerCase() ?? '';
+      const found = target
+        ? users.find((row) => row.email.toLowerCase() === target.toLowerCase()) ??
+          users.find((row) => row.name === user?.fullName) ??
+          users.find((row) => row.role === user?.role)
+        : undefined;
+      setRow(found ?? users[0] ?? null);
+      setMatched(Boolean(found));
+    } catch (err: any) {
+      setError(err?.message ?? 'Không tải được hồ sơ.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (row) {
+      setName(row.name);
+      setPhone(row.phone ?? '');
+    } else {
+      setName('');
+      setPhone('');
+    }
+    const fallback = user?.fullName ?? row?.name ?? '';
+    const fallbackEmail = user?.email ?? (settings?.contactEmail ?? '');
+    setContactName(fallback);
+    setContactEmail(fallbackEmail);
+  }, [row, user, settings]);
+
+  const handleProfile = async () => {
+    if (!row || !matched) return;
     setSaving(true);
-    setSaveMsg('');
+    setActionError('');
     try {
-      await api.patch('/tenant/auth/profile', { fullName, phone });
-      setSaveMsg('Profile updated successfully.');
+      await data.users.update(row.id, { name, phone });
+      setSavedAt(formatDateTimeVN(new Date().toISOString()));
+      setConfirmId(null);
     } catch (err: any) {
-      setSaveMsg(err?.response?.data?.message || 'Failed to update profile.');
+      setActionError(err?.message ?? 'Không lưu được hồ sơ.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPasswordMsg('');
-
-    if (newPassword !== confirmNewPassword) {
-      setPasswordMsg('Passwords do not match.');
-      return;
-    }
-    if (newPassword.length < 8) {
-      setPasswordMsg('Password must be at least 8 characters.');
-      return;
-    }
-
-    setChangingPassword(true);
+  const handleContact = async () => {
+    if (!settings) return;
+    setSaving(true);
+    setActionError('');
     try {
-      const res = await api.post('/tenant/auth/change-password', {
-        oldPassword,
-        newPassword,
+      const updated = await data.settings.update({
+        contactName,
+        contactEmail,
       });
-      if (res.data?.ok) {
-        setPasswordMsg('Password changed successfully.');
-        setOldPassword('');
-        setNewPassword('');
-        setConfirmNewPassword('');
-      } else {
-        setPasswordMsg(res.data?.message || 'Failed to change password.');
-      }
+      setSettings(updated);
+      setSavedAt(updated.updatedAt);
+      setConfirmId(null);
     } catch (err: any) {
-      setPasswordMsg(err?.response?.data?.message || 'Current password is incorrect.');
+      setActionError(err?.message ?? 'Không lưu được thông tin liên hệ.');
     } finally {
-      setChangingPassword(false);
+      setSaving(false);
     }
   };
 
-  if (!user) {
-    return <div className="text-inkSoft text-center py-12">Please sign in to view your profile.</div>;
-  }
-
   return (
-    <div className="max-w-2xl mx-auto space-y-10">
-      <div>
-        <h1 className="text-2xl font-bold text-ink">My Profile</h1>
-        <p className="text-inkSoft mt-1">Manage your account information and security.</p>
-      </div>
-
-      <Card className="p-6 md:p-8 bg-white  border-slate-200 shadow-xl">
-        <h2 className="text-lg font-bold text-ink mb-6">Account Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Email</label>
-            <p className="text-ink font-medium">{user.email}</p>
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Role</label>
-            <p className="text-ink font-medium">{String(user.role).replace(/_/g, ' ')}</p>
-          </div>
+    <div className="space-y-6">
+      {loading ? (
+        <div className="flex items-center justify-center rounded-xl border border-line bg-canvas py-8">
+          <StatusLabel tone="neutral">Đang tải hồ sơ...</StatusLabel>
         </div>
+      ) : (
+        <div className="space-y-6">
+          <EditorialPageHeader
+            eyebrow="Cá nhân"
+            title="Hồ sơ của bạn"
+            description="Cập nhật thông tin liên hệ và quyền truy cập tài khoản tenant của bạn."
+          />
 
-        <form onSubmit={handleSaveProfile} className="space-y-5">
-          <Input
-            label="Full Name"
-            type="text"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Your full name"
-          />
-          <Input
-            label="Phone"
-            type="text"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="Phone number"
-          />
-          {saveMsg && (
-            <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-              saveMsg.includes('success') ? 'border-emerald-200 bg-emerald-50/80 text-emerald-700' : 'border-rose-200 bg-rose-50/80 text-rose-700'
-            }`}>
-              {saveMsg}
+          {error ? (
+            <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas px-4 py-3">
+              <StatusLabel tone="danger">Lỗi dữ liệu</StatusLabel>
+              <span className="text-[12px] text-ink-soft">{error}</span>
+              <button type="button" onClick={load} className="ml-auto text-[11px] font-medium text-accent hover:underline">
+                Thử lại
+              </button>
             </div>
-          )}
-          <Button type="submit" variant="primary" isLoading={saving}>
-            Save Changes
-          </Button>
-        </form>
-      </Card>
+          ) : null}
 
-      <Card className="p-6 md:p-8 bg-white  border-slate-200 shadow-xl">
-        <h2 className="text-lg font-bold text-ink mb-6">Change Password</h2>
-        <form onSubmit={handleChangePassword} className="space-y-5">
-          <Input
-            label="Current Password"
-            type="password"
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            placeholder="Enter current password"
-            required
-          />
-          <Input
-            label="New Password"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="Min. 8 characters"
-            required
-            minLength={8}
-          />
-          <Input
-            label="Confirm New Password"
-            type="password"
-            value={confirmNewPassword}
-            onChange={(e) => setConfirmNewPassword(e.target.value)}
-            placeholder="Re-enter new password"
-            required
-            minLength={8}
-          />
-          {passwordMsg && (
-            <div className={`rounded-xl border px-4 py-3 text-sm font-medium ${
-              passwordMsg.includes('success') ? 'border-emerald-200 bg-emerald-50/80 text-emerald-700' : 'border-rose-200 bg-rose-50/80 text-rose-700'
-            }`}>
-              {passwordMsg}
+          {actionError ? (
+            <p className="text-[12px] font-medium text-danger">{actionError}</p>
+          ) : null}
+
+          {savedAt ? (
+            <p className="text-[12px] text-ink-soft">Đã lưu lúc {formatDateTimeVN(savedAt)}.</p>
+          ) : null}
+
+          <EditorialSection title="Thông tin tài khoản" eyebrow="Đăng nhập">
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div>
+                <label className="text-[11px] font-bold text-ink-faint uppercase tracking-[0.13em]" htmlFor="profile-email">
+                  Email
+                </label>
+                <Input id="profile-email" readOnly value={row?.email ?? user?.email ?? ''} />
+                {matched ? null : (
+                  <p className="mt-1 text-[10px] text-warning">
+                    Tài khoản demo chưa có trong danh sách người dùng tenant — liên hệ hệ thống.
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-ink-faint uppercase tracking-[0.13em]" htmlFor="profile-name">
+                  Họ và tên
+                </label>
+                <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-ink-faint uppercase tracking-[0.13em]" htmlFor="profile-phone">
+                  Điện thoại
+                </label>
+                <Input id="profile-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-ink-faint uppercase tracking-[0.13em]">
+                  Vai trò
+                </label>
+                <p className="text-[12px] font-medium text-ink mt-1">{roleLabel(user?.role ?? '')}</p>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-ink-faint uppercase tracking-[0.13em]">
+                  Trạng thái
+                </label>
+                <p className="mt-1">
+                  <StatusLabel tone={accountStatusTone(row?.status ?? 'ACTIVE')}>
+                    {accountStatusLabel(row?.status ?? 'ACTIVE')}
+                  </StatusLabel>
+                </p>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-ink-faint uppercase tracking-[0.13em]">
+                  Ngày tạo tài khoản
+                </label>
+                <p className="text-[12px] text-ink-faint mt-1">{row ? formatDateTimeVN(row.createdAt) : '—'}</p>
+              </div>
             </div>
-          )}
-          <Button type="submit" variant="primary" isLoading={changingPassword}>
-            Update Password
-          </Button>
-        </form>
-      </Card>
+            {matched ? (
+              <div className="mt-6">
+                <Button type="button" variant="outline" onClick={() => setConfirmId('profile')}>
+                  Lưu thông tin
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-4">
+                <p className="text-[12px] text-ink-soft">
+                  Tài khoản demo chưa có thay đổi trực tiếp; thông tin sẽ ghi vào liên hệ của tenant.
+                </p>
+                <div className="mt-4">
+                  <Button type="button" onClick={() => setConfirmId('contact')}>
+                    Lưu liên hệ
+                  </Button>
+                </div>
+              </div>
+            )}
+          </EditorialSection>
+
+          <EditorialSection title="Thông tin liên hệ doanh nghiệp" eyebrow="Hồ sơ tenant">
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div>
+                <label className="text-[11px] font-bold text-ink-faint uppercase tracking-[0.13em]" htmlFor="profile-contact-name">
+                  Người liên hệ
+                </label>
+                <Input id="profile-contact-name" value={contactName} onChange={(e) => setContactName(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-ink-faint uppercase tracking-[0.13em]" htmlFor="profile-contact-email">
+                  Email doanh nghiệp
+                </label>
+                <Input id="profile-contact-email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+              </div>
+            </div>
+            <p className="mt-4 text-[12px] text-ink-faint">
+              Email liên hệ được dùng cho thông báo vận đơn, đối soát COD và các kênh đã chọn.
+            </p>
+          </EditorialSection>
+
+          <Modal
+            isOpen={confirmId !== null}
+            onClose={() => setConfirmId(null)}
+            title={confirmId === 'contact' ? 'Lưu liên hệ doanh nghiệp' : 'Lưu hồ sơ'}
+            size="sm"
+          >
+            <div className="mb-4">
+              <p className="text-[12px] text-ink-soft">
+                Xác nhận lưu thay đổi cho{' '}
+                <span className="font-medium text-ink">
+                  {confirmId === 'contact' ? contactName : row?.name ?? `${name}`}
+                </span>{' '}
+                (email {confirmId === 'contact' ? contactEmail : row?.email ?? user?.email ?? ''}).
+              </p>
+            </div>
+            {actionError ? (
+              <p className="mb-4 text-[11px] font-medium text-danger">{actionError}</p>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setConfirmId(null)}>
+                Bỏ qua
+              </Button>
+              <Button
+                type="button"
+                onClick={() =>
+                  confirmId === 'profile' ? handleProfile() : handleContact()
+                }
+                isLoading={saving}
+                disabled={saving}
+              >
+                Xác nhận
+              </Button>
+            </div>
+          </Modal>
+        </div>
+      )}
     </div>
   );
 }

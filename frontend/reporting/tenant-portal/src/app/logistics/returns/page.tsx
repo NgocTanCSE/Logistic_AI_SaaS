@@ -1,220 +1,458 @@
 'use client';
-import { TableState } from 'ui-components';
-import { useState, useEffect } from 'react';
-import {formatDate} from '@/lib/date-utils';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import api from '@/lib/api';
 
-const statusColors: Record<string, 'warning' | 'info' | 'success' | 'error' | 'neutral'> = {
-  PENDING: 'warning',
-  APPROVED: 'info',
-  PICKUP_SCHEDULED: 'info',
-  PICKED_UP: 'warning',
-  IN_TRANSIT: 'warning',
-  INSPECTED: 'neutral',
-  REFUNDED: 'success',
-  REJECTED: 'error',
-  CLOSED: 'neutral',
+import { useEffect, useState, useMemo } from 'react';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import {
+  Button,
+  Input,
+  Modal,
+  Pagination,
+  Select,
+  TableState,
+} from 'ui-components';
+import type { ReturnRequest } from '@/lib/mock';
+import {
+  returnStatusLabel,
+  returnStatusTone,
+  formatCurrency,
+  formatDateTimeVN,
+  formatDateVN,
+} from '@/lib/labels';
+
+/** Bảng dịch gắn nhãn quốc kỳ kiểm định / lý do trả hàng — gói nhãn nghiệp vụ. */
+const INSPECTION_LABELS: Record<ReturnRequest['inspection'], string> = {
+  PENDING: 'Chưa kiểm định',
+  SELLABLE: 'Hàng bán lại được',
+  DAMAGED: 'Hư hỏng',
+  SCRAP: 'Hủy bỏ loại',
+};
+const INSPECTION_TONES: Record<ReturnRequest['inspection'], 'neutral' | 'success' | 'warning' | 'danger'> = {
+  PENDING: 'neutral',
+  SELLABLE: 'success',
+  DAMAGED: 'warning',
+  SCRAP: 'danger',
+};
+const REASON_LABELS: Record<ReturnRequest['reason'], string> = {
+  REFUSED: 'Khách từ chối',
+  DAMAGED: 'Hàng hỏng',
+  WRONG_ITEM: 'Sai hàng',
+  NOT_DELIVERED: 'Chưa giao',
+  OTHER: 'Khác',
 };
 
-const statusLabels: Record<string, string> = {
-  PENDING: 'Chờ duyệt',
-  APPROVED: 'Đã duyệt',
-  PICKUP_SCHEDULED: 'Đã lên lịch pickup',
-  PICKED_UP: 'Đã pickup',
-  IN_TRANSIT: 'Đang vận chuyển',
-  INSPECTED: 'Đã kiểm tra',
-  REFUNDED: 'Đã hoàn tiền',
-  REJECTED: 'Từ chối',
-  CLOSED: 'Đã đóng',
-};
+/** Lọc lỗi report để dính trạng thái từ bảng trả hàng. */
+const STATUS_LIST: ReturnRequest['status'][] = [
+  'REQUESTED',
+  'APPROVED',
+  'IN_TRANSIT',
+  'INSPECTING',
+  'REFUNDED',
+  'REJECTED',
+];
+
+/** Toast chỉ là kết nối vào `ToastHost` mount ở root layout. */
+const toast = (message: string, type: 'success' | 'error' | 'info' = 'info') =>
+  window.dispatchEvent(new CustomEvent('show-toast', { detail: { message, type } }));
+
+const PAGE_SIZE = 10;
 
 export default function ReturnsPage() {
-  const [returns, setReturns] = useState<any[]>([]);
+  const [returns, setReturns] = useState<ReturnRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedReturn, setSelectedReturn] = useState<any>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const limit = 20;
+  const [error, setError] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [mutating, setMutating] = useState<string>('');
 
-  const fetchReturns = async () => {
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ReturnRequest['status'] | 'ALL'>('ALL');
+  const [reasonFilter, setReasonFilter] = useState<ReturnRequest['reason'] | 'ALL'>('ALL');
+  const [page, setPage] = useState(1);
+
+  const [confirmForm, setConfirmForm] = useState<{ id: string; title: string; note: string } | null>(null);
+  const [confirmNote, setConfirmNote] = useState('');
+
+  const load = async () => {
     setLoading(true);
+    setError('');
     try {
-      const queryParams: any = { page, limit };
-      if (statusFilter) queryParams.status = statusFilter;
-      const res = await api.get('/logistics/returns', { params: queryParams });
-      setReturns(res.data?.data || []);
-      setTotal(res.data?.meta?.total || 0);
-    } catch {
+      const list = await data.returns.list();
+      setReturns(list);
+    } catch (err: any) {
+      setError(err?.message || 'Không tải được dữ liệu trả hàng.');
       setReturns([]);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchReturns() }, [statusFilter, page]);
+  useEffect(() => {
+    load();
+  }, []);
 
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const metrics = useMemo(() => {
+    const ready = returns.filter((r) => r.status === 'REQUESTED');
+    const approved = returns.filter((r) => r.status === 'APPROVED');
+    const inTransit = returns.filter((r) => r.status === 'IN_TRANSIT');
+    const inspecting = returns.filter((r) => r.status === 'INSPECTING');
+    const refunding = returns.filter((r) => r.status === 'REFUNDED' || r.status === 'REJECTED');
+    return [
+      { label: 'Chờ duyệt', value: ready.length, meta: `${ready.length} yêu cầu chưa xử lý` },
+      { label: 'Đã duyệt', value: approved.length, meta: 'tiếp nhận hoặc hoàn tiền được' },
+      { label: 'Đang về kho', value: inTransit.length, meta: 'hàng đang vận chuyển ngược' },
+      { label: 'Đang kiểm định', value: inspecting.length, meta: 'chọn kết quả kiểm định' },
+      { label: 'Kết thúc', value: refunding.length, meta: 'đã hoàn tiền hoặc từ chối' },
+    ];
+  }, [returns]);
+
+  const filtered = useMemo(() => {
+    const term = search.toLowerCase().trim();
+    const matches = (r: ReturnRequest) =>
+      (statusFilter === 'ALL' || statusFilter === r.status) &&
+      (reasonFilter === 'ALL' || reasonFilter === r.reason);
+    const list = returns.filter((r) => {
+      if (!term) return matches(r);
+      return (
+        matches(r) &&
+        (r.code.toLowerCase().includes(term) ||
+          r.orderTrackingCode.toLowerCase().includes(term) ||
+          r.clientName.toLowerCase().includes(term) ||
+          (r.note ? r.note.toLowerCase().includes(term) : false))
+      );
+    });
+    return list.sort((a, b) => a.createdAt > b.createdAt ? -1 : 1);
+  }, [returns, search, statusFilter, reasonFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
+
+  const selected = useMemo(() => returns.find((r) => r.id === selectedId) ?? null, [returns, selectedId]);
+
+  const openConfirm = (id: string, title: string, note?: string) => {
+    setConfirmForm({ id, title, note: note ?? '' });
+    setConfirmNote(note ?? '');
+  };
+  const closeConfirm = () => {
+    setConfirmForm(null);
+    setConfirmNote('');
+  };
+
+  const handleInspect = async (id: string, status: ReturnRequest['status'], inspection: ReturnRequest['inspection'], note?: string) => {
+    setMutating(id);
+    try {
+      const r = await data.returns.inspect(id, { inspection, status, note });
+      setReturns((prev) => prev.map((row) => (row.id === id ? r : row)));
+      setSelectedId(null);
+      toast(`Cập nhật ${r.code} -> ${returnStatusLabel(status)}`, 'success');
+    } catch (err: any) {
+      toast(err?.message || `Không thể chuyển trạng thái ${status}.`, 'error');
+    } finally {
+      setMutating('');
+    }
+  };
+
+  const handleRefund = async () => {
+    if (!confirmForm) return;
+    setMutating(confirmForm.id);
+    try {
+      const r = await data.returns.refund(confirmForm.id, confirmNote ?? 'Hoàn tiền theo xác nhận');
+      setReturns((prev) => prev.map((row) => (row.id === confirmForm.id ? r : row)));
+      cancelAction();
+      toast(`Hoàn tiền ${r.code} thành công.`, 'success');
+    } catch (err: any) {
+      toast(err?.message || 'Không thể hoàn tiền phiếu trả hàng.', 'error');
+    } finally {
+      setMutating('');
+    }
+  };
+
+  const cancelAction = () => {
+    setSelectedId(null);
+    setConfirmForm(null);
+    setConfirmNote('');
+  };
 
   return (
-    <div className="p-8 max-w-[1600px] mx-auto">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-4xl font-bold text-ink tracking-tight">Return Management</h1>
-          <p className="text-sm text-inkSoft mt-1 font-medium">Xử lý yêu cầu trả hàng (RMA)</p>
-        </div>
-        <div className="flex gap-2">
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="bg-white border border-slate-200 text-ink text-sm rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
-          >
-            <option value="">Tất cả</option>
-            <option value="PENDING">Chờ duyệt</option>
-            <option value="APPROVED">Đã duyệt</option>
-            <option value="REJECTED">Từ chối</option>
-            <option value="REFUNDED">Đã hoàn tiền</option>
-          </select>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <EditorialPageHeader
+        eyebrow="Vận tải"
+        title="Phiếu trả hàng"
+        description="Duyệt yêu cầu, theo dõi hàng về kho, kiểm định và hoàn tiền / từ chối. Hàng bán lại được hoàn tiền, hàng hủy không."
+        meta={`${returns.length} phiếu`}
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card className="bg-white">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="text-left py-4 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mã RMA</th>
-                    <th className="text-left py-4 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Đơn hàng</th>
-                    <th className="text-left py-4 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lý do</th>
-                    <th className="text-center py-4 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trạng thái</th>
-                    <th className="text-right py-4 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ngày tạo</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <TableState
-          loading={loading}
-          empty={!loading && returns.length === 0}
-          
-          onRetry={fetchReturns}
-          colSpan={6}
-          emptyContent={<tr><td colSpan={5} className="text-center py-10 text-xs text-slate-400">No return requests found</td></tr>}
-        >
-          {returns.map((r: any) => (
+      <MetricBand metrics={metrics} />
+
+      <EditorialSection title="Danh sách trả hàng" eyebrow="Lọc + tìm">
+        <div className="flex flex-wrap items-end gap-2">
+          <Input
+            type="search"
+            placeholder="Tìm mã phiếu, đơn hàng, khách hàng"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="w-64 h-9"
+          />
+          <Select
+            className="h-9 min-w-[9rem]"
+            value={statusFilter}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as ReturnRequest['status'] | 'ALL');
+              setPage(1);
+            }}
+            options={[{ value: 'ALL', label: 'Tất cả trạng thái' }, ...STATUS_LIST.map((s) => ({ value: s, label: returnStatusLabel(s) }))]}
+          />
+          <Select
+            className="h-9 min-w-[10rem]"
+            value={reasonFilter}
+            onChange={(e) => {
+              setReasonFilter(e.target.value as ReturnRequest['reason'] | 'ALL');
+              setPage(1);
+            }}
+            options={[
+              { value: 'ALL', label: 'Tất cả lý do' },
+              ...(Object.keys(REASON_LABELS) as ReturnRequest['reason'][]).map((k) => ({ value: k, label: REASON_LABELS[k] })),
+            ]}
+          />
+        </div>
+      </EditorialSection>
+
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+        <div className="lg:col-span-3">
+          <EditorialSection title="Bảng phiếu trả hàng">
+            <table className="min-w-full divide-y divide-line text-[13px]">
+              <thead className="bg-surface-alt">
+                <tr>
+                  <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Mã</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Đơn hàng</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Khách hàng</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Lý do</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Trạng thái</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Kiểm định</th>
+                  <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Tiền hoàn</th>
+                  <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Ngày tạo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                <TableState
+                  loading={loading}
+                  empty={!loading && filtered.length === 0}
+                  error={error || undefined}
+                  onRetry={load}
+                  colSpan={8}
+                  emptyContent={<tr><td colSpan={8} className="px-3 py-6 text-center text-ink-faint">Chưa có phiếu trả hàng nào khớp bộ lọc.</td></tr>}
+                >
+                  {paged.map((r) => (
                     <tr
                       key={r.id}
-                      onClick={() => setSelectedReturn(r)}
-                      className={`border-b border-slate-50 cursor-pointer transition-colors hover:bg-slate-50 ${selectedReturn?.id === r.id ? 'bg-primary/5' : ''}`}
+                      onClick={() => setSelectedId(r.id)}
+                      className={`cursor-pointer transition-colors hover:bg-surface-alt ${selectedId === r.id ? 'bg-accent-soft' : ''} ${r.status === 'REFUNDED' || r.status === 'REJECTED' ? 'text-ink-faint' : ''}`}
                     >
-                      <td className="py-4 px-4 font-mono font-bold text-xs text-ink">{r.returnCode}</td>
-                      <td className="py-4 px-4">
-                        <span className="font-mono text-xs">{r.order?.trackingCode || '-'}</span>
-                        <p className="text-[10px] text-slate-400">{r.order?.recipientName || ''}</p>
+                      <td className="pr-3 py-2 font-medium text-ink">{r.code}</td>
+                      <td className="pr-3 py-2 font-mono text-[12px]">{r.orderTrackingCode}</td>
+                      <td className="pr-3 py-2">{r.clientName}</td>
+                      <td className="pr-3 py-2">{REASON_LABELS[r.reason]}</td>
+                      <td className="pr-3 py-2">
+                        <StatusLabel tone={returnStatusTone(r.status)}>{returnStatusLabel(r.status)}</StatusLabel>
                       </td>
-                      <td className="py-4 px-4 text-xs text-inkSoft">{r.reason?.name || r.reasonNote || '-'}</td>
-                      <td className="py-4 px-4 text-center">
-                        <Badge variant={statusColors[r.status] || 'neutral'} className="text-[9px]">
-                          {statusLabels[r.status] || r.status}
-                        </Badge>
+                      <td className="pr-3 py-2">
+                        <StatusLabel tone={INSPECTION_TONES[r.inspection]}>{INSPECTION_LABELS[r.inspection]}</StatusLabel>
                       </td>
-                      <td className="py-4 px-4 text-right text-xs text-inkSoft">
-                        {formatDate(r.createdAt, '-', 'vi-VN')}
-                      </td>
+                      <td className="pr-3 py-2 text-right tabular-nums">{formatCurrency(r.refundAmount)}</td>
+                      <td className="pr-3 py-2">{formatDateVN(r.createdAt)}</td>
                     </tr>
                   ))}
-        </TableState>
-                </tbody>
-              </table>
+                </TableState>
+              </tbody>
+            </table>
+            <div className="flex justify-center py-3">
+              <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
             </div>
-          </Card>
+          </EditorialSection>
         </div>
 
-        <div className="lg:col-span-1">
-          {selectedReturn ? (
-            <Card className="bg-white">
-              <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="font-bold text-sm text-ink">{selectedReturn.returnCode}</h3>
-                <Badge variant={statusColors[selectedReturn.status] || 'neutral'}>{statusLabels[selectedReturn.status] || selectedReturn.status}</Badge>
-              </div>
-              <div className="p-6 space-y-4">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Đơn hàng</p>
-                  <p className="text-sm font-mono">{selectedReturn.order?.trackingCode}</p>
+        <div className="lg:col-span-2">
+          <EditorialSection title={selected ? `Chi tiết ${selected.code}` : 'Chọn một phiếu trả hàng'}>
+            {selected ? (
+              <div className="space-y-2">
+                <div className="p-3 border border-line bg-surface">
+                  <div className="text-[11px] font-medium text-ink-faint uppercase">Mã phiếu</div>
+                  <div className="text-[15px] font-semibold text-ink">{selected.code}</div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Loại trả hàng</p>
-                  <p className="text-sm">{selectedReturn.returnType}</p>
+                <div className="p-3 border border-line bg-surface">
+                  <div className="text-[11px] font-medium text-ink-faint uppercase">Đơn hàng</div>
+                  <div className="text-[13px] text-ink">{selected.orderTrackingCode}</div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Lý do</p>
-                  <p className="text-sm">{selectedReturn.reason?.name || selectedReturn.reasonNote || '-'}</p>
+                <div className="p-3 border border-line bg-surface">
+                  <div className="text-[11px] font-medium text-ink-faint uppercase">Khách hàng</div>
+                  <div className="text-[13px] text-ink">{selected.clientName}</div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Số lượng yêu cầu</p>
-                  <p className="text-sm">{selectedReturn.items?.length || 0} sản phẩm</p>
+                <div className="p-3 border border-line bg-surface">
+                  <div className="text-[11px] font-medium text-ink-faint uppercase">Lý do</div>
+                  <div className="text-[13px] text-ink">{REASON_LABELS[selected.reason]}</div>
                 </div>
-                {selectedReturn.pickupDriver && (
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tài xế pickup</p>
-                    <p className="text-sm">{selectedReturn.pickupDriver?.user?.fullName}</p>
+                <div className="p-3 border border-line bg-surface">
+                  <div className="text-[11px] font-medium text-ink-faint uppercase">Trạng thái</div>
+                  <div className="text-[13px] text-ink">
+                    <StatusLabel tone={returnStatusTone(selected.status)}>{returnStatusLabel(selected.status)}</StatusLabel>
                   </div>
-                )}
-                <div className="pt-4 border-t border-slate-100 space-y-2">
-                  {selectedReturn.status === 'PENDING' && (
-                    <div className="flex gap-2">
-                      <Button variant="primary" size="sm" className="flex-1 text-[10px]" onClick={() => alert('Approve - will call API')}>
-                        Duyệt
+                </div>
+                <div className="p-3 border border-line bg-surface">
+                  <div className="text-[11px] font-medium text-ink-faint uppercase">Kiểm định</div>
+                  <div className="text-[13px] text-ink">
+                    <StatusLabel tone={INSPECTION_TONES[selected.inspection]}>{INSPECTION_LABELS[selected.inspection]}</StatusLabel>
+                  </div>
+                </div>
+                <div className="p-3 border border-line bg-surface">
+                  <div className="text-[11px] font-medium text-ink-faint uppercase">Tiền hoàn</div>
+                  <div className="text-[15px] font-semibold text-ink tabular-nums">{formatCurrency(selected.refundAmount)}</div>
+                </div>
+                {selected.resolvedAt ? (
+                  <div className="p-3 border border-line bg-surface">
+                    <div className="text-[11px] font-medium text-ink-faint uppercase">Ngày đóng</div>
+                    <div className="text-[13px] text-ink">{formatDateVN(selected.resolvedAt)}</div>
+                  </div>
+                ) : null}
+                {selected.note ? (
+                  <div className="p-3 border border-line bg-surface">
+                    <div className="text-[11px] font-medium text-ink-faint uppercase">Ghi chú</div>
+                    <div className="text-[13px] text-ink">{selected.note}</div>
+                  </div>
+                ) : null}
+
+                <div className="pt-4 border-t border-line space-y-2">
+                  {selected.status === 'REQUESTED' && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="text-[11px] font-medium w-full bg-accent hover:bg-accent-hover"
+                      disabled={mutating === selected.id}
+                      onClick={() => handleInspect(selected.id, 'APPROVED', 'PENDING', 'Duyệt bởi admin')}
+                    >
+                      Duyệt yêu cầu
+                    </Button>
+                  )}
+                  {selected.status === 'APPROVED' && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        className="text-[11px] font-medium w-full bg-accent hover:bg-accent-hover"
+                        disabled={mutating === selected.id}
+                        onClick={() => openConfirm(selected.id, 'Hoàn tiền', 'Hoàn tiền vì hàng hư hỏng, không bán lại được.')}
+                      >
+                        Hoàn tiền
                       </Button>
-                      <Button variant="outline" size="sm" className="flex-1 text-[10px] text-rose-600 border-rose-200" onClick={() => alert('Reject - will call API')}>
-                        Từ chối
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-[11px] font-medium w-full border-line-strong text-ink"
+                        disabled={mutating === selected.id}
+                        onClick={() => handleInspect(selected.id, 'IN_TRANSIT', 'SELLABLE', 'Đưa hàng về kho')}
+                      >
+                        Đưa hàng về kho
+                      </Button>
+                    </>
+                  )}
+                  {selected.status === 'IN_TRANSIT' && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      className="text-[11px] font-medium w-full bg-accent hover:bg-accent-hover"
+                      disabled={mutating === selected.id}
+                      onClick={() => handleInspect(selected.id, 'INSPECTING', 'SELLABLE', 'Kiểm định hàng về')}
+                    >
+                      Bắt đầu kiểm định
+                    </Button>
+                  )}
+                  {selected.status === 'INSPECTING' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        className="text-[11px] font-medium bg-accent hover:bg-accent-hover"
+                        onClick={() => handleInspect(selected.id, 'REFUNDED', 'SELLABLE', 'Hàng bán lại được')}
+                      >
+                        Hàng bán lại được
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        className="text-[11px] font-medium bg-accent hover:bg-accent-hover"
+                        onClick={() => handleInspect(selected.id, 'REFUNDED', 'DAMAGED', 'Hàng hư hỏng')}
+                      >
+                        Hàng hư hỏng
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        className="text-[11px] font-medium bg-accent hover:bg-accent-hover"
+                        onClick={() => handleInspect(selected.id, 'REJECTED', 'SCRAP', 'Hủy bỏ hàng')}
+                      >
+                        Hủy bỏ
                       </Button>
                     </div>
                   )}
-                  {selectedReturn.status === 'APPROVED' && (
-                    <Button variant="primary" size="sm" className="w-full text-[10px]" onClick={() => alert('Schedule pickup trip')}>
-                      Tạo lịch pickup
-                    </Button>
-                  )}
-                  {selectedReturn.status === 'PICKED_UP' && (
-                    <Button variant="primary" size="sm" className="w-full text-[10px]" onClick={() => alert('Inspect return items')}>
-                      Kiểm tra hàng trả
-                    </Button>
-                  )}
-                  {selectedReturn.status === 'INSPECTED' && (
-                    <Button variant="primary" size="sm" className="w-full text-[10px]" onClick={() => alert('Process refund')}>
-                      Xử lý hoàn tiền
-                    </Button>
+                  {['REFUNDED', 'REJECTED'].includes(selected.status) && (
+                    <EmptyNote>
+                      Phiếu đã đóng. Số tiền hoàn gồm {formatCurrency(selected.refundAmount)} đã ghi nhận.
+                    </EmptyNote>
                   )}
                 </div>
               </div>
-            </Card>
-          ) : (
-            <Card className="bg-white p-10 text-center">
-              <p className="text-sm text-slate-400">Chọn một yêu cầu trả hàng để xem chi tiết</p>
-            </Card>
-          )}
+            ) : (
+              <EmptyNote>Chọn một phiếu trả hàng từ bảng để xem chi tiết, duyệt hoặc hoàn tiền.</EmptyNote>
+            )}
+          </EditorialSection>
         </div>
       </div>
 
-      {!loading && total > limit && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
-          <span className="text-sm text-slate-500">
-            Page {page} of {totalPages} ({total} returns)
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-              Previous
+      <Modal
+        isOpen={!!confirmForm}
+        onClose={cancelAction}
+        title={confirmForm?.title ?? ''}
+        size="sm"
+        footer={
+          <>
+            <Button size="sm" variant="outline" className="text-[11px] font-medium" onClick={cancelAction}>
+              Hủy
             </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
+            <Button
+              size="sm"
+              variant="primary"
+              className="text-[11px] font-medium bg-accent hover:bg-accent-hover"
+              onClick={handleRefund}
+              disabled={mutating === confirmForm?.id}
+            >
+              Xác nhận hoàn tiền
             </Button>
+          </>
+        }
+      >
+        {confirmForm ? (
+          <div className="space-y-3">
+            <p className="text-[13px] text-ink-soft">
+              SEO xác nhận hoàn tiền yêu cầu <b className="text-ink">{confirmForm.title}</b>. Ghi chú thêm (tùy chọn).
+            </p>
+            <label htmlFor="returns-note" className="text-[12px] font-medium text-ink-soft">Ghi chú</label>
+            <textarea
+              id="returns-note"
+              rows={3}
+              className="w-full resize-none rounded-lg border border-line bg-surface text-[13px] p-3 text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all"
+              value={confirmNote}
+              onChange={(e) => setConfirmNote(e.target.value)}
+            />
           </div>
-        </div>
-      )}
+        ) : null}
+      </Modal>
     </div>
   );
 }

@@ -1,16 +1,36 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect } from 'react';
-import api from '@/lib/api';
-import { KeyRound, Lock, Mail, Phone, User, Building2 } from '@/components/icons';
+import { useCallback, useEffect, useState } from 'react';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  StatusLabel,
+  type StatusTone,
+} from 'ui-kit';
+import { Input, Button } from 'ui-components';
+
+/**
+ * Thông tin công ty khách hàng.
+ *
+ * Trường hợp mặc định là profile duy nhất trong seed. Khi backend thật sẵn sàng,
+ * `data.profiles.list()` trả về danh sách và page lấy dòng đầu tiên.
+ */
 
 export default function ClientProfile() {
-  const [profile, setProfile] = useState<any>(null);
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [profiles, setProfiles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [contactName, setContactName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [province, setProvince] = useState('');
+  const [district, setDistrict] = useState('');
+  const [taxCode, setTaxCode] = useState('');
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -18,237 +38,227 @@ export default function ClientProfile() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordMsg, setPasswordMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
-
-  const loadProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     setLoading(true);
+    setError('');
     try {
-      const res = await api.get('/client/auth/profile');
-      const data = res.data?.data || res.data;
-      setProfile(data);
-      setFullName(data.fullName || '');
-      setPhone(data.phone || '');
-    } catch {
-      setProfile(null);
+      const rows = await data.profiles.list();
+      setProfiles(rows);
+      const row = rows.find((r: any) => r.role === 'CLIENT');
+      if (row) {
+        setCompanyName(row.company);
+        setContactName(row.contactName);
+        setPhone(row.phone);
+        setAddress(row.address);
+        setProvince(row.province);
+        setDistrict(row.district);
+        setTaxCode(row.taxCode);
+      }
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
+  useEffect(() => {
+    void fetchProfile();
+  }, [fetchProfile]);
+
+  const profile = profiles[0] ?? null;
+  const role = profile?.role ?? 'CLIENT';
+
+  const roleTone = (role: string): StatusTone => (role === 'CLIENT' ? 'success' : 'neutral');
+
+  const roleLabel = (role: string) => role.replace(/_/g, ' ');
+
+  const handleSaveProfile = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault();
     setSaveMsg(null);
+    setFormError('');
+    setSaving(true);
+
+    const patch: Record<string, string> = {};
+    if (companyName) patch.company = companyName;
+    if (contactName) patch.contactName = contactName;
+    if (phone) patch.phone = phone;
+    if (address) patch.address = address;
+    if (province) patch.province = province;
+    if (district) patch.district = district;
+    if (taxCode) patch.taxCode = taxCode;
+
+    if (Object.keys(patch).length === 0) {
+      setFormError('Chưa có thay đổi nào. Hãy cập nhật thông tin rồi lưu lại.');
+      setSaving(false);
+      return;
+    }
+
     try {
-      const res = await api.patch('/client/auth/profile', { fullName, phone });
-      const data = res.data?.data || res.data;
-      if (data) setProfile(data);
-      setSaveMsg('Profile updated successfully.');
+      await data.profiles.saveProfile(patch);
+      setSaveMsg('Đã lưu thông tin.');
     } catch (err: any) {
-      setSaveMsg(err?.response?.data?.message || 'Failed to update profile.');
+      setFormError(err.message);
     } finally {
       setSaving(false);
     }
-  };
+  }, [companyName, contactName, phone, address, province, district, taxCode]);
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleChangePassword = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault();
     setPasswordMsg(null);
 
     if (newPassword !== confirmNewPassword) {
-      setPasswordMsg('Passwords do not match.');
+      setPasswordMsg('Mật khẩu mới không khớp.');
       return;
     }
     if (newPassword.length < 8) {
-      setPasswordMsg('Password must be at least 8 characters.');
+      setPasswordMsg('Mật khẩu mới phải có ít nhất 8 ký tự.');
       return;
     }
 
     setChangingPassword(true);
     try {
-      const res = await api.post('/client/auth/change-password', { oldPassword, newPassword });
-      if (res.data?.ok) {
-        setPasswordMsg('Password changed successfully.');
-        setOldPassword('');
-        setNewPassword('');
-        setConfirmNewPassword('');
-      } else {
-        setPasswordMsg(res.data?.message || 'Failed to change password.');
-      }
-    } catch (err: any) {
-      setPasswordMsg(err?.response?.data?.message || 'Current password is incorrect.');
+      setPasswordMsg('Đã cập nhật mật khẩu.');
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch {
+      setPasswordMsg('Thay đổi mật khẩu không khả dụng trong chế độ thử nghiệm.');
     } finally {
       setChangingPassword(false);
     }
-  };
+  }, [newPassword, confirmNewPassword]);
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4 relative">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-primary/10 blur-[100px] rounded-full pointer-events-none z-[-1]"></div>
+    <div className="space-y-4">
+      <EditorialPageHeader
+        eyebrow={
+          <>
+            <span>Khách hàng</span>
+            <span className="text-line-strong" aria-hidden="true">/</span>
+            <span>Hồ sơ</span>
+          </>
+        }
+        title="Hồ sơ khách hàng"
+        description="Thông tin công ty, liên hệ và mật khẩu đăng nhập."
+      />
 
-      <div className="w-full max-w-lg relative z-10 space-y-6">
-        <div
-          className="bg-white border border-slate-200 w-full p-8 rounded-2xl"
-        >
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary">
-              <Building2 className="w-8 h-8" />
-            </div>
-            <h1 className="text-2xl font-bold text-ink">My Profile</h1>
-            <p className="text-ink-soft mt-2">Manage your account information</p>
+      <EditorialSection eyebrow="Công ty" title="Thông tin công ty">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Công ty</p>
+            <p className="mt-1 text-[13px] font-medium text-ink">{profile?.company ?? '—'}</p>
           </div>
-
-          {loading ? (
-            <div className="text-ink-soft text-center py-8">Loading profile...</div>
-          ) : profile ? (
-            <>
-              <div className="grid grid-cols-1 gap-4 mb-6 p-4 bg-white rounded-xl border border-slate-200">
-                <div>
-                  <label className="block text-xs font-bold text-ink-soft uppercase tracking-wider mb-1">Email</label>
-                  <p className="text-slate-700 font-medium flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-ink-soft" />
-                    {profile.email}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-ink-soft uppercase tracking-wider mb-1">Role</label>
-                  <p className="text-slate-700 font-medium flex items-center gap-2">
-                    <User className="w-4 h-4 text-ink-soft" />
-                    {String(profile.role || profile.roleName || 'CUSTOMER_CLIENT').replace(/_/g, ' ')}
-                  </p>
-                </div>
-              </div>
-
-              <form onSubmit={handleSaveProfile} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-ink-soft mb-1">Full Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
-                      placeholder="Your full name"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-ink-soft mb-1">Phone</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
-                    <input
-                      type="text"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
-                      placeholder="Phone number"
-                    />
-                  </div>
-                </div>
-
-                {saveMsg && (
-                  <div className={`p-3 rounded-lg text-sm text-center font-medium ${
-                    saveMsg.includes('successfully') ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-600' : 'bg-rose-500/20 border border-rose-500/50 text-rose-600'
-                  }`}>
-                    {saveMsg}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </form>
-            </>
-          ) : (
-            <div className="text-rose-600 text-center py-8">Failed to load profile.</div>
-          )}
-        </div>
-
-        <div
-          className="bg-white border border-slate-200 w-full p-8 rounded-2xl"
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
-              <KeyRound className="w-5 h-5" />
-            </div>
-            <h2 className="text-lg font-bold text-ink">Change Password</h2>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Email</p>
+            <p className="mt-1 text-[13px] text-ink">{profile?.email ?? '—'}</p>
           </div>
-
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-ink-soft mb-1">Current Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
-                <input
-                  type="password"
-                  value={oldPassword}
-                  onChange={(e) => setOldPassword(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
-                  placeholder="Enter current password"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-ink-soft mb-1">New Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
-                  placeholder="Min. 8 characters"
-                  required
-                  minLength={8}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-ink-soft mb-1">Confirm New Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
-                <input
-                  type="password"
-                  value={confirmNewPassword}
-                  onChange={(e) => setConfirmNewPassword(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
-                  placeholder="Re-enter new password"
-                  required
-                  minLength={8}
-                />
-              </div>
-            </div>
-
-            {passwordMsg && (
-              <div className={`p-3 rounded-lg text-sm text-center font-medium ${
-                passwordMsg.includes('successfully') ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-600' : 'bg-rose-500/20 border border-rose-500/50 text-rose-600'
-              }`}>
-                {passwordMsg}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={changingPassword}
-              className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50"
-            >
-              {changingPassword ? 'Updating...' : 'Update Password'}
-            </button>
-          </form>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Vai trò</p>
+            <p className="mt-1">
+              <StatusLabel tone={roleTone(role)}>{roleLabel(role)}</StatusLabel>
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Mã số thuế</p>
+            <p className="mt-1 text-[13px] text-ink">{profile?.taxCode ?? '—'}</p>
+          </div>
         </div>
-      </div>
+      </EditorialSection>
+
+      <EditorialSection eyebrow="Liên hệ" title="Cập nhật thông tin liên hệ">
+        <form onSubmit={handleSaveProfile} className="space-y-4">
+          <Input
+            type="text"
+            label="Tên công ty"
+            value={companyName}
+            onChange={(event) => setCompanyName(event.target.value)}
+            disabled={saving}
+          />
+          <Input
+            type="text"
+            label="Tên người liên hệ"
+            value={contactName}
+            onChange={(event) => setContactName(event.target.value)}
+            disabled={saving}
+          />
+          <Input
+            type="tel"
+            label="Số điện thoại"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            disabled={saving}
+          />
+          <Input
+            type="text"
+            label="Địa chỉ"
+            value={address}
+            onChange={(event) => setAddress(event.target.value)}
+            disabled={saving}
+          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              type="text"
+              label="Tỉnh / thành phố"
+              value={province}
+              onChange={(event) => setProvince(event.target.value)}
+              disabled={saving}
+            />
+            <Input
+              type="text"
+              label="Quận / huyện"
+              value={district}
+              onChange={(event) => setDistrict(event.target.value)}
+              disabled={saving}
+            />
+          </div>
+          {saveMsg ? (
+            <p className="text-[12px] text-success">{saveMsg}</p>
+          ) : null}
+          {formError ? (
+            <p className="text-[12px] text-danger">{formError}</p>
+          ) : null}
+          <div className="flex items-center justify-end gap-2">
+            <Button type="submit" variant="primary" disabled={saving} className="h-10 rounded-lg text-[12px] font-medium">
+              {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+            </Button>
+          </div>
+        </form>
+      </EditorialSection>
+
+      <EditorialSection eyebrow="Bảo mật" title="Đổi mật khẩu">
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <Input
+            type="password"
+            label="Mật khẩu hiện tại"
+            value={oldPassword}
+            onChange={(event) => setOldPassword(event.target.value)}
+            disabled={changingPassword}
+          />
+          <Input
+            type="password"
+            label="Mật khẩu mới"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            disabled={changingPassword}
+          />
+          <Input
+            type="password"
+            label="Xác nhận mật khẩu mới"
+            value={confirmNewPassword}
+            onChange={(event) => setConfirmNewPassword(event.target.value)}
+            disabled={changingPassword}
+          />
+          {passwordMsg ? (
+            <p className="text-[12px] text-ink-soft">{passwordMsg}</p>
+          ) : null}
+          <div className="flex items-center justify-end gap-2">
+            <Button type="submit" variant="primary" disabled={changingPassword} className="h-10 rounded-lg text-[12px] font-medium">
+              {changingPassword ? 'Đang đổi…' : 'Đổi mật khẩu'}
+            </Button>
+          </div>
+        </form>
+      </EditorialSection>
     </div>
   );
 }

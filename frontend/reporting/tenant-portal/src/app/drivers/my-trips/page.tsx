@@ -1,103 +1,276 @@
 'use client';
-import { DataState } from 'ui-components';
+
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { useState, useEffect } from 'react';
-import api from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import type { EditorialMetric } from 'ui-kit';
+import { Button, DataState, TableState } from 'ui-components';
+import type { Driver, Trip } from '@/lib/mock';
+import {
+  driverStatusLabel,
+  driverStatusTone,
+  formatCurrency,
+  formatDateTimeVN,
+  formatNumber,
+  tripStatusLabel,
+  tripStatusTone,
+} from '@/lib/labels';
+
+const PERIOD = new Date().toISOString().slice(0, 7);
 
 export default function MyTripsPage() {
-  const { user, token } = useAuth();
-  const [trips, setTrips] = useState<any[]>([]);
+  const { user } = useAuth();
+  const router = useRouter();
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mapModalOpen, setMapModalOpen] = useState(false);
-  const [selectedTrip, setSelectedTrip] = useState<any>(null);
+  const [error, setError] = useState('');
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  const driver = useMemo(
+    () =>
+      drivers.find((d) => d.name === user?.fullName) ??
+      drivers.find((d) => d.id === user?.id),
+    [drivers, user?.fullName, user?.id],
+  );
+
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [driversRes, tripsRes] = await Promise.all([data.drivers.list(), data.trips.list()]);
+      setDrivers(driversRes);
+      setTrips(tripsRes);
+    } catch (err: any) {
+      const msg = err?.message || 'Không tải được chuyến của bạn.';
+      setError(msg);
+      setDrivers([]);
+      setTrips([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    if (token) {
-      api.get('/logistics/trips?page=1&limit=50')
-         .then(res => setTrips(Array.isArray(res.data?.data) ? res.data.data : (Array.isArray(res.data) ? res.data : [])))
-         .finally(() => setLoading(false));
+    load();
+  }, []);
+
+  const myTrips = useMemo(
+    () =>
+      trips
+        .filter((t) => t.driverId === driver?.id)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    [trips, driver?.id],
+  );
+
+  const completed = myTrips.filter((t) => t.status === 'COMPLETED');
+  const active = myTrips.filter((t) => t.status === 'IN_PROGRESS' || t.status === 'DISPATCHED');
+
+  const metrics: EditorialMetric[] = [
+    { label: 'Chuyến hôm nay', value: myTrips.filter((t) => t.createdAt.startsWith(PERIOD)).length, meta: 'chưa vận chuyển' },
+    { label: 'Đã hoàn thành', value: completed.length, meta: 'tháng này' },
+    { label: 'Chưa hoàn thành', value: active.length, meta: 'cần kết thúc' },
+    { label: 'Giao hàng', value: formatNumber(myTrips.reduce((total, t) => total + t.stops.length, 0)), meta: 'tổng điểm giao' },
+  ];
+
+  const confirmComplete = async (id: string) => {
+    if (confirmId !== id) return;
+    try {
+      await data.trips.complete(id);
+    } catch (err: any) {
+      setError(err?.message || 'Không thể kết thúc chuyến.');
+      return;
     }
-  }, [token]);
-  
+    setConfirmId(null);
+    await load();
+  };
+
   return (
-    <div className="p-8 max-w-5xl mx-auto ">
-      <div className="mb-10">
-        <h1 className="text-4xl font-bold text-ink tracking-tight">
-          My Trips
-        </h1>
-        <p className="text-sm text-inkSoft mt-2 font-medium">View and manage your assigned delivery routes.</p>
-      </div>
+    <div className="space-y-6">
+      <EditorialPageHeader
+        eyebrow="Chuyến của tôi"
+        title="Tài xế"
+        description="Chuyến thuộc về tài xế của bạn, trạng thái, điểm giao chưa hoàn thành và COD."
+        meta={
+          driver ? (
+            <StatusLabel tone={driverStatusTone(driver.status)}>
+              {driverStatusLabel(driver.status)}
+            </StatusLabel>
+          ) : undefined
+        }
+        actions={
+          <Button variant="outline" size="sm" className="text-[11px] font-medium" onClick={load} disabled={loading}>
+            Làm mới
+          </Button>
+        }
+      />
 
-      <Card className="p-6">
-        <DataState
-          loading={loading}
-          empty={!loading && trips.length === 0}
-          
-          
-          emptyContent={<EmptyState 
-            title="No Active Trips" 
-            description="You do not have any trips assigned to you at the moment. Please wait for dispatch to assign a route."
-            icon={<svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>}
-          />}
-        >
-          <div className="space-y-4">
-             {trips.map(trip => (
-                <div key={trip.id} className="border border-slate-100 rounded-xl p-5 hover:border-slate-300 transition-all">
-                   <div className="flex justify-between items-start">
-                     <div>
-                       <div className="font-bold text-lg text-ink">{trip.tripNumber || trip.id.split('-')[0]}</div>
-                       <div className="text-sm text-slate-500 mt-1">Vehicle: {trip.vehicleId || 'Unassigned'}</div>
-                     </div>
-                     <Badge variant="neutral">{trip.status}</Badge>
-                   </div>
-                   <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end">
-                     <Button size="sm" onClick={() => {
-                       setSelectedTrip(trip);
-                       setMapModalOpen(true);
-                     }}>View Route</Button>
-                   </div>
-                </div>
-             ))}
-          </div>
-        </DataState>
-      </Card>
+      {error ? <p className="border-l-2 border-danger py-1 pl-3 text-[12px] text-danger">{error}</p> : null}
 
-      {mapModalOpen && selectedTrip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40  ">
-          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col h-[80vh]">
-            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-              <div>
-                <h2 className="text-xl font-bold text-ink tracking-tight">Turn-by-turn Navigation</h2>
-                <p className="text-sm text-inkSoft">Trip: {selectedTrip.tripNumber || selectedTrip.id.split('-')[0]}</p>
+      {!driver ? (
+        <EditorialSection title="Chưa liên kết tài xế">
+          <EmptyNote>
+            Tài khoản này chưa liên kết với tài xế. Vui lòng liên hệ quản lý để gán.
+          </EmptyNote>
+        </EditorialSection>
+      ) : (
+        <>
+          <MetricBand metrics={metrics} />
+
+          <EditorialSection title="Chuyến gần đây">
+            <DataState loading={loading} empty={!loading && myTrips.length === 0}>
+              <table className="min-w-full divide-y divide-line text-[13px]">
+                <thead className="bg-surface-alt">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                      Mã chuyến
+                    </th>
+                    <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                      Khởi hành
+                    </th>
+                    <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                      Trạng thái
+                    </th>
+                    <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                      Điểm giao
+                    </th>
+                    <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                      Thu COD
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  <TableState
+                    loading={loading}
+                    empty={!loading && myTrips.length === 0}
+                    onRetry={load}
+                    colSpan={5}
+                    emptyContent={
+                      <tr>
+                        <td colSpan={5} className="px-3 py-8 text-center text-ink-faint">
+                          Tài xế {driver?.name ?? ''} chưa có chuyến nào.
+                        </td>
+                      </tr>
+                    }
+                    error={error ? new Error(error) : undefined}
+                  >
+                    {myTrips.map((trip) => (
+                      <tr
+                        key={trip.id}
+                        className="hover:bg-surface-alt cursor-pointer"
+                        onClick={() => router.push(`/logistics/trips/${trip.id}/pod`)}
+                      >
+                        <td className="px-3 py-2">
+                          <p className="text-[13px] font-medium text-ink">{trip.code}</p>
+                          <p className="text-[11px] text-ink-faint">
+                            <span className="font-mono">{trip.driverName}</span>
+                          </p>
+                        </td>
+                        <td className="px-3 py-2">
+                          <p className="text-[13px] font-medium text-ink">
+                            {new Date(trip.createdAt).toLocaleDateString('vi-VN')}
+                          </p>
+                          <p className="text-[11px] text-ink-faint">
+                            {formatDateTimeVN(trip.startedAt ?? trip.createdAt)}
+                          </p>
+                        </td>
+                        <td className="px-3 py-2">
+                          <StatusLabel tone={tripStatusTone(trip.status)}>
+                            {tripStatusLabel(trip.status)}
+                          </StatusLabel>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums">
+                          <span className="text-[13px] font-medium text-ink">
+                            {trip.stops.length}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right tabular-nums text-ink-faint">
+                          {formatCurrency(trip.codCollected)}
+                        </td>
+                      </tr>
+                    ))}
+                  </TableState>
+                </tbody>
+              </table>
+            </DataState>
+          </EditorialSection>
+
+          {active.length > 0 && (
+            <EditorialSection title="Chuyến đang hoạt động">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {active.map((trip) => (
+                  <div
+                    key={trip.id}
+                    className="border border-line bg-surface p-3 hover:bg-surface-alt transition-colors"
+                    onClick={() => router.push(`/logistics/trips/${trip.id}/pod`)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-[13px] font-medium text-ink">{trip.code}</p>
+                        <p className="text-[11px] text-ink-faint">
+                          {trip.stops.length} điểm giao · {Math.round(trip.actualDistanceKm)} km
+                        </p>
+                      </div>
+                      <StatusLabel tone={tripStatusTone(trip.status)}>
+                        {tripStatusLabel(trip.status)}
+                      </StatusLabel>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      {trip.status === 'IN_PROGRESS' && confirmId !== trip.id ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-[11px] font-medium"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmId(trip.id);
+                          }}
+                        >
+                          Kết thúc chuyến
+                        </Button>
+                      ) : null}
+                      {trip.status === 'IN_PROGRESS' && confirmId === trip.id ? (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            className="text-[11px] font-medium"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              confirmComplete(trip.id);
+                            }}
+                          >
+                            Xác nhận
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-[11px] font-medium"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmId(null);
+                            }}
+                          >
+                            Hủy
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <button onClick={() => setMapModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12"/></svg>
-              </button>
-            </div>
-            
-            <div className="flex-1 bg-slate-100 relative">
-               <div className="absolute inset-0" style={{ backgroundImage: "linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px)", backgroundSize: "20px 20px" }}></div>
-               
-               <div className="absolute inset-x-4 bottom-4 bg-white rounded-2xl shadow-lg p-6 ">
-                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center">
-                       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
-                    </div>
-                    <div>
-                      <p className="font-bold text-ink">Map Integration Coming Soon</p>
-                      <p className="text-sm text-slate-500">Live GPS tracking and route optimization will be displayed here.</p>
-                    </div>
-                 </div>
-               </div>
-            </div>
-          </div>
-        </div>
+            </EditorialSection>
+          )}
+        </>
       )}
     </div>
   );
 }
-

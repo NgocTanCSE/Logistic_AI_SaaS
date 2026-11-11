@@ -139,6 +139,112 @@ export type StoreTable =
   | 'adminProfile'
   | 'tenants'
   | 'invoices'
+  | 'controlTower'
+  | 'pricing'
+  | 'aiInsights'
+  | 'costCalc'
+  | 'logisticsSimulation';
+
+export type ControlTowerStats = {
+  activeShipments: number;
+  onTimePercent: number;
+  incidents: number;
+  fleetSize: number;
+};
+
+export type NetworkNode = {
+  id: string;
+  name: string;
+  type: 'hub' | 'depot';
+  status: 'UP' | 'DEGRADED' | 'DOWN';
+  load: number;
+};
+
+export type ControlTowerData = {
+  stats: ControlTowerStats;
+  nodes: NetworkNode[];
+  scenario: {
+    id: string;
+    name: string;
+    demandDelta: number;
+    costDelta: number;
+    etaDelta: number;
+  } | null;
+};
+
+export type PricingRule = {
+  id: string;
+  route: string;
+  model: 'fixed' | 'dynamic' | 'surge';
+  baseRate: number;
+  demandFactor: number;
+  effective: number;
+  active: boolean;
+};
+
+export type PriceForecast = { month: string; demand: number; price: number };
+
+export type PricingData = {
+  rules: PricingRule[];
+  forecast: PriceForecast[];
+  currentPrice: number;
+  suggestedPrice: number;
+  confidence: number;
+};
+
+export type AIInsight = {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  confidence: number;
+  recommendation: string;
+  status: 'NEW' | 'DECIDED' | 'ESCALATED' | 'RESOLVED';
+  createdAt: string;
+};
+
+export type CostInputs = {
+  demand: number;
+  capacity: number;
+  pricePerUnit: number;
+  variableCost: number;
+  fixedCost: number;
+  serviceLevel: number;
+  laborCost: number;
+};
+
+export type CostProjection = {
+  id: string;
+  month: string;
+  demand: number;
+  sold: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+  margin: number;
+  breakEven: number;
+};
+
+export type SimulationParams = {
+  demand: number;
+  drivers: number;
+  vehicles: number;
+  avgSpeed: number;
+  fuelCost: number;
+  distance: number;
+};
+
+export type SimulationResult = {
+  id: string;
+  params: SimulationParams;
+  delivered: number;
+  delayed: number;
+  cost: number;
+  fuel: number;
+  etaDeviation: number;
+  chart: { hour: string; demand: number; supply: number }[];
+  createdAt: string;
+};
 
 type StoredRecord = { id: string; [key: string]: any };
 
@@ -580,7 +686,110 @@ const SEED_ADMIN_PROFILE: UserProfile = {
   fullName: 'Admin User',
 };
 
-const SEED_DATA: Record<StoreTable, any> = {
+const SEED_CONTROL_TOWER: ControlTowerData = {
+  stats: { activeShipments: 34, onTimePercent: 94.2, incidents: 3, fleetSize: 42 },
+  nodes: [
+    { id: 'hub_north', name: 'Hanoi Hub', type: 'hub', status: 'UP', load: 87 },
+    { id: 'hub_south', name: 'Ho Chi Minh Hub', type: 'hub', status: 'UP', load: 92 },
+    { id: 'depot_central', name: 'Da Nang Depot', type: 'depot', status: 'DEGRADED', load: 64 },
+    { id: 'depot_bienhoa', name: 'Bien Hoa Depot', type: 'depot', status: 'UP', load: 71 },
+    { id: 'hub_haiphong', name: 'Hai Phong Port', type: 'hub', status: 'UP', load: 58 },
+  ],
+  scenario: null,
+};
+
+const SEED_PRICING: PricingData = {
+  rules: [
+    { id: 'rule_01', route: 'Hanoi -> Ho Chi Minh', model: 'dynamic', baseRate: 120000, demandFactor: 1.15, effective: 138000, active: true },
+    { id: 'rule_02', route: 'Northern cluster', model: 'fixed', baseRate: 85000, demandFactor: 1, effective: 85000, active: true },
+    { id: 'rule_03', route: 'Southern cluster', model: 'surge', baseRate: 95000, demandFactor: 1.3, effective: 123500, active: true },
+    { id: 'rule_04', route: 'Da Nang corridor', model: 'dynamic', baseRate: 70000, demandFactor: 0.9, effective: 63000, active: false },
+  ],
+  forecast: [
+    { month: 'Jul', demand: 320, price: 110000 },
+    { month: 'Aug', demand: 410, price: 118000 },
+    { month: 'Sep', demand: 380, price: 112000 },
+    { month: 'Oct', demand: 450, price: 125000 },
+    { month: 'Nov', demand: 490, price: 130000 },
+    { month: 'Dec', demand: 520, price: 142000 },
+  ],
+  currentPrice: 130000,
+  suggestedPrice: 138000,
+  confidence: 0.86,
+};
+
+const SEED_AI_INSIGHTS: AIInsight[] = [
+  {
+    id: 'insight_01',
+    type: 'delay',
+    title: 'Northern cluster delay risk',
+    description: '3 shipments are delayed beyond SLA in the Northern cluster. Reassigning to nearby drivers recovers 85% of ETAs.',
+    confidence: 0.92,
+    recommendation: 'Reassign SHP-003 and SHP-007 to Route 21 drivers',
+    status: 'NEW',
+    createdAt: '2024-09-15T06:00:00Z',
+  },
+  {
+    id: 'insight_02',
+    type: 'maintenance',
+    title: 'Preventive maintenance due',
+    description: 'Vehicles T003 and T005 are overdue for scheduled maintenance. Risk of unplanned downtime rises after 48h.',
+    confidence: 0.84,
+    recommendation: 'Schedule maintenance windows for both vehicles',
+    status: 'NEW',
+    createdAt: '2024-09-15T05:30:00Z',
+  },
+  {
+    id: 'insight_03',
+    type: 'cost',
+    title: 'Fuel price surge',
+    description: 'Fuel prices rose 7% week-over-week, cutting margin on dynamic routes. Repricing routes 5-10% would restore margin.',
+    confidence: 0.78,
+    recommendation: 'Propose price revision for Southern cluster surge routes',
+    status: 'NEW',
+    createdAt: '2024-09-15T04:00:00Z',
+  },
+  {
+    id: 'insight_04',
+    type: 'churn',
+    title: 'Tenant churn warning - Mekong Trade',
+    description: 'Mekong Trade volume dropped 30% over 30 days. Trigger chat and offer volume discount.',
+    confidence: 0.71,
+    recommendation: 'Contact account owner before renewal',
+    status: 'NEW',
+    createdAt: '2024-09-14T11:00:00Z',
+  },
+];
+
+const SEED_COST_PROJECTIONS: CostProjection[] = [
+  { id: 'proj_01', month: 'Jul', demand: 320, sold: 300, revenue: 33000000, cost: 24000000, profit: 9000000, margin: 27.3, breakEven: 187 },
+  { id: 'proj_02', month: 'Aug', demand: 410, sold: 390, revenue: 46170000, cost: 29250000, profit: 16920000, margin: 36.6, breakEven: 231 },
+  { id: 'proj_03', month: 'Sep', demand: 380, sold: 370, revenue: 41400000, cost: 27900000, profit: 13500000, margin: 32.6, breakEven: 190 },
+];
+
+const SEED_LOGISTICS_SIMULATIONS: SimulationResult[] = [
+  {
+    id: 'sim_01',
+    params: { demand: 400, drivers: 38, vehicles: 42, avgSpeed: 40, fuelCost: 18000, distance: 250 },
+    delivered: 358,
+    delayed: 12,
+    cost: 14500000,
+    fuel: 6200000,
+    etaDeviation: 12.5,
+    chart: [
+      { hour: '06:00', demand: 30, supply: 28 },
+      { hour: '08:00', demand: 68, supply: 72 },
+      { hour: '10:00', demand: 92, supply: 88 },
+      { hour: '12:00', demand: 100, supply: 100 },
+      { hour: '14:00', demand: 85, supply: 95 },
+      { hour: '16:00', demand: 60, supply: 64 },
+      { hour: '18:00', demand: 40, supply: 42 },
+      { hour: '20:00', demand: 15, supply: 20 },
+    ],
+    createdAt: '2024-09-15T08:00:00Z',
+  },
+];
+
   orders: SEED_ORDERS,
   shipments: SEED_SHIPMENTS,
   dashboardStats: SEED_DASHBOARD_STATS,
@@ -591,6 +800,11 @@ const SEED_DATA: Record<StoreTable, any> = {
   adminProfile: SEED_ADMIN_PROFILE,
   tenants: SEED_TENANTS,
   invoices: SEED_INVOICES,
+  controlTower: SEED_CONTROL_TOWER,
+  pricing: SEED_PRICING,
+  aiInsights: SEED_AI_INSIGHTS,
+  costCalc: SEED_COST_PROJECTIONS,
+  logisticsSimulation: SEED_LOGISTICS_SIMULATIONS,
 };
 
 /* -------------------------------------------------------------------------- */
@@ -712,6 +926,11 @@ async function tryAPI(table: StoreTable, method: 'POST' | 'PATCH' | 'DELETE', pa
     adminProfile: '/admin/auth/profile',
     tenants: '/admin/tenants',
     invoices: '/admin/billing',
+    controlTower: '/admin/control-tower',
+    pricing: '/admin/pricing',
+    aiInsights: '/ai/v1/insights',
+    costCalc: '/admin/cost-calculator',
+    logisticsSimulation: '/admin/simulate',
   };
 
   const endpoint = endpointMap[table];
@@ -764,4 +983,152 @@ export async function fetchFromStoreOrAPI<T = any>(
   } catch {
     return getAll<T>(table);
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* AI layer — control tower, pricing, insights, cost calculator and logistics */
+/* simulation.                                                                */
+/* -------------------------------------------------------------------------- */
+
+/** Read the digital twin configuration (control tower). */
+export function getControlTower(): ControlTowerData {
+  return getAll<ControlTowerData>('controlTower');
+}
+
+/** Persist a what-if scenario against the twin. */
+export function setControlTower(data: ControlTowerData): void {
+  window.localStorage.setItem(tableKey('controlTower'), safeJSONStringify(data) ?? '{}');
+}
+
+/** Pricing data — rules, forecasts and the live demand signal. */
+export function getPricing(): PricingData {
+  return getAll<PricingData>('pricing');
+}
+
+export function savePricingRule(rule: PricingRule): PricingData {
+  const sheet = getPricing();
+  const rules = [...sheet.rules, { ...rule, id: rule.id || `rule_${Date.now()}` }];
+  setPricing({ ...sheet, rules });
+  return { ...sheet, rules };
+}
+
+export function updatePricingRule(id: string, data: Partial<PricingRule>): PricingData {
+  const sheet = getPricing();
+  const rules = sheet.rules.map((rule) => (rule.id === id ? { ...rule, ...data, id } : rule));
+  setPricing({ ...sheet, rules });
+  return { ...sheet, rules };
+}
+
+export function removePricingRule(id: string): PricingData {
+  const sheet = getPricing();
+  const rules = sheet.rules.filter((rule) => rule.id !== id);
+  setPricing({ ...sheet, rules });
+  return { ...sheet, rules };
+}
+
+/** AI insights — the admin decision surface mirrors `aiInsights.decide`. */
+export function getInsights(): AIInsight[] {
+  return getAll<AIInsight[]>('aiInsights');
+}
+
+export function decideInsight(id: string, status: AIInsight['status']): AIInsight {
+  const list = getInsights();
+  const index = list.findIndex((item) => item.id === id);
+  if (index === -1) {
+    throw new Error('Insight not found');
+  }
+  const insight = { ...list[index], status, decidedAt: Date.now() };
+  list[index] = insight;
+  window.localStorage.setItem(tableKey('aiInsights'), safeJSONStringify(list) ?? '[]');
+  tryAPI('aiInsights', 'PATCH', insight);
+  return insight;
+}
+
+/** BounceX cost calculator inputs and derived projections. */
+export function saveCostInputs(inputs: CostInputs): CostProjection {
+  const projection = calculateCostInputs(inputs);
+  const history = getCostHistory();
+  history.push(projection);
+  window.localStorage.setItem(tableKey('costCalc'), safeJSONStringify(history) ?? '[]');
+  return projection;
+}
+
+export function getCostHistory(): CostProjection[] {
+  return getAll<CostProjection[]>('costCalc');
+}
+
+export function calculateCostInputs(inputs: CostInputs): CostProjection {
+  const { demand, capacity, pricePerUnit, variableCost, fixedCost, serviceLevel, laborCost } = inputs;
+  const served = capacity * (serviceLevel / 100);
+  const demandServed = served >= demand ? demand : served;
+  const revenue = demandServed * pricePerUnit;
+  const cost = demand * variableCost + fixedCost + laborCost;
+  const profit = revenue - cost;
+  const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+  const breakEven =
+    (pricePerUnit - variableCost) > 0
+      ? Math.ceil((fixedCost + laborCost) / (pricePerUnit - variableCost))
+      : Infinity;
+  return {
+    id: `proj_${Date.now()}`,
+    month: new Date().toISOString().slice(0, 7),
+    demand,
+    sold: demandServed,
+    revenue: Math.round(revenue),
+    cost: Math.round(cost),
+    profit: Math.round(profit),
+    margin: Math.round(margin * 10) / 10,
+    breakEven,
+  };
+}
+
+/** Logistics simulation — deterministic demand / capacity replay. */
+export function getSimulations(): SimulationResult[] {
+  return getAll<SimulationResult[]>('logisticsSimulation');
+}
+
+export function runSimulation(params: SimulationParams): SimulationResult {
+  const now = Date.now();
+  const id = `sim_${now}`;
+
+  // Assumptions: every vehicle runs 10h/day over the average delivery link.
+  const capacityPerVehicle = params.avgSpeed * 10;
+  const fleetCapacity = params.vehicles * capacityPerVehicle;
+  const demand = params.demand;
+
+  const delivered = Math.min(demand, fleetCapacity);
+  const delayed = Math.max(0, demand - delivered);
+  const fuel = delivered * params.distance * params.fuelCost;
+  const cost = fuel + delayed * 50000;
+  const etaDeviation = demand > 0 ? (delayed / demand) * 100 : 0;
+
+  const chart: { hour: string; demand: number; supply: number }[] = [];
+  for (let hour = 0; hour < 24; hour += 2) {
+    const time = `${String(hour).padStart(2, '0')}:00`;
+    const demandFactor = hour >= 6 && hour <= 20
+      ? 0.1 + 0.9 * Math.sin(((hour - 6) / 14) * Math.PI)
+      : 0.1;
+    chart.push({
+      hour: time,
+      demand: Math.round(demand * demandFactor),
+      supply: Math.round((fleetCapacity / 24) * (hour >= 8 && hour <= 20 ? 1 : 0.35)),
+    });
+  }
+
+  const result: SimulationResult = {
+    id,
+    params,
+    delivered,
+    delayed,
+    cost: Math.round(cost),
+    fuel: Math.round(fuel),
+    etaDeviation: Math.round(etaDeviation * 10) / 10,
+    chart,
+    createdAt: new Date(now).toISOString(),
+  };
+
+  const list = getSimulations();
+  list.push(result);
+  window.localStorage.setItem(tableKey('logisticsSimulation'), safeJSONStringify(list) ?? '[]');
+  return result;
 }

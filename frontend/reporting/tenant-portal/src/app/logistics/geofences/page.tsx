@@ -1,247 +1,389 @@
 'use client';
-import { TableState } from 'ui-components';
-import { useState, useEffect } from 'react';
-import api from '@/lib/api';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
-import { ErrorBanner } from '@/components/ui/ErrorBanner';
-import { RoleGuard } from '@/components/auth/RoleGuard';
 
-type Geofence = {
-  id: string;
-  name: string;
-  zoneType: 'ALLOWED' | 'RESTRICTED';
-  polygon?: string;
-  isActive?: boolean;
+import { useEffect, useMemo, useState } from 'react';
+import { data } from '@/lib/data';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  MetricBand,
+  StatusLabel,
+  EmptyNote,
+} from 'ui-kit';
+import { Button, DataState, Input, Modal, Pagination, Select, TableState } from 'ui-components';
+import type { Geofence } from '@/lib/mock';
+import { formatNumber } from '@/lib/labels';
+
+const PAGE_SIZE = 12;
+
+/** Mã vùng an toàn / hạn chế không có trên labels.ts: định nghĩa tại trang. */
+const KIND_LABELS: Record<Geofence['kind'], string> = {
+  SAFE: 'Vùng an toàn',
+  RESTRICTED: 'Vùng hạn chế',
 };
 
-function GeofencesContent() {
+/** Ngày tạo vùng an toàn mặc định. */
+const KIND_TONES: Record<Geofence['kind'], 'success' | 'warning'> = {
+  SAFE: 'success',
+  RESTRICTED: 'warning',
+};
+
+export default function GeofencesPage() {
   const [geofences, setGeofences] = useState<Geofence[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [error, setError] = useState('');
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [formData, setFormData] = useState({ name: '', type: 'ALLOWED', polygon: '' });
+  const [filter, setFilter] = useState('');
+  const [kindFilter, setKindFilter] = useState<Geofence['kind'] | 'ALL'>('ALL');
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const limit = 20;
 
-  useEffect(() => {
-    fetchGeofences();
-  }, [page]);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [form, setForm] = useState({
+    name: '',
+    kind: 'SAFE' as Geofence['kind'],
+    province: '',
+    centerLat: '',
+    centerLng: '',
+    radiusM: '',
+    note: '',
+  });
 
-  const fetchGeofences = async () => {
+  const load = async () => {
     setLoading(true);
+    setError('');
     try {
-      const res = await api.get('/geofences', { params: { page, limit } });
-      const data = Array.isArray(res.data) ? res.data : (res.data?.data || res.data?.items || []);
-      setGeofences(data);
-      setTotal(res.data?.meta?.total || 0);
-    } catch (err) {
-      console.error('Failed to fetch geofences:', err);
-      setError('Failed to load geofences. Geofence service may be unavailable.');
+      const rows = await data.geofences.list();
+      setGeofences(rows);
+    } catch (err: any) {
+      const msg = err?.message || 'Không tải được dữ liệu địa danh.';
+      setError(msg);
       setGeofences([]);
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    load();
+  }, []);
+
+  const sortedGeofences = useMemo(() => {
+    const rows = geofences.slice();
+    const term = filter.toLowerCase().trim();
+    const filtered = kindFilter === 'ALL' ? rows : rows.filter((g) => g.kind === kindFilter);
+    if (term) {
+      return filtered.filter((g) => g.name.toLowerCase().includes(term) || g.province.toLowerCase().includes(term));
+    }
+    return filtered;
+  }, [geofences, filter, kindFilter]);
+
+  const paged = useMemo(
+    () => sortedGeofences.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [sortedGeofences, page],
+  );
+  const totalPages = Math.max(1, Math.ceil(sortedGeofences.length / PAGE_SIZE));
+
+  const metrics = [
+    { label: 'Đang hoạt động', value: geofences.filter((g) => g.active).length, meta: 'vùng kích hoạt' },
+    { label: 'Tắt', value: geofences.filter((g) => !g.active).length, meta: 'tạm ngưng' },
+    { label: 'Lỗi địa danh trong 24h', value: geofences.reduce((a, g) => a + g.alerts24h, 0), meta: 'cần xử lý' },
+    { label: 'Vùng hạn chế', value: geofences.filter((g) => g.kind === 'RESTRICTED').length, meta: 'chặn dừng' },
+  ];
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setCreating(true);
-    setError('');
+    if (!form.name || !form.province || !form.centerLat || !form.centerLng || !form.radiusM) {
+      setError('Vui lòng nhập đủ tên vùng, tỉnh, tọa độ và bán kính.');
+      return;
+    }
+    setSubmitting(true);
     try {
-      await api.post('/geofences', {
-        name: formData.name,
-        zoneType: formData.type,
-        polygonWkt: formData.polygon,
+      await data.geofences.create({
+        name: form.name,
+        kind: form.kind,
+        province: form.province,
+        centerLat: Number(form.centerLat),
+        centerLng: Number(form.centerLng),
+        radiusM: Number(form.radiusM),
+        note: form.note,
+        active: true,
+        alerts24h: 0,
       });
-      setIsModalOpen(false);
-      setFormData({ name: '', type: 'ALLOWED', polygon: '' });
-      fetchGeofences();
-    } catch (err) {
-      console.error('Failed to create geofence:', err);
-      setError('Failed to create geofence. Please try again.');
+      setForm({ name: '', kind: 'SAFE', province: '', centerLat: '', centerLng: '', radiusM: '', note: '' });
+      setModalOpen(false);
+      await load();
+    } catch (err: any) {
+      setError(err?.message || 'Không tạo được địa danh.');
     } finally {
-      setCreating(false);
+      setSubmitting(false);
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / limit));
-  const filtered = geofences.filter((g) =>
-    g.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const handleUpdate = async (patch: Partial<Geofence>) => {
+    if (!geofences.some((g) => g.id === patch.id)) {
+      setError('Địa danh không tồn tại.');
+      return;
+    }
+    try {
+      const updated = await data.geofences.update(patch.id as string, patch);
+      setGeofences((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
+      setModalOpen(false);
+      setEditingId(null);
+    } catch (err: any) {
+      setError(err?.message || 'Cập nhật địa danh thất bại.');
+    }
+  };
+
+  const handleToggleActive = async (geofence: Geofence) => {
+    try {
+      const updated = await data.geofences.update(geofence.id, { active: !geofence.active });
+      setGeofences((prev) => prev.map((g) => (g.id === updated.id ? updated : g)));
+    } catch (err: any) {
+      setError(err?.message || 'Cập nhật trạng thái thất bại.');
+    }
+  };
+
+  const openEdit = (geofence: Geofence) => {
+    setForm({
+      name: geofence.name,
+      kind: geofence.kind,
+      province: geofence.province,
+      centerLat: String(geofence.centerLat),
+      centerLng: String(geofence.centerLng),
+      radiusM: String(geofence.radiusM),
+      note: geofence.note ?? '',
+    });
+    setEditingId(geofence.id);
+    setModalOpen(true);
+  };
+
+  const openCreate = () => {
+    setForm({ name: '', kind: 'SAFE', province: '', centerLat: '', centerLng: '', radiusM: '', note: '' });
+    setEditingId(null);
+    setModalOpen(true);
+  };
 
   return (
-    <RoleGuard allowedRoles={['LOGISTICS_MANAGER', 'TENANT_ADMIN']}>
-    <div className="p-8 max-w-7xl mx-auto ">
-      <div className="flex justify-between items-center mb-10">
-        <div>
-          <h1 className="text-4xl font-bold text-ink tracking-tight">Geofences</h1>
-          <p className="text-sm text-inkSoft mt-2 font-medium">
-            Manage allowed and restricted delivery zones.
-          </p>
-        </div>
-        <Button variant="primary" onClick={() => setIsModalOpen(true)}>
-          Create Geofence
-        </Button>
-      </div>
-
-      {error && <ErrorBanner message={error} onRetry={fetchGeofences} />}
-
-      <Card className="p-6 mb-8">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="relative w-full sm:w-72">
-            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search zones..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-white border border-slate-200 text-ink text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-            />
+    <div className="space-y-6">
+      <EditorialPageHeader
+        eyebrow="Vận tải"
+        title="Địa danh"
+        description="Quản lý vùng an toàn và vùng hạn chế, theo dõi cảnh báo trái địa danh và kích hoạt / tắt vùng."
+        meta={`${geofences.length} vùng`}
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="text-[11px] font-medium" onClick={load} disabled={loading}>
+              Làm mới
+            </Button>
+            <Button variant="primary" size="sm" className="text-[11px] font-medium" onClick={openCreate}>
+              Tạo vùng
+            </Button>
           </div>
-        </div>
-      </Card>
+        }
+      />
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-500 border-b border-slate-100">
+      {error ? <p className="border-l-2 border-danger py-1 pl-3 text-[12px] text-danger">{error}</p> : null}
+
+      <MetricBand metrics={metrics} />
+
+      <EditorialSection title="Danh sách địa danh">
+        <div className="flex flex-wrap items-end gap-2 mb-3">
+          <Input
+            type="search"
+            placeholder="Tìm tên vùng, tỉnh"
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(1);
+            }}
+            className="w-64 h-9"
+          />
+          <Select
+            className="h-9 min-w-[14rem]"
+            value={kindFilter}
+            onChange={(e) => setKindFilter(e.target.value as Geofence['kind'] | 'ALL')}
+            options={[
+              { value: 'ALL', label: 'Tất cả loại' },
+              { value: 'SAFE', label: KIND_LABELS.SAFE },
+              { value: 'RESTRICTED', label: KIND_LABELS.RESTRICTED },
+            ]}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-[11px] font-medium"
+            onClick={() => {
+              setFilter('');
+              setKindFilter('ALL');
+            }}
+          >
+            Xóa bộ lọc
+          </Button>
+        </div>
+        <DataState loading={loading} empty={!loading && sortedGeofences.length === 0}>
+          <table className="min-w-full divide-y divide-line text-[13px]">
+            <thead className="bg-surface-alt">
               <tr>
-                <th className="px-6 py-4 font-bold">Zone Name</th>
-                <th className="px-6 py-4 font-bold">Type</th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Tên vùng
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Loại
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Tỉnh
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                  Bán kính
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Cảnh báo 24h
+                </th>
+                <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                  Trạng thái
+                </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-line">
               <TableState
-          loading={loading}
-          empty={!loading && filtered.length === 0}
-          error={error ? new Error(error) : undefined}
-          onRetry={fetchGeofences}
-          colSpan={6}
-          emptyContent={<tr>
-                  <td colSpan={2} className="px-6 py-12 text-center text-sm text-slate-400">
-                    {search ? 'No zones match your search.' : 'No geofences yet. Create one to get started.'}
-                  </td>
-                </tr>}
-        >
-          {filtered.map((row) => (
-                  <tr key={row.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                        </div>
-                        <span className="font-semibold text-ink">{row.name}</span>
-                      </div>
+                loading={loading}
+                empty={!loading && paged.length === 0}
+                onRetry={load}
+                colSpan={6}
+                emptyContent={
+                  <tr>
+                    <td colSpan={6} className="px-3 py-8 text-center text-ink-faint">
+                      Không tìm thấy địa danh.
                     </td>
-                    <td className="px-6 py-4">
-                      <Badge variant={row.zoneType === 'ALLOWED' ? 'success' : 'error'}>
-                        {row.zoneType}
-                      </Badge>
+                  </tr>
+                }
+                error={error ? new Error(error) : undefined}
+              >
+                {paged.map((g) => (
+                  <tr key={g.id} className="hover:bg-surface-alt">
+                    <td className="px-3 py-2 font-medium text-ink">{g.name}</td>
+                    <td className="px-3 py-2">
+                      <StatusLabel tone={KIND_TONES[g.kind]}>{KIND_LABELS[g.kind]}</StatusLabel>
+                    </td>
+                    <td className="px-3 py-2 text-ink-faint">{g.province}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{formatNumber(g.radiusM)} m</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {g.alerts24h > 0 ? (
+                        <StatusLabel tone="warning">{g.alerts24h}</StatusLabel>
+                      ) : (
+                        <StatusLabel tone="neutral">{0}</StatusLabel>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <StatusLabel tone={g.active ? 'success' : 'neutral'}>{g.active ? 'Đang kích hoạt' : 'Tạm ngưng'}</StatusLabel>
                     </td>
                   </tr>
                 ))}
-        </TableState>
+              </TableState>
             </tbody>
           </table>
-        </div>
-      </Card>
-
-      {!loading && total > limit && (
-        <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
-          <span className="text-sm text-slate-500">
-            Page {page} of {totalPages} ({total} geofences)
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
-              Next
-            </Button>
+          <div className="flex justify-center py-3">
+            <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
           </div>
-        </div>
-      )}
+        </DataState>
+      </EditorialSection>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40  ">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-8 border-t-4 border-t-primary">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-ink">Create Geofence</h2>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingId ? 'Sửa địa danh' : 'Tạo địa danh'}
+      >
+        <form onSubmit={handleCreate} className="space-y-3">
+          <div>
+            <label className="block text-[11px] font-medium text-ink-soft mb-1">Tên vùng</label>
+            <Input
+              required
+              className="h-9"
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="VD: KCN Sóng Thần"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-medium text-ink-soft mb-1">Loại</label>
+              <Select
+                className="h-9"
+                value={form.kind}
+                onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value as Geofence['kind'] }))}
+                options={[
+                  { value: 'SAFE', label: KIND_LABELS.SAFE },
+                  { value: 'RESTRICTED', label: KIND_LABELS.RESTRICTED },
+                ]}
+              />
             </div>
-            <form onSubmit={handleCreate} className="space-y-5">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                  Zone Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full bg-white border border-slate-200 text-ink text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  placeholder="e.g. Downtown Core"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                  Zone Type
-                </label>
-                <select
-                  value={formData.type}
-                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                  className="w-full bg-white border border-slate-200 text-ink text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                >
-                  <option value="ALLOWED">Allowed</option>
-                  <option value="RESTRICTED">Restricted</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1.5 ml-1">
-                  Polygon (WKT format)
-                </label>
-                <textarea
-                  value={formData.polygon}
-                  onChange={(e) => setFormData({ ...formData, polygon: e.target.value })}
-                  className="w-full bg-white border border-slate-200 text-ink text-sm rounded-xl px-4 py-3 font-mono h-24 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                  placeholder="POLYGON((...))"
-                  required
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" variant="primary" disabled={creating || !formData.name || !formData.polygon}>
-                  {creating ? 'Saving...' : 'Create'}
-                </Button>
-              </div>
-            </form>
+            <div>
+              <label className="block text-[11px] font-medium text-ink-soft mb-1">Tỉnh</label>
+              <Input
+                required
+                className="h-9"
+                value={form.province}
+                onChange={(e) => setForm((f) => ({ ...f, province: e.target.value }))}
+                placeholder="VD: Bình Dương"
+              />
+            </div>
           </div>
-        </div>
-      )}
+          <div className="grid grid-cols-4 gap-3">
+            <div>
+              <label className="block text-[11px] font-medium text-ink-soft mb-1">Vĩ độ</label>
+              <Input
+                required
+                type="number"
+                step="0.000001"
+                className="h-9"
+                value={form.centerLat}
+                onChange={(e) => setForm((f) => ({ ...f, centerLat: e.target.value }))}
+                placeholder="10.9239"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-ink-soft mb-1">Kinh độ</label>
+              <Input
+                required
+                type="number"
+                step="0.000001"
+                className="h-9"
+                value={form.centerLng}
+                onChange={(e) => setForm((f) => ({ ...f, centerLng: e.target.value }))}
+                placeholder="106.7147"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-ink-soft mb-1">Bán kính (m)</label>
+              <Input
+                required
+                type="number"
+                className="h-9"
+                value={form.radiusM}
+                onChange={(e) => setForm((f) => ({ ...f, radiusM: e.target.value }))}
+                placeholder="2400"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-ink-soft mb-1">Ghi chú</label>
+              <Input
+                className="h-9"
+                value={form.note}
+                onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+                placeholder="Không bắt buộc"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setModalOpen(false)}>
+              Hủy
+            </Button>
+            <Button type="submit" variant="primary" size="sm" disabled={submitting}>
+              {submitting ? 'Đang tạo' : 'Tạo'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
-    </RoleGuard>
   );
-}
-
-export default function GeofencesPage() {
-  return <GeofencesContent />;
 }

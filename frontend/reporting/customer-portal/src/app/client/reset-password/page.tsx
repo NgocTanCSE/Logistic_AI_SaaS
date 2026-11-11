@@ -1,17 +1,23 @@
-"use client";
+'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import api from '@/lib/api';
-import { ArrowLeft, Lock, Building2 } from '@/components/icons';
+import {
+  EditorialPageHeader,
+  EditorialSection,
+  StatusLabel,
+} from 'ui-kit';
+import { Input, Button } from 'ui-components';
+
+/** Đặt lại mật khẩu bằng token nhận được qua email. */
 
 function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const token = searchParams.get('token') || '';
-  const email = searchParams.get('email') || '';
-  const slug = searchParams.get('slug') || '';
+  const token = searchParams.get('token') ?? '';
+  const email = searchParams.get('email') ?? '';
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -19,116 +25,117 @@ function ResetPasswordForm() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
     if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError('Mật khẩu mới không khớp.');
       return;
     }
     if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setError('Mật khẩu mới phải có ít nhất 8 ký tự.');
       return;
     }
     setLoading(true);
-    setError('');
     try {
-      const res = await api.post('/client/auth/reset-password', { email, token, password }, {
-        headers: { 'x-tenant-slug': slug },
-      });
+      const res = await api.post('/client/auth/reset-password', { email, token, password });
       if (res.data?.ok) {
         setSuccess(true);
       } else {
-        setError(res.data?.message || 'Failed to reset password.');
+        setError(res.data?.message || 'Không thể xác thực yêu cầu.');
       }
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Invalid or expired reset token.');
+      setError(err?.response?.data?.message || 'Liên kết đã hết hạn, vui lòng yêu cầu lại.');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!token || !email) {
-    return (
-      <div className="text-center">
-        <div className="w-16 h-16 bg-rose-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-rose-500">
-          <Building2 className="w-8 h-8" />
-        </div>
-        <h1 className="text-2xl font-bold text-ink mb-2">Invalid Link</h1>
-        <p className="text-ink-soft mb-6">This password reset link is invalid or has expired.</p>
-        <Link href="/client/forgot-password" className="text-primary hover:text-primary/80 font-medium">
-          Request a new reset link
-        </Link>
-      </div>
-    );
-  }
-
-  if (success) {
-    return (
-      <div className="text-center">
-        <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-emerald-500">
-          <Lock className="w-8 h-8" />
-        </div>
-        <h1 className="text-2xl font-bold text-ink mb-2">Password Reset</h1>
-        <p className="text-ink-soft mb-6">Your password has been reset successfully.</p>
-        <Link href="/client/login" className="inline-flex items-center gap-2 text-primary hover:text-primary/80 font-medium">
-          <ArrowLeft className="w-4 h-4" />
-          Back to Login
-        </Link>
-      </div>
-    );
-  }
-
   return (
-    <>
-      <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary">
-          <Lock className="w-8 h-8" />
+    <EditorialSection>
+      <div className="space-y-4">
+        {success ? (
+          <EditorialPageHeader
+            title="Đã đặt lại mật khẩu"
+            description="Mật khẩu của bạn đã được cập nhật. Hãy đăng nhập lại."
+          />
+        ) : (
+          <EditorialPageHeader
+            title="Đặt lại mật khẩu"
+            description={`Đặt lại mật khẩu cho tài khoản ${email}.`}
+          />
+        )}
+        {!success ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error ? (
+              <div className="flex items-center gap-2 rounded-md border-l-2 border-danger bg-surface px-3 py-2">
+                <StatusLabel tone="danger">{error}</StatusLabel>
+              </div>
+            ) : null}
+            <Input
+              id="new-password"
+              type="password"
+              label="Mật khẩu mới"
+              placeholder="Tối thiểu 8 ký tự"
+              required
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              disabled={loading}
+            />
+            <Input
+              id="confirm-password"
+              type="password"
+              label="Xác nhận mật khẩu mới"
+              placeholder="Nhập lại mật khẩu"
+              required
+              minLength={8}
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              disabled={loading}
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              className="h-11 w-full text-[13px] font-semibold rounded-lg"
+              disabled={loading}
+            >
+              {loading ? 'Đang đặt lại…' : 'Đặt lại mật khẩu'}
+            </Button>
+          </form>
+        ) : null}
+        <div>
+          <Link
+            href={success ? '/client/login' : '/client/forgot-password'}
+            className="text-[12px] font-medium text-ink-soft hover:text-ink"
+          >
+            {success ? 'Về trang đăng nhập' : 'Yêu cầu liên kết mới'}
+          </Link>
         </div>
-        <h1 className="text-2xl font-bold text-ink">Set New Password</h1>
-        <p className="text-ink-soft mt-2">Enter your new password for <strong className="text-ink">{email}</strong></p>
       </div>
-
-      {error && (
-        <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-sm text-rose-600 text-center">{error}</div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-ink-soft mb-1">New Password</label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
-              placeholder="Min. 8 characters" required minLength={8} />
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-ink-soft mb-1">Confirm Password</label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-soft" />
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
-              placeholder="Re-enter password" required minLength={8} />
-          </div>
-        </div>
-        <button type="submit" disabled={loading}
-          className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50 mt-4">
-          {loading ? 'Resetting...' : 'Reset Password'}
-        </button>
-      </form>
-    </>
+    </EditorialSection>
   );
 }
 
-export default function B2BResetPassword() {
-  return (
-    <div className="flex-1 flex items-center justify-center p-4 relative">
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-primary/10 blur-[100px] rounded-full pointer-events-none z-[-1]"></div>
-        <div className="bg-white border border-slate-200 w-full max-w-md p-8 rounded-2xl">
-        <Suspense fallback={<div className="text-ink-soft text-center py-8">Loading...</div>}>
-          <ResetPasswordForm />
-        </Suspense>
-      </div>
-    </div>
-  );
+export default function ClientResetPassword() {
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token') ?? '';
+  const email = searchParams.get('email') ?? '';
+
+  if (!token || !email) {
+    return (
+      <EditorialSection>
+        <div className="space-y-4">
+          <EditorialPageHeader title="Liên kết không hợp lệ" description="Liên kết đặt lại mật khẩu này đã hết hạn hoặc không hợp lệ." />
+          <div>
+            <Link href="/client/forgot-password" className="text-[12px] font-medium text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent">
+              Yêu cầu liên kết đặt lại mật khẩu mới
+            </Link>
+          </div>
+        </div>
+      </EditorialSection>
+    );
+  }
+
+  return <ResetPasswordForm />;
 }

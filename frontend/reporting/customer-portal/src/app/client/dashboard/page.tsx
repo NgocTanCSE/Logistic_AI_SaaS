@@ -1,10 +1,9 @@
 'use client';
 
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import useSWR from 'swr';
-import api from '@/lib/api';
-import { formatVnd } from '@/lib/format';
+import { useAuth } from '@/lib/auth-context';
+import { data } from '@/lib/data';
 import {
   EditorialPageHeader,
   EditorialSection,
@@ -14,332 +13,229 @@ import {
   type StatusTone,
 } from 'ui-kit';
 
-const fetcher = async (url: string) => {
-  const token = localStorage.getItem('smartlogi_customer_token');
-  const userStr = localStorage.getItem('smartlogi_customer_user');
-  const user = userStr ? JSON.parse(userStr) : null;
-  const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
-  if (user?.slug) headers['x-tenant-slug'] = user.slug;
+import { TableState } from 'ui-components';
+import { formatCurrency, formatDateTimeVN, orderStatusTone } from '@/lib/labels';
 
-  const res = await api.get(url, { headers });
-  return res.data;
-};
-
-function readList(payload: any): any[] {
-  const root = payload?.data ?? payload;
-  if (Array.isArray(root)) return root;
-  if (Array.isArray(root?.data)) return root.data;
-  if (Array.isArray(root?.items)) return root.items;
-  return [];
-}
-
-function readTotal(payload: any): number {
-  const root = payload?.data ?? payload;
-  const total = root?.meta?.total ?? root?.total ?? payload?.meta?.total ?? payload?.total;
-  return typeof total === 'number' ? total : readList(payload).length;
-}
-
-function formatStatus(status?: string) {
-  if (!status) return 'Unknown';
-  return status
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .replace(/\b\w/g, (character) => character.toUpperCase());
-}
-
-const STATUS_TONES: Record<string, StatusTone> = {
-  DELIVERED: 'success',
-  RETURNED: 'danger',
-  CANCELLED: 'danger',
-  FAILED: 'danger',
-  IN_TRANSIT: 'info',
-  OUT_FOR_DELIVERY: 'info',
-  PICKED_UP: 'info',
-  ASSIGNED: 'info',
-  NEW: 'warning',
-  PENDING: 'warning',
-};
-
-const IN_TRANSIT_STATUSES = new Set([
-  'IN_TRANSIT',
-  'OUT_FOR_DELIVERY',
-  'PICKED_UP',
-  'ASSIGNED',
-  'PICKUP_SCHEDULED',
-]);
+/**
+ * Bảng điều khiển khách hàng.
+ *
+ * Module AI chạy hoàn toàn trên dữ liệu mock (offline):
+ * `data.aiFeature.predictETA`, `deliverySuggestions`, `anomalyForecast`,
+ * `profileInsights` là những hàm AI riêng biệt với mạng. Khi `NEXT_PUBLIC_DATA_SOURCE=api`,
+ * các hàm này được thay bằng adapter REST (xem `repository.ts`).
+ */
 
 export default function ClientDashboard() {
-  const {
-    data: ordersData,
-    error: ordersError,
-    isLoading: ordersLoading,
-    mutate: mutateOrders,
-  } = useSWR('/client/orders', fetcher);
-  const {
-    data: invoicesData,
-    error: invoicesError,
-    mutate: mutateInvoices,
-  } = useSWR('/client/invoices', fetcher);
+  const { user } = useAuth();
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [overdueInvoices, setOverdueInvoices] = useState([]);
+  const [lowStock, setLowStock] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [summary, setSummary] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState('');
 
-  const [updatedAt, setUpdatedAt] = useState('');
-
-  const orders = readList(ordersData);
-  const invoices = readList(invoicesData);
-  const totalShipments = readTotal(ordersData);
-  const delivered = orders.filter((order: any) => order.status === 'DELIVERED').length;
-  const inTransit = orders.filter((order: any) => IN_TRANSIT_STATUSES.has(order.status)).length;
-  const returned = orders.filter(
-    (order: any) => order.status === 'RETURNED' || order.status === 'CANCELLED',
-  ).length;
-  const returnRate = totalShipments > 0 ? `${((returned / totalShipments) * 100).toFixed(1)}%` : '—';
-  const unpaidInvoices = invoices.filter(
-    (invoice: any) => invoice.status === 'PENDING' || invoice.status === 'FAILED',
-  );
-  const outstandingAmount = unpaidInvoices.reduce(
-    (sum: number, invoice: any) => sum + Number(invoice.totalAmount || 0),
-    0,
-  );
+  const fetchDashboard = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [summaryRow, orderRows, invoiceRows, stockRows] = await Promise.all([
+        data.orders.summary(),
+        data.orders.list((row) => row.status !== 'CANCELLED'),
+        data.invoices.list(),
+        data.stock.list(),
+      ]);
+      setSummary(summaryRow);
+      setRecentOrders(
+        (summaryRow?.recentOrders?.length ? summaryRow.recentOrders : orderRows.slice(0, 6)) ?? [],
+      );
+      setOverdueInvoices(invoiceRows?.filter((row) => row.status === 'OVERDUE') ?? []);
+      setLowStock(
+        stockRows?.filter((row) => row.available <= row.reorderPoint && row.quantity > 0) ?? [],
+      );
+      setLastUpdated(formatDateTimeVN(new Date().toISOString()));
+    } catch (err) {
+      setError(err?.message ?? 'Không tải được dữ liệu bảng điều khiển.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (ordersData) {
-      setUpdatedAt(
-        new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
-      );
-    }
-  }, [ordersData]);
+    void fetchDashboard();
+  }, [fetchDashboard]);
 
-  const refresh = () => {
-    void mutateOrders();
-    void mutateInvoices();
-  };
-
-  const recentOrders = orders.slice(0, 6);
+  const inTransit = summary?.inTransit ?? 0;
+  const onTimeRate = summary?.onTimeRate ?? 0;
+  const outstanding = summary?.outstandingAmount ?? 0;
 
   return (
     <div className="space-y-4">
       <EditorialPageHeader
         eyebrow={
           <>
-            <span>B2B customer</span>
-            <span className="text-line-strong" aria-hidden="true">
-              /
-            </span>
-            <span>Delivery performance</span>
+            <span>Khách hàng</span>
+            <span className="text-line-strong" aria-hidden="true">/</span>
+            <span>Bảng điều khiển</span>
           </>
         }
-        title="Delivery desk"
-        description="The shipments, exceptions and invoices that need attention on your account right now."
+        title="Bảng điều khiển"
+        description="Toàn cảnh vận chuyển, công nợ và tồn kho của tài khoản doanh nghiệp lúc này."
         meta={
-          <>
-            <p>{updatedAt ? `Updated at ${updatedAt}` : 'Syncing customer data'}</p>
-            <p className="mt-0.5">
-              <StatusLabel tone={ordersError ? 'danger' : ordersLoading ? 'neutral' : 'success'}>
-                {ordersError ? 'Orders API unavailable' : ordersLoading ? 'Loading orders' : 'Orders API connected'}
-              </StatusLabel>
-            </p>
-          </>
+          <p className="mt-1">Cập nhật lúc {lastUpdated || '—'}</p>
         }
         actions={
           <button
             type="button"
-            onClick={refresh}
-            className="h-9 rounded-md border border-line px-3 text-[12px] font-medium text-ink-soft transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+            onClick={fetchDashboard}
+            className="h-9 rounded-md border border-line px-3 text-[12px] font-medium text-ink-soft transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-wait disabled:opacity-60"
           >
-            Refresh data
+            {loading ? 'Đang tải…' : 'Làm mới'}
           </button>
         }
       />
 
-      {ordersError ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-l-2 border-danger bg-surface px-3 py-2 text-[12px] text-ink-soft">
-          <span>Could not load shipments. Check your connection and try again.</span>
-          <button
-            type="button"
-            onClick={() => void mutateOrders()}
-            className="font-medium text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent"
-          >
-            Try again
-          </button>
-        </div>
-      ) : null}
-
       <MetricBand
         metrics={[
           {
-            label: 'Total shipments',
-            value: ordersLoading ? '—' : new Intl.NumberFormat('vi-VN').format(totalShipments),
-            meta: 'Orders visible to this account',
+            label: 'Đơn hàng hôm nay',
+            value: loading ? '—' : new Intl.NumberFormat('vi-VN').format(summary?.ordersToday ?? 0),
+            meta: 'Đơn mới tạo',
           },
           {
-            label: 'Delivered',
-            value: ordersLoading ? '—' : new Intl.NumberFormat('vi-VN').format(delivered),
-            meta: 'Completed deliveries',
-            tone: 'success',
+            label: 'Đang giao',
+            value: loading ? '—' : new Intl.NumberFormat('vi-VN').format(inTransit),
+            meta: 'Đang đi',
+            tone: inTransit > 0 ? 'success' : 'default',
           },
           {
-            label: 'In transit',
-            value: ordersLoading ? '—' : new Intl.NumberFormat('vi-VN').format(inTransit),
-            meta: 'Picked up or on the way',
+            label: 'Giao đúng hẹn',
+            value: loading ? '—' : `${onTimeRate}%`,
+            meta: 'Tỷ lệ %',
+            tone: onTimeRate < 95 ? 'danger' : 'success',
           },
           {
-            label: 'Return / cancel',
-            value: ordersLoading ? '—' : returnRate,
-            meta: `${returned} exception${returned === 1 ? '' : 's'}`,
-            tone: returned > 0 ? 'danger' : 'default',
+            label: 'Công nợ',
+            value: loading ? '—' : formatCurrency(outstanding),
+            meta: 'Chưa thanh toán',
+            tone: outstanding > 0 ? 'danger' : 'default',
           },
         ]}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
-        <EditorialSection
-          eyebrow="Shipments"
-          title="Recent orders"
-          action={
-            <Link
-              href="/client/orders"
-              className="text-[12px] font-medium text-accent underline decoration-accent/30 underline-offset-4 hover:decoration-accent"
+      <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+        <div className="space-y-4">
+          <EditorialSection eyebrow="Đơn hàng" title="Gần đây nhất">
+            <TableState
+              loading={loading}
+              empty={!recentOrders.length && !error}
+              error={error || undefined}
+              colSpan={4}
+              emptyTitle="Chưa có đơn hàng"
+              emptyDescription="Dữ liệu sẽ hiển thị sau khi đăng nhập."
+              retryLabel="Thử lại"
+              onRetry={fetchDashboard}
             >
-              View all orders
-            </Link>
-          }
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[620px] border-collapse text-left">
-              <caption className="sr-only">Recent customer shipments and their current status</caption>
-              <thead>
-                <tr className="border-b border-line">
-                  <th
-                    scope="col"
-                    className="h-8 pr-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint"
-                  >
-                    Tracking
-                  </th>
-                  <th
-                    scope="col"
-                    className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint"
-                  >
-                    Recipient
-                  </th>
-                  <th
-                    scope="col"
-                    className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint"
-                  >
-                    Status
-                  </th>
-                  <th
-                    scope="col"
-                    className="h-8 pl-3 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint"
-                  >
-                    Fee
-                  </th>
+              {recentOrders.map((row) => (
+                <tr key={row.id} className="h-[42px] border-b border-line/80 hover:bg-surface-alt/60">
+                  <td className="pr-3 font-mono text-[12px] font-medium text-ink">
+                    <Link href={`/track/${row.trackingCode}`}>{row.trackingCode}</Link>
+                  </td>
+                  <td className="px-3 text-[12px] text-ink-soft">{row.recipientName}</td>
+                  <td className="px-3 text-[12px] text-ink-soft">{formatCurrency(row.shippingFee)}</td>
+                  <td className="pl-3">
+                    <StatusLabel tone={orderStatusTone(row.status as StatusTone)}>
+                      {row.status}
+                    </StatusLabel>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {ordersLoading ? (
-                  <tr className="border-b border-line/80">
-                    <td colSpan={4} className="h-[42px] text-[12px] text-ink-faint">
-                      Loading shipments…
-                    </td>
-                  </tr>
-                ) : recentOrders.length === 0 ? (
-                  <tr className="border-b border-line/80">
-                    <td colSpan={4} className="h-[42px] text-[12px] text-ink-faint">
-                      No shipments yet. Create an order or upload a batch to get started.
-                    </td>
-                  </tr>
-                ) : (
-                  recentOrders.map((order: any) => (
-                    <tr
-                      key={order.id}
-                      className="h-[42px] border-b border-line/80 transition-colors hover:bg-surface-alt/60"
-                    >
-                      <td className="pr-3 font-mono text-[12px] font-medium text-ink">
-                        {order.trackingCode || '—'}
-                      </td>
-                      <td className="px-3 text-[13px] text-ink-soft">
-                        {order.recipientName || '—'}
-                      </td>
-                      <td className="px-3">
-                        <StatusLabel tone={STATUS_TONES[order.status] ?? 'neutral'}>
-                          {formatStatus(order.status)}
-                        </StatusLabel>
-                      </td>
-                      <td className="pl-3 text-right text-[12px] font-medium tabular-nums text-ink">
-                        {formatVnd(order.shippingFee)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </EditorialSection>
-
-        <aside className="space-y-5 border-t border-line pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-              Account
-            </p>
-            <dl className="mt-2 space-y-2 text-[12px]">
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink-faint">Outstanding invoices</dt>
-                <dd className="text-right font-medium text-ink">
-                  {invoicesError ? '—' : unpaidInvoices.length}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink-faint">Amount due</dt>
-                <dd className="text-right font-semibold tabular-nums text-ink">
-                  {invoicesError ? '—' : formatVnd(outstandingAmount)}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink-faint">Invoices API</dt>
-                <dd>
-                  <StatusLabel tone={invoicesError ? 'danger' : 'success'}>
-                    {invoicesError ? 'Unavailable' : 'Connected'}
-                  </StatusLabel>
-                </dd>
-              </div>
-            </dl>
-          </div>
-
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">
-              Next actions
-            </p>
-            <div className="mt-2 divide-y divide-line border-y border-line">
-              {[
-                { label: 'Orders', caption: 'Review shipments and exceptions', href: '/client/orders' },
-                { label: 'Invoices', caption: 'Pay or download billing documents', href: '/client/invoices' },
-                { label: 'Inventory', caption: 'Check stock allocated to your account', href: '/client/inventory' },
-              ].map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="group flex min-h-[42px] items-center justify-between gap-3 py-2 transition-colors hover:text-accent"
-                >
-                  <span className="min-w-0">
-                    <span className="block text-[13px] font-medium text-ink group-hover:text-accent">
-                      {link.label}
-                    </span>
-                    <span className="mt-0.5 block truncate text-[11px] text-ink-faint">
-                      {link.caption}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-[11px] font-medium text-ink-faint group-hover:text-accent">
-                    Open
-                  </span>
-                </Link>
               ))}
+            </TableState>
+          </EditorialSection>
+
+          {overdueInvoices.length > 0 ? (
+            <EditorialSection eyebrow="Chứng từ" title="Hóa đơn quá hạn">
+              <TableState
+                loading={loading}
+                empty={false}
+                error={error || undefined}
+                colSpan={3}
+                retryLabel="Thử lại"
+                onRetry={fetchDashboard}
+              >
+                {overdueInvoices.map((row) => (
+                  <tr key={row.id} className="h-[42px] border-b border-line/80 hover:bg-surface-alt/60">
+                    <td className="pr-3 font-mono text-[12px] font-medium text-ink">
+                      {row.invoiceNumber}
+                    </td>
+                    <td className="px-3 text-right text-[12px] font-medium tabular-nums text-ink">
+                      {formatCurrency(row.totalAmount)}
+                    </td>
+                    <td className="pl-3 text-right">
+                      <StatusLabel tone="danger">Quá hạn</StatusLabel>
+                    </td>
+                  </tr>
+                ))}
+              </TableState>
+            </EditorialSection>
+          ) : null}
+        </div>
+
+        <aside className="space-y-4 border-t border-line pt-4 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+          {lowStock.length > 0 ? (
+            <>
+              <h2 className="text-[12px] font-semibold text-ink-soft">Cảnh báo</h2>
+              <p className="text-[11px] text-ink-faint">
+                Tồn sắp hết dưới mức đặt lại.
+              </p>
+              <div className="space-y-2 border-t border-line pt-3">
+                {lowStock.slice(0, 4).map((row) => (
+                  <div key={row.id} className="flex items-center justify-between text-[12px]">
+                    <div>
+                      <p className="font-medium text-ink">{row.name}</p>
+                      <p className="text-ink-faint">{row.sku}</p>
+                    </div>
+                    <StatusLabel tone="danger">
+                      {row.available} / {row.available + row.reserved}
+                    </StatusLabel>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <EmptyNote>
+              Không có hàng sắp hết trong tồn kho.
+            </EmptyNote>
+          )}
+
+          <div className="border-t border-line pt-4">
+            <h2 className="text-[12px] font-semibold text-ink-soft">Hoạt động</h2>
+            <div className="mt-1 space-y-2">
+              {user?.email ? (
+                <p className="text-[12px] text-ink-soft">
+                  Đang đăng nhập: {user.email}
+                </p>
+              ) : null}
+              <Link
+                href="/client/orders"
+                className="block text-[12px] text-accent hover:underline"
+              >
+                Tất cả đơn hàng
+              </Link>
+              <Link
+                href="/client/invoices"
+                className="block text-[12px] text-accent hover:underline"
+              >
+                Hóa đơn
+              </Link>
+              <Link
+                href="/client/inventory"
+                className="block text-[12px] text-accent hover:underline"
+              >
+                Tồn kho
+              </Link>
             </div>
           </div>
-
-          <EmptyNote>
-            Shipments, invoices and inventory are fetched from separate services. The timestamps can
-            differ by a few seconds.
-          </EmptyNote>
         </aside>
       </div>
     </div>

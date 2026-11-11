@@ -14,10 +14,17 @@ const customerSections: NavSection[] = [
     items: [
       { label: 'Dashboard', href: '/client/dashboard' },
       { label: 'Orders', href: '/client/orders' },
+      { label: 'Orders Upload', href: '/client/orders/upload' },
       { label: 'Inventory', href: '/client/inventory' },
       { label: 'Webhooks', href: '/client/webhooks' },
       { label: 'Invoices', href: '/client/invoices' },
       { label: 'Returns', href: '/client/returns' },
+    ],
+  },
+  {
+    title: 'Account',
+    items: [
+      { label: 'Profile', href: '/client/profile' },
     ],
   },
 ];

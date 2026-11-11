@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import React, { useState, useEffect } from 'react';
-import { ShieldWarning, Envelope, User, Key, Lock, ArrowLeft } from 'phosphor-react';
+import { useState, useEffect } from 'react';
+import { Button, Input } from 'ui-components';
+import { EditorialPageHeader, EditorialSection, StatusLabel } from 'ui-kit';
 import { useAuth } from '@/lib/auth-context';
 import { switchRole } from '@/lib/role-switch';
-import api from '@/lib/api';
 import { ROLES } from '@/lib/roles';
-import { initStore, getAll, getOne, create, update, UserProfile } from '@/lib/local-store';
+import { initStore, getAll, getOne, update, UserProfile } from '@/lib/local-store';
 
 export default function AdminProfile() {
   const { user, logout } = useAuth();
@@ -15,7 +15,7 @@ export default function AdminProfile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-
+  const [saveMsgType, setSaveMsgType] = useState<'success' | 'danger'>('success');
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -28,41 +28,36 @@ export default function AdminProfile() {
     loadProfile();
   }, []);
 
-   const loadProfile = async () => {
+  const loadProfile = async () => {
     setLoading(true);
     try {
       initStore();
-      const response = await api.get('/admin/auth/profile');
-      const data = response.data?.data || response.data;
+      const cached = getOne('adminProfile', 'current');
+      const data: UserProfile = cached || { id: 'current', email: user?.email, role: user?.role, fullName: user?.name };
       setProfile(data);
       setFullName(data.fullName || user?.email?.split('@')[0] || '');
-      create('adminProfile', { id: 'current', ...data });
     } catch {
-      const cached = getOne('adminProfile', 'current');
-      setProfile(cached || null);
-      if (cached) {
-        setFullName((cached as UserProfile).fullName || user?.email?.split('@')[0] || '');
-      } else {
-        setProfile(null);
-      }
+      setProfile(null);
     } finally {
       setLoading(false);
     }
   };
 
-   const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setSaveMsg(null);
     try {
-      const response = await api.patch('/admin/auth/profile', { fullName });
-      const data = response.data?.data || response.data;
-      if (data) setProfile(data);
-      setSaveMsg('Profile updated successfully.');
+      const record = update('adminProfile', 'current', { fullName }) as UserProfile | null;
+      if (record) {
+        setProfile(record);
+        setSaveMsg('Profile updated successfully.');
+        setSaveMsgType('success');
+      }
     } catch (err: any) {
       setProfile({ ...profile, fullName });
-      update('adminProfile', 'current', { fullName });
-      setSaveMsg(err?.response?.data?.message || 'Profile saved locally. API server unavailable.');
+      setSaveMsg('Profile saved locally. API server unavailable.');
+      setSaveMsgType('danger');
     } finally {
       setSaving(false);
     }
@@ -83,17 +78,17 @@ export default function AdminProfile() {
 
     setChangingPassword(true);
     try {
-      const res = await api.post('/admin/auth/change-password', { oldPassword, newPassword });
-      if (res.data?.ok) {
+      const res = await authApiPost('/admin/auth/change-password', { oldPassword, newPassword });
+      if (res?.ok) {
         setPasswordMsg('Password changed successfully.');
         setOldPassword('');
         setNewPassword('');
         setConfirmNewPassword('');
       } else {
-        setPasswordMsg(res.data?.message || 'Failed to change password.');
+        setPasswordMsg(res?.message || 'Failed to change password.');
       }
-    } catch (err: any) {
-      setPasswordMsg(err?.response?.data?.message || 'Current password is incorrect.');
+    } catch {
+      setPasswordMsg('Failed to change password. Your password may not match.');
     } finally {
       setChangingPassword(false);
     }
@@ -121,214 +116,150 @@ export default function AdminProfile() {
   const displayRole = user?.role || profile?.role || 'SUPER_ADMIN';
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div>
+      <EditorialPageHeader
+        eyebrow="Administration"
+        title="Profile"
+        description="Manage your account information, password, and role permissions."
+        meta={
+          <div className="text-[11px] leading-5">
+            <StatusLabel tone={user?.role === 'SUPER_ADMIN' ? 'success' : 'info'}>
+              {roleOf(displayRole)} · {displayRole}
+            </StatusLabel>
+          </div>
+        }
+      />
+
       {/* Role-switch quick bar */}
-      <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold text-inkSoft uppercase tracking-wider">
-            Current Role: {String(displayRole).replace(/_/g, ' ')}
-          </h2>
-        </div>
+      <EditorialSection eyebrow="Access" title="Role switch">
         <div className="flex flex-wrap gap-2">
           {Object.entries(ROLES).map(([value, label]) => (
-            <button
+            <Button
               key={value}
+              variant={value === displayRole ? 'primary' : 'outline'}
+              size="sm"
               onClick={() => handleSwitchRole(value)}
               disabled={roleSwitching || value === displayRole}
-              className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all disabled:opacity-50 ${
-                value === displayRole
-                  ? 'bg-primary text-white shadow-md'
-                  : 'bg-slate-100 text-slate-600 hover:bg-primary/10 hover:text-primary border border-slate-200'
-              }`}
             >
-              {label}
-            </button>
+              {value === displayRole ? `Current: ${label}` : label}
+            </Button>
           ))}
         </div>
-      </div>
+        {roleMsg && (
+          <p className="mt-3 text-[12px] text-ink-soft">
+            <span className="mr-2">{roleMsg}</span>
+          </p>
+        )}
+      </EditorialSection>
 
-      {roleMsg && (
-        <div className="mb-4 p-3 rounded-lg border text-sm text-center font-medium bg-primary/5 border-primary/20 text-primary">
-          {roleMsg}
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* Profile card */}
-        <div className="md:col-span-2 bg-white border border-slate-200 rounded-2xl p-8 shadow-card">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
-              <ShieldWarning className="w-7 h-7" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-ink">Admin Profile</h1>
-              <p className="text-sm text-inkSoft mt-1 font-medium">Manage your account information</p>
-            </div>
-          </div>
-
+        <EditorialSection eyebrow="Account" title="Personal info" className="lg:col-span-2">
           {loading ? (
-            <div className="text-inkSoft text-center py-8">Loading profile...</div>
+            <p className="text-[12px] text-ink-faint">Loading profile…</p>
           ) : profile ? (
-            <>
-              <div className="grid grid-cols-1 gap-4 mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <form onSubmit={handleSaveProfile} className="max-w-lg space-y-5">
+              <div className="space-y-3 border-b border-line pb-5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Email</label>
-                  <p className="text-ink font-medium flex items-center gap-2">
-                    <Envelope className="w-4 h-4 text-slate-400" />
-                    {profile.email}
+                  <label htmlFor="profile-email" className="text-[11px] font-medium text-ink-soft">Email</label>
+                  <p className="mt-1 h-9 rounded-md border border-line bg-surface-alt px-3 text-[13px] text-ink">
+                    {profile.email || '—'}
                   </p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Role</label>
-                  <p className="text-ink font-medium flex items-center gap-2">
-                    <User className="w-4 h-4 text-slate-400" />
+                  <label htmlFor="profile-role" className="text-[11px] font-medium text-ink-soft">Role</label>
+                  <p className="mt-1 h-9 rounded-md border border-line bg-surface-alt px-3 text-[13px] text-ink">
                     {String(profile.role || 'SUPER_ADMIN').replace(/_/g, ' ')}
                   </p>
                 </div>
               </div>
 
-              <form onSubmit={handleSaveProfile} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1">Full Name</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary transition-colors"
-                      placeholder="Your full name"
-                      required
-                    />
-                  </div>
-                </div>
-
-                {saveMsg && (
-                  <div className={`p-3 rounded-lg text-sm text-center font-medium ${
-                    saveMsg.includes('successfully')
-                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                      : 'bg-rose-50 border border-rose-200 text-rose-700'
-                  }`}>
-                    {saveMsg}
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50 shadow-sm"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </form>
-            </>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-rose-500 mb-4">Failed to load profile.</p>
-              <button onClick={loadProfile} className="text-sm text-primary hover:text-primary-hover underline">
-                Try again
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Quick actions card */}
-        <div className="flex flex-col gap-4">
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-card">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
-                <Key className="w-5 h-5" />
-              </div>
-              <h2 className="text-lg font-bold text-ink">Security</h2>
-            </div>
-            <p className="text-sm text-inkSoft mb-4">Change your password and review account security settings.</p>
-            <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Current Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="password"
-                    value={oldPassword}
-                    onChange={(e) => setOldPassword(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary transition-colors"
-                    placeholder="Enter current password"
-                    required
-                  />
-                </div>
+                <Input
+                  id="profile-full-name"
+                  label="Full name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Your full name"
+                  required
+                />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">New Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary transition-colors"
-                    placeholder="Min. 8 characters"
-                    required
-                    minLength={8}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Confirm New Password</label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                  <input
-                    type="password"
-                    value={confirmNewPassword}
-                    onChange={(e) => setConfirmNewPassword(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl py-3 pl-10 pr-4 text-ink focus:outline-none focus:border-primary transition-colors"
-                    placeholder="Re-enter new password"
-                    required
-                    minLength={8}
-                  />
-                </div>
-              </div>
-
-              {passwordMsg && (
-                <div className={`p-3 rounded-lg text-sm text-center font-medium ${
-                  passwordMsg.includes('successfully')
-                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                    : 'bg-rose-50 border border-rose-200 text-rose-700'
-                }`}>
-                  {passwordMsg}
-                </div>
+              {saveMsg && (
+                <p className={`text-[12px] ${saveMsgType === 'success' ? 'text-success' : 'text-danger'}`}>
+                  {saveMsg}
+                </p>
               )}
 
-              <button
-                type="submit"
-                disabled={changingPassword}
-                className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-50 shadow-sm"
-              >
-                {changingPassword ? 'Updating...' : 'Update Password'}
-              </button>
+              <Button type="submit" variant="primary" disabled={saving} isLoading={saving}>
+                {saving ? 'Saving…' : 'Save changes'}
+              </Button>
             </form>
-          </div>
-
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-card">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 11-6 0v-1m6-1V7a3 3 0 016 0v1" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-bold text-ink">Session</h2>
+          ) : (
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-surface-alt p-10 text-center">
+              <p className="text-[12px] text-danger">Failed to load profile.</p>
+              <Button variant="outline" size="sm" onClick={loadProfile}>
+                Try again
+              </Button>
             </div>
-            <p className="text-sm text-inkSoft mb-4">Sign out of your current session on this device.</p>
-            <button
-              onClick={logout}
-              className="w-full text-sm font-bold uppercase tracking-wider text-rose-600 hover:bg-rose-50 border border-rose-200 py-2.5 rounded-xl transition-colors"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
+          )}
+        </EditorialSection>
+
+        {/* Security card */}
+        <EditorialSection eyebrow="Access & security" title="Password">
+          <form onSubmit={handleChangePassword} className="max-w-sm space-y-4">
+            <div>
+              <Input label="Current password" type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} placeholder="Enter current password" required />
+            </div>
+            <div>
+              <Input label="New password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Min. 8 characters" required minLength={8} />
+            </div>
+            <div>
+              <Input label="Confirm new password" type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder="Re-enter new password" required minLength={8} />
+            </div>
+            {passwordMsg && (
+              <p className={`text-[12px] ${passwordMsg.includes('successfully') ? 'text-success' : 'text-danger'}`}>
+                {passwordMsg}
+              </p>
+            )}
+            <Button type="submit" variant="secondary" disabled={changingPassword} isLoading={changingPassword}>
+              {changingPassword ? 'Updating…' : 'Update password'}
+            </Button>
+          </form>
+        </EditorialSection>
       </div>
+
+      <EditorialSection eyebrow="Session" title="Sign out">
+        <p className="mb-4 text-[12px] text-ink-soft">Sign out of your current session on this device.</p>
+        <div className="flex gap-2">
+          <Button variant="danger" size="sm" onClick={logout}>
+            Sign out
+          </Button>
+        </div>
+      </EditorialSection>
     </div>
   );
+}
+
+function roleOf(role?: string) {
+  if (!role) return 'Admin';
+  return role.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * Core helper — route auth calls through a single point so the data layer
+ * stays on local-store only.
+ */
+async function authApiPost(path: string, payload: unknown) {
+  try {
+    const res = await fetch(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const body = await res.json();
+    return { ok: res.ok, message: body?.message };
+  } catch {
+    return { ok: false, message: 'Failed to change password. Please try again.' };
+  }
 }

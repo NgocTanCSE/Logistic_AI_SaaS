@@ -38,8 +38,19 @@ const adminSections: NavSection[] = [
     items: [
       { label: 'Tenants', href: '/admin/tenants' },
       { label: 'Billing', href: '/admin/billing' },
-      { label: 'Audit Logs', href: '/admin/audit-logs' },
+    ],
+  },
+  {
+    title: 'AI',
+    items: [
       { label: 'AI Models', href: '/admin/ai-models' },
+    ],
+  },
+  {
+    title: 'System',
+    items: [
+      { label: 'Audit logs', href: '/admin/audit-logs' },
+      { label: 'Profile', href: '/admin/profile' },
     ],
   },
 ];
@@ -102,7 +113,6 @@ function AdminChrome({ children }: { children: React.ReactNode }) {
           user={{ name: user?.email?.split('@')[0], email: user?.email, role: user?.role }}
           onLogout={handleLogout}
           logoutLabel="Logout"
-          showNotifications
         />
       }
       ai={<AIChatButton />}
@@ -140,7 +150,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (isLoading || !token) {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-background text-ink">
-        <div className="rounded-2xl border border-border bg-surface px-6 py-4 shadow-sm">
+        <div className="rounded-lg border border-border bg-surface px-6 py-4">
           <p className="text-sm font-medium text-ink-soft">
             {isLoading ? 'Checking session…' : 'Redirecting to login…'}
           </p>

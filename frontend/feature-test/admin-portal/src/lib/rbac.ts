@@ -47,6 +47,11 @@ export const PAGE_PERMISSIONS: Record<string, AdminRole[]> = {
   '/admin/billing': ['SUPER_ADMIN', 'TENANT_ADMIN'],
   '/admin/audit-logs': ['SUPER_ADMIN', 'TENANT_ADMIN'],
   '/admin/ai-models': ['SUPER_ADMIN', 'WAREHOUSE_MANAGER', 'LOGISTICS_MANAGER'],
+  '/admin/control-tower': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER'],
+  '/admin/pricing': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER'],
+  '/admin/ai-insights': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER'],
+  '/admin/cost-calculator': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'LOGISTICS_MANAGER'],
+  '/admin/logistics-simulation': ['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'WAREHOUSE_STAFF', 'LOGISTICS_MANAGER'],
   '/admin/profile': [
     'SUPER_ADMIN',
     'TENANT_ADMIN',
@@ -151,3 +156,34 @@ export function canViewAIModules(role: string | undefined | null): boolean {
 export function canViewAuditLogs(role: string | undefined | null): boolean {
   return ROLE_GROUPS.PLATFORM.includes(role as AdminRole);
 }
+
+/** AI modules are gated to client-facing positions (platform + warehouse + logistics). */
+export function canAccessAIInsights(role: string | undefined | null): boolean {
+  return [
+    ...ROLE_GROUPS.PLATFORM,
+    ...ROLE_GROUPS.WAREHOUSE,
+    ...ROLE_GROUPS.LOGISTICS,
+  ].includes(role as AdminRole);
+}
+
+/** Pricing, cost and simulation tools are gated to operations roles. */
+export function canAccessSimulation(role: string | undefined | null): boolean {
+  return [
+    ...ROLE_GROUPS.PLATFORM,
+    ...ROLE_GROUPS.WAREHOUSE,
+    ...ROLE_GROUPS.LOGISTICS,
+  ].includes(role as AdminRole);
+}
+
+/** The pricing module is written to by platform and warehouse managers. */
+export function canSetPricing(role: string | undefined | null): boolean {
+  return ROLE_GROUPS.PLATFORM.includes(role as AdminRole) ||
+    ROLE_GROUPS.WAREHOUSE.includes(role as AdminRole);
+}
+
+/** Cost calculator is a platform-level business tool. */
+export function canUseCostCalculator(role: string | undefined | null): boolean {
+  return ROLE_GROUPS.PLATFORM.includes(role as AdminRole) ||
+    ROLE_GROUPS.LOGISTICS.includes(role as AdminRole);
+}
+

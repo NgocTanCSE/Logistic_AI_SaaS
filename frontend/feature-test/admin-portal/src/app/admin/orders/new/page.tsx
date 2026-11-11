@@ -1,20 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus } from 'phosphor-react';
+import { Button, Input, Select } from 'ui-components';
+import { EditorialPageHeader, EditorialSection } from 'ui-kit';
 import { create, Order, initStore } from '@/lib/local-store';
 
-const STATUSES: Order['status'][] = [
-  'NEW',
-  'UNASSIGNED',
-  'PENDING_PICKUP',
-  'IN_TRANSIT',
-  'OUT_FOR_DELIVERY',
-  'DELIVERED',
-  'RETURNED',
-  'RETURN_REQUESTED',
-  'CANCELLED',
+const STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: 'NEW', label: 'New' },
+  { value: 'UNASSIGNED', label: 'Unassigned' },
+  { value: 'PENDING_PICKUP', label: 'Pending pickup' },
+  { value: 'IN_TRANSIT', label: 'In transit' },
+  { value: 'OUT_FOR_DELIVERY', label: 'Out for delivery' },
+  { value: 'DELIVERED', label: 'Delivered' },
+  { value: 'RETURNED', label: 'Returned' },
+  { value: 'RETURN_REQUESTED', label: 'Return requested' },
+  { value: 'CANCELLED', label: 'Cancelled' },
 ];
 
 export default function NewOrderPage() {
@@ -32,25 +33,22 @@ export default function NewOrderPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generateTrackingCode = () => {
+  useEffect(() => {
+    initStore();
     const year = new Date().getFullYear();
     const num = Math.floor(1000 + Math.random() * 9000);
-    return `TRK-${year}-${num}`;
-  };
-
-  const handleGenerateCode = () => {
-    setTrackingCode(generateTrackingCode());
-  };
+    setTrackingCode(`TRK-${year}-${num}`);
+    setClientOrderRef(`PO-${year}-${num + 1}`);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSaving(true);
     try {
-      initStore();
       const newOrder: Order = {
         id: `ord_${Date.now()}`,
-        trackingCode: trackingCode || generateTrackingCode(),
+        trackingCode: trackingCode || `TRK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
         clientOrderRef,
         recipientName,
         recipientAddress,
@@ -76,175 +74,81 @@ export default function NewOrderPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto pb-10">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-ink">New Order</h2>
-        <button
-          onClick={handleCancel}
-          className="text-sm text-inkSoft hover:text-ink underline"
-        >
-          Back to Orders
-        </button>
-      </div>
+    <div>
+      <EditorialPageHeader
+        eyebrow="Dashboard"
+        title="New order"
+        description="Create a new shipping order for one of your tenants' customers."
+        actions={
+          <Button variant="ghost" size="sm" onClick={handleCancel}>
+            Back to orders
+          </Button>
+        }
+      />
 
-      {error && (
-        <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-6 bg-white border border-slate-200 rounded-2xl p-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">Tracking Code</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={trackingCode}
-                onChange={(e) => setTrackingCode(e.target.value)}
-                className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-primary/50"
-                placeholder="TRK-2024-xxxx"
-              />
-              <button
-                type="button"
-                onClick={handleGenerateCode}
-                className="px-3 rounded-xl border border-slate-200 hover:bg-surface-alt text-xs font-medium"
-                title="Generate random tracking code"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
+      <EditorialSection eyebrow="Order" title="Create order">
+        <div className="max-w-3xl">
+          {error && (
+            <div className="mb-4 rounded-md border border-danger/40 bg-danger/5 px-3 py-2 text-[12px] text-danger">
+              {error}
             </div>
-          </div>
+          )}
 
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">Client Order Ref</label>
-            <input
-              type="text"
-              value={clientOrderRef}
-              onChange={(e) => setClientOrderRef(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-primary/50"
-              placeholder="PO-2024-xxxx"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div>
+                <Input label="Tracking code" value={trackingCode} onChange={(e) => setTrackingCode(e.target.value)} placeholder="TRK-2024-xxxx" required />
+              </div>
+              <div>
+                <Input label="Client order ref" value={clientOrderRef} onChange={(e) => setClientOrderRef(e.target.value)} placeholder="PO-2024-xxxx" required />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div>
+                <Input label="Recipient name" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="e.g. Acme Logistics" required />
+              </div>
+              <div>
+                <Input label="Client name" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="e.g. Acme Logistics" />
+              </div>
+            </div>
+
+            <div>
+              <Input label="Recipient address" value={recipientAddress} onChange={(e) => setRecipientAddress(e.target.value)} placeholder="e.g. 123 Main St, Hanoi" required />
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+              <div>
+                <Input label="Origin" value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="e.g. Bien Hoa Warehouse" required />
+              </div>
+              <div>
+                <Input label="Destination" value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="e.g. District 1, Ho Chi Minh" required />
+              </div>
+              <div>
+                <Select label="Status" options={STATUS_OPTIONS} value={status} onChange={(e) => setStatus(e.target.value as Order['status'])} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+              <div>
+                <Input label="COD amount (VND)" value={codAmount} onChange={(e) => setCodAmount(e.target.value)} placeholder="e.g. 2450000" type="number" required />
+              </div>
+              <div>
+                <Input label="Shipping fee (VND)" value={shippingFee} onChange={(e) => setShippingFee(e.target.value)} placeholder="e.g. 85000" type="number" />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-line pt-4">
+              <Button variant="ghost" type="button" onClick={handleCancel}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="primary" disabled={saving} isLoading={saving}>
+                {saving ? 'Saving…' : 'Create order'}
+              </Button>
+            </div>
+          </form>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">Recipient Name</label>
-            <input
-              type="text"
-              value={recipientName}
-              onChange={(e) => setRecipientName(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-primary/50"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">Client Name</label>
-            <input
-              type="text"
-              value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-primary/50"
-              placeholder="e.g. Acme Logistics"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-ink-soft mb-1">Recipient Address</label>
-          <input
-            type="text"
-            value={recipientAddress}
-            onChange={(e) => setRecipientAddress(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-primary/50"
-            required
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">Origin</label>
-            <input
-              type="text"
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-primary/50"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">Destination</label>
-            <input
-              type="text"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-primary/50"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">Status</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as Order['status'])}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-primary/50"
-            >
-              {STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s.replace('_', ' ')}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">COD Amount (đ)</label>
-            <input
-              type="number"
-              value={codAmount}
-              onChange={(e) => setCodAmount(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-primary/50"
-              placeholder="e.g. 2450000"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">Shipping Fee (đ)</label>
-            <input
-              type="number"
-              value={shippingFee}
-              onChange={(e) => setShippingFee(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-ink focus:outline-none focus:border-primary/50"
-              placeholder="e.g. 85000"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
-          <button
-            type="button"
-            onClick={handleCancel}
-            className="px-5 py-2.5 rounded-xl border border-slate-200 text-ink hover:bg-surface-alt transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
-          >
-            {saving ? 'Saving...' : 'Create Order'}
-            {!saving && <Plus className="w-4 h-4" />}
-          </button>
-        </div>
-      </form>
+      </EditorialSection>
     </div>
   );
 }

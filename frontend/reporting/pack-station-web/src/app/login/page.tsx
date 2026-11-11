@@ -1,142 +1,179 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import api from '@/lib/api';
-import { setToken, setUser } from '@/lib/auth';
-import { GoogleLoginButton } from '@/components/ui/GoogleLoginButton';
+import { useAuth } from '@/lib/auth-context';
+import { mockLogin } from '@/lib/mock';
+import { EditorialPageHeader, EmptyNote, StatusLabel } from 'ui-kit';
+import { Input, Button } from 'ui-components';
+
+/** Giải mã payload base64url của token giả, lấy staffId / stationId cho phiên. */
+function decodePayload(token: string) {
+  const segment = token.split('.')[1];
+  if (!segment) throw new Error('Token không hợp lệ.');
+  const base64 = segment.replace(/-/g, '+').replace(/_/g, '/');
+  // Base64 chuẩn yêu cầu chiều dài bội số 4: trả lại padding đã bị xóa lúc mã hóa.
+  const padding = (4 - (base64.length % 4)) % 4;
+  const bytes = atob(base64 + '='.repeat(padding));
+  return JSON.parse(utf8toString(bytes)) as Record<string, unknown>;
+}
+
+/** Chuyển byte (0-255) hạ giải từ base64 thành ký tự UTF-8. */
+function utf8toString(bytes: string) {
+  const code = Array.from(bytes).map((b) => b.charCodeAt(0));
+  let result = '';
+  let i = 0;
+  while (i < code.length) {
+    const a = code[i];
+    const b1 = code[i + 1] ?? 0;
+    const b2 = code[i + 2] ?? 0;
+    const b3 = code[i + 3] ?? 0;
+    if (a < 0x80) {
+      result += String.fromCharCode(a);
+      i += 1;
+      continue;
+    }
+    if ((a & 0xe0) === 0xc0) {
+      result += String.fromCharCode(((a & 0x1f) << 6) | (b1 & 0x3f));
+      i += 2;
+      continue;
+    }
+    if ((a & 0xf0) === 0xe0) {
+      result += String.fromCharCode(((a & 0x0f) << 12) | ((b1 & 0x3f) << 6) | (b2 & 0x3f));
+      i += 3;
+      continue;
+    }
+    if ((a & 0xf8) === 0xf0) {
+      result += String.fromCharCode(((a & 0x07) << 18) | ((b1 & 0x3f) << 12) | ((b2 & 0x3f) << 6) | (b3 & 0x3f));
+      i += 4;
+      continue;
+    }
+    result += String.fromCharCode(a);
+    i += 1;
+  }
+  return result;
+}
+
+/**
+ * Đăng nhập trạm đóng gói.
+ *
+ * Chế độ demo: email `pack@smartlogi.vn` + mật khẩu bất kỳ tạo một token giả
+ * giống tenant portal (`mockLogin`), lưu phiên vào `localStorage` và đẩy về
+ * `/pack`. Token mang theo `staffId` / `stationId` nên phiên mở đúng trạm.
+ * Không gọi Google OAuth khi chưa có `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
+ */
 
 export default function PackStationLogin() {
-  const [slug, setSlug] = useState('');
+  const { login } = useAuth();
+  const router = useRouter();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const router = useRouter();
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!slug) {
-      setError('Please enter your workspace slug.');
+  const performLogin = useCallback(async (credentialEmail: string, credentialPassword: string) => {
+    const { accessToken } = mockLogin({ email: credentialEmail, password: credentialPassword });
+    const payload = decodePayload(accessToken);
+    login(accessToken, {
+      fullName: payload.fullName as string,
+      email: payload.email as string,
+      role: payload.role as string,
+      staffId: payload.staffId as string,
+      stationId: payload.stationId as string,
+    });
+    router.push('/pack');
+  }, [login, router]);
+
+  const handleSubmit = useCallback(async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      setError('Vui lòng nhập email và mật khẩu.');
       return;
     }
+    setError('');
+
+    const mockMail = 'pack@smartlogi.vn';
+    if (email.trim().toLowerCase() !== mockMail) {
+      setError('Email không thuộc tài khoản demo nhân viên trạm.');
+      return;
+    }
+
     setLoading(true);
-    setError(null);
     try {
-      const res = await api.post('/tenant/auth/login', { email, password }, {
-        headers: { 'x-tenant-slug': slug, 'x-portal': 'pack-station' },
-      });
-      if (res.data?.accessToken) {
-        setToken(res.data.accessToken);
-        setUser({ slug, email });
-        router.push(ROLE_REDIRECT_MAP[res.data?.role || 'WAREHOUSE_STAFF'] || '/dashboard');
-      }
+      await performLogin(mockMail, password);
     } catch (err: any) {
-      console.error(err);
-      setError(err.response?.data?.message || err.message || 'Login failed. Please check your credentials.');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [email, password, performLogin]);
 
-  const ROLE_REDIRECT_MAP: Record<string, string> = {
-    'TENANT_ADMIN': '/dashboard',
-    'WAREHOUSE_MANAGER': '/dashboard',
-    'WAREHOUSE_STAFF': '/dashboard',
-    'LOGISTICS_MANAGER': '/logistics/dispatch',
-    'DRIVER': '/drivers/my-trips',
-    'CUSTOMER_CLIENT': '/orders',
-    'TENANT_USER': '/dashboard',
-  };
+  const handleDemoLogin = useCallback(() => {
+    void performLogin('pack@smartlogi.vn', 'demo1234');
+  }, [performLogin]);
 
   return (
-    <div className="flex-1 min-h-screen flex items-center justify-center p-4 bg-slate-50">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v1m6 11h2m-6 0h-8v4h8v-4zm-4-8h4m-4 4h4m6-4v1m-4-1v1m-4-1v1m-4-1v1m2-4h12a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Pack Station</h1>
-          <p className="mt-2 text-sm text-slate-600">Warehouse Staff Access</p>
+    <div className="min-h-screen bg-canvas p-6 font-sans text-ink">
+      <div className="mx-auto grid max-w-[72rem] gap-8 md:grid-cols-2">
+        <div className="self-center space-y-6">
+          <EditorialPageHeader
+            title="Đăng nhập trạm đóng gói"
+            description="Đăng nhập để đóng gói, quét mã thuốc và ghi nhận kiện hàng tại trạm A/B."
+          />
+          <EmptyNote>
+            Tài khoản demo: email `pack@smartlogi.vn`, mật khẩu bất kỳ. Đóng gói chỉ hoạt
+            động khi đăng nhập.
+          </EmptyNote>
         </div>
 
-        {error && (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleLogin} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Workspace Slug</label>
-            <input
-              type="text"
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
-              placeholder="e.g. demo-tenant"
+        <div className="self-center">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <Input
+              id="pack-email"
+              type="email"
+              label="Email nhân viên"
+              placeholder="pack@smartlogi.vn"
               required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Staff ID / Email</label>
-            <input
-              type="text"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
-              placeholder="e.g. staff_01"
-              required
+              onChange={(event) => setEmail(event.target.value)}
+              disabled={loading}
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-            <input
+            <Input
+              id="pack-password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20"
-              placeholder="Enter password"
+              label="Mật khẩu"
+              placeholder="Nhập mật khẩu…"
               required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              disabled={loading}
             />
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-primary px-4 py-3 text-sm font-medium text-white hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 transition-colors mt-2"
-          >
-            {loading ? 'Authenticating...' : 'Start Shift'}
-          </button>
-        </form>
+            {error ? (
+              <div className="flex items-center gap-2 rounded-md border-l-2 border-danger bg-surface px-3 py-2">
+                <StatusLabel tone="danger">{error}</StatusLabel>
+              </div>
+            ) : null}
 
-        <div className="space-y-3">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-200"></div>
-            </div>
-            <div className="relative flex justify-center text-xs text-slate-400">
-              <span className="bg-white px-2">Or continue with Google</span>
-            </div>
-          </div>
+            <Button
+              type="submit"
+              variant="primary"
+              className="h-11 w-full text-[13px] font-semibold rounded-lg"
+              disabled={loading}
+            >
+              {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
+            </Button>
 
-          <div className={slug.trim() ? '' : 'pointer-events-none opacity-50'}>
-            <GoogleLoginButton tenantSlug={slug.trim()} onError={setError} />
-          </div>
-          {!slug.trim() && (
-            <p className="text-center text-xs text-slate-400">
-              Enter your workspace slug first to enable Google sign-in.
-            </p>
-          )}
-        </div>
-
-        <div className="text-center text-sm text-slate-500">
-          <Link href="/forgot-password" className="text-slate-600 hover:text-primary transition-colors">
-            Forgot Password?
-          </Link>
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-11 w-full text-[13px] font-semibold rounded-lg"
+              onClick={handleDemoLogin}
+            >
+              Vào bằng tài khoản thử nghiệm
+            </Button>
+          </form>
         </div>
       </div>
     </div>

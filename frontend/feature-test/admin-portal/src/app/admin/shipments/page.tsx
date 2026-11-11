@@ -2,12 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { TableState } from 'ui-components';
-import api from '@/lib/api';
-import { Card } from '@/components/ui-new/Card';
-import { Badge } from '@/components/ui-new/Badge';
+import { EditorialPageHeader, EditorialSection, MetricBand, StatusLabel } from 'ui-kit';
+import { formatCurrency, formatNumber } from '@/lib/format';
 import { Shipment, fetchFromStoreOrAPI, getAll, initStore } from '@/lib/local-store';
 
-const STATUS_VARIANT: Record<string, 'neutral' | 'success' | 'warning' | 'error' | 'info'> = {
+const STATUS_TONE: Record<string, 'neutral' | 'success' | 'warning' | 'danger' | 'info'> = {
   IN_TRANSIT: 'info',
   DELAYED: 'warning',
   DELIVERED: 'success',
@@ -26,7 +25,7 @@ export default function ShipmentsPage() {
     try {
       initStore();
       const data = await fetchFromStoreOrAPI<Shipment[]>('shipments', '/logistics/shipments?limit=20');
-      setShipments(data);
+      setShipments(Array.isArray(data) ? data : []);
     } catch (err: any) {
       setError(err?.message || 'Failed to load shipments');
       setShipments(getAll<Shipment[]>('shipments'));
@@ -44,70 +43,73 @@ export default function ShipmentsPage() {
   const delivered = shipments.filter((s) => s.status === 'DELIVERED').length;
 
   return (
-    <div className="pb-10">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-ink">Shipments</h2>
-          <p className="text-sm text-inkSoft mt-1">Real-time tracking of all active and completed shipments.</p>
-        </div>
-      </div>
+    <div>
+      <EditorialPageHeader
+        eyebrow="Dashboard"
+        title="Shipments"
+        description="Real-time tracking of all active and completed shipments."
+        meta={
+          <div className="text-[11px] leading-5">
+            <StatusLabel tone={error ? 'danger' : 'success'}>{error ? 'Error loading data' : 'All systems'}</StatusLabel>
+          </div>
+        }
+        actions={
+          <button
+            type="button"
+            onClick={fetchShipments}
+            className="h-9 rounded-md border border-line px-3 text-[12px] font-medium text-ink-soft transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+          >
+            Refresh
+          </button>
+        }
+      />
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-ink">{shipments.length}</div>
-          <div className="text-xs text-inkSoft">Total Shipments</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-cyan-600">{inTransit}</div>
-          <div className="text-xs text-inkSoft">In Transit</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-amber-600">{delayed}</div>
-          <div className="text-xs text-inkSoft">Delayed</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-600">{delivered}</div>
-          <div className="text-xs text-inkSoft">Delivered</div>
-        </div>
-      </div>
+      <MetricBand
+        metrics={[
+          { label: 'Total shipments', value: shipments.length, meta: 'Local storage mirror' },
+          { label: 'In transit', value: inTransit, meta: 'En route to destination' },
+          { label: 'Delayed', value: delayed, meta: delayed > 0 ? 'Needs attention' : 'All on time', tone: delayed > 0 ? 'warning' : 'default' },
+          { label: 'Delivered', value: delivered, meta: 'Completed today' },
+        ]}
+      />
 
-      <Card className="overflow-hidden">
+      <EditorialSection eyebrow="Tracking" title="Active shipments">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Tracking #</th>
-                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Driver</th>
-                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Vehicle</th>
-                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Route</th>
-                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">ETA</th>
+          <table className="w-full border-collapse text-left">
+            <caption className="sr-only">All active and completed shipments</caption>
+            <thead>
+              <tr className="border-b border-line">
+                <th scope="col" className="h-8 pr-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Tracking #</th>
+                <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Driver</th>
+                <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Vehicle</th>
+                <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Route</th>
+                <th scope="col" className="h-8 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">Status</th>
+                <th scope="col" className="h-8 pl-3 text-right text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-faint">ETA</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               <TableState
                 loading={loading}
                 empty={!loading && shipments.length === 0}
-                error={error ? new Error(error) : undefined}
+                error={error}
+                onRetry={fetchShipments}
                 colSpan={6}
-                emptyContent={<tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">No shipments found.</td></tr>}
+                emptyTitle="No shipments found"
+                emptyDescription="Shipments synced from the backend will appear here."
               >
                 {shipments.map((shipment) => (
-                  <tr key={shipment.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs font-bold text-ink">{shipment.trackingNumber}</td>
-                    <td className="px-6 py-4 text-ink">{shipment.driver}</td>
-                    <td className="px-6 py-4 text-slate-600">{shipment.vehicle}</td>
-                    <td className="px-6 py-4 text-slate-600">{shipment.origin} → {shipment.destination}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Badge variant={STATUS_VARIANT[shipment.status] || 'neutral'}>
-                          {shipment.status.replace('_', ' ')}
-                        </Badge>
-                        <span className="text-xs text-slate-400">{shipment.progress}%</span>
-                      </div>
+                  <tr key={shipment.id} className="h-[42px] border-b border-line/80 transition-colors hover:bg-surface-alt/60">
+                    <td className="pr-3 text-[12px] font-medium text-ink">{shipment.trackingNumber}</td>
+                    <td className="px-3 text-[12px] text-ink">{shipment.driver}</td>
+                    <td className="px-3 text-[12px] text-ink-soft">{shipment.vehicle}</td>
+                    <td className="px-3 text-[12px] text-ink-soft">{shipment.origin} → {shipment.destination}</td>
+                    <td className="px-3 text-[12px]">
+                      <StatusLabel tone={STATUS_TONE[shipment.status] || 'neutral'}>
+                        {shipment.status.replace(/_/g, ' ')} · {shipment.progress}%
+                      </StatusLabel>
                     </td>
-                    <td className="px-6 py-4 text-right text-xs text-slate-500">
-                      {new Date(shipment.eta).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    <td className="pl-3 text-right text-[12px] tabular-nums text-ink-soft">
+                      {new Date(shipment.eta).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' })}
                     </td>
                   </tr>
                 ))}
@@ -115,13 +117,7 @@ export default function ShipmentsPage() {
             </tbody>
           </table>
         </div>
-      </Card>
-
-      {error && (
-        <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
-          {error} Data shown is from local storage.
-        </div>
-      )}
+      </EditorialSection>
     </div>
   );
 }

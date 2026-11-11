@@ -94,13 +94,13 @@ function ResetPasswordForm() {
           <label className="block text-sm font-medium text-ink-soft mb-1">New Password</label>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
             className="w-full bg-surface-alt border border-border rounded-xl py-3 px-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
-            placeholder="Min. 8 characters" required minLength={8} />
+            placeholder="Tối thiểu 8 ký tự" required minLength={8} />
         </div>
         <div>
           <label className="block text-sm font-medium text-ink-soft mb-1">Confirm Password</label>
           <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
             className="w-full bg-surface-alt border border-border rounded-xl py-3 px-4 text-ink focus:outline-none focus:border-primary/50 transition-colors"
-            placeholder="Re-enter password" required minLength={8} />
+            placeholder="Nhập lại mật khẩu" required minLength={8} />
         </div>
         <button type="submit" disabled={loading}
           className="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3.5 rounded-xl transition-colors disabled:opacity-50 mt-2">
