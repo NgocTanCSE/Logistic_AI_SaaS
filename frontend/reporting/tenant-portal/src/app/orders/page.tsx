@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { data } from '@/lib/data';
+import { useRole } from '@/lib/use-role';
 import {
   EditorialPageHeader,
   EditorialSection,
@@ -162,6 +163,8 @@ export default function OrdersPage() {
   const [serviceFilter, setServiceFilter] = useState<ServiceLevel | 'ALL'>('ALL');
   const [warehouseFilter, setWarehouseFilter] = useState('ALL');
   const [page, setPage] = useState(1);
+
+  const { can } = useRole();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState<OrderForm>(EMPTY_FORM);
@@ -441,12 +444,16 @@ export default function OrdersPage() {
         meta={`${filtered.length} / ${orders.length} đơn`}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setBulkOpen(true)}>
-              Nhập hàng loạt
-            </Button>
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              Tạo đơn
-            </Button>
+            {can('order:write') && (
+              <Button variant="outline" size="sm" onClick={() => setBulkOpen(true)}>
+                Nhập hàng loạt
+              </Button>
+            )}
+            {can('order:write') && (
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                Tạo đơn
+              </Button>
+            )}
           </div>
         }
       />

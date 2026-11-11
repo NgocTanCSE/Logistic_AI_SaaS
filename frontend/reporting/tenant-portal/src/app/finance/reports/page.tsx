@@ -6,6 +6,7 @@ import { TableState } from 'ui-components';
 import { data } from '@/lib/data';
 import type { ReportSummary, ReportOnTime, ReportCosts, ReportFleet, ReportParams } from '@/lib/mock';
 import { formatCurrency, formatNumber } from '@/lib/labels';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 
 const FULL_MONTHS = [
   'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
@@ -19,7 +20,7 @@ function yearRange() {
 function monthItems(year: number) {
   return Array.from({ length: 12 }, (_, i) => ({
     month: i + 1,
-    label: `${FULL_MONTHS[i]} ${year}`,
+    label: `${FULL_MONTHS[i']} fallbackHref="/dashboard"> ${year}`,
   }));
 }
 
@@ -262,139 +263,141 @@ export default function ReportsPage() {
                   >
                     {costs?.byCategory.map((item) => {
                       const share = costs.total === 0 ? 0 : (item.amount / costs.total) * 100;
-                      return (
-                        <tr key={item.category} className="border-b border-line last:border-b-0 transition-colors hover:bg-surface-alt">
+  return (
+    <RoleGuard allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'WAREHOUSE_MANAGER', 'LOGISTICS_MANAGER']} fallbackHref="/dashboard">
+                          <tr key={item.category} className="border-b border-line last:border-b-0 transition-colors hover:bg-surface-alt">
+                            <td className="px-4 py-2">
+                              <span className="text-[12px] font-medium text-ink">{item.category}</span>
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              <span className="tabular-nums text-[12px] font-medium text-ink">{formatCurrency(item.amount)}</span>
+                            </td>
+                            <td className="px-4 py-2">
+                              <div className="flex items-center gap-2 text-[11px]">
+                                <div className="h-2 w-24 rounded-full bg-line">
+                                  <div
+                                    className="h-2 rounded-full bg-accent"
+                                    style={{ width: `${share}%` }}
+                                  />
+                                </div>
+                                <span className="tabular-nums text-ink-faint">{share.toFixed(1)}%</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </TableState>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </EditorialSection>
+        ) : null}
+
+        {summary && fleet ? (
+          <EditorialSection
+            title="Đội xe — hiệu suất"
+            eyebrow="Xu hướng xe chạy tháng qua"
+            action={
+              <span className="text-[11px] text-ink-faint">
+                {summary.fleetUtilization}% sử dụng
+              </span>
+            }
+          >
+            <div className="rounded-xl border border-line bg-canvas">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left" cellPadding={0} cellSpacing={0}>
+                  <thead>
+                    <tr className="border-b border-line">
+                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                        Biển số
+                      </th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                        chuyến
+                      </th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                        km
+                      </th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                        xăng
+                      </th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                        bảo trì
+                      </th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                        hiệu suất
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <TableState
+                      loading={loading}
+                      empty={!loading && (fleet?.byVehicle.length === 0)}
+                      error={error ? new Error(error) : undefined}
+                      onRetry={load}
+                      colSpan={6}
+                      emptyTitle="Chưa có dữ liệu xe"
+                      emptyDescription="Không có xe chạy trong kỳ được chọn."
+                    >
+                      {fleet?.byVehicle.map((vehicle) => (
+                        <tr key={vehicle.id} className="border-b border-line last:border-b-0 transition-colors hover:bg-surface-alt">
                           <td className="px-4 py-2">
-                            <span className="text-[12px] font-medium text-ink">{item.category}</span>
+                            <div>
+                              <div className="text-[12px] font-medium text-ink">{vehicle.plate}</div>
+                              <div className="text-[10px] text-ink-faint">{vehicle.type}</div>
+                            </div>
                           </td>
                           <td className="px-4 py-2 text-right">
-                            <span className="tabular-nums text-[12px] font-medium text-ink">{formatCurrency(item.amount)}</span>
+                            <span className="tabular-nums text-[12px] text-ink">{formatNumber(vehicle.trips)}</span>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <span className="tabular-nums text-[12px] text-ink">{formatNumber(vehicle.distanceKm)}</span>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <span className="tabular-nums text-[12px] text-ink">{formatCurrency(vehicle.fuelCost)}</span>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <span className="tabular-nums text-[12px] text-ink">{formatCurrency(vehicle.maintenanceCost)}</span>
                           </td>
                           <td className="px-4 py-2">
-                            <div className="flex items-center gap-2 text-[11px]">
+                            <div className="flex justify-between gap-2 text-[11px]">
                               <div className="h-2 w-24 rounded-full bg-line">
                                 <div
                                   className="h-2 rounded-full bg-accent"
-                                  style={{ width: `${share}%` }}
+                                  style={{ width: `${vehicle.rate}%` }}
                                 />
                               </div>
-                              <span className="tabular-nums text-ink-faint">{share.toFixed(1)}%</span>
+                              <span className={vehicle.rate >= 80 ? 'text-success' : 'text-warning'}>
+                                {vehicle.rate}%
+                              </span>
                             </div>
                           </td>
                         </tr>
-                      );
-                    })}
-                  </TableState>
-                </tbody>
-              </table>
+                      ))}
+                    </TableState>
+                  </tbody>
+                </table>
+              </div>
             </div>
+          </EditorialSection>
+        ) : null}
+
+        <EditorialSection title="Tóm tắt hiệu suất tháng" eyebrow="Chỉ số chính">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { label: 'Doanh thu', value: summary ? formatCurrency(summary.revenue) : '—' },
+              { label: 'Chi phí', value: summary ? formatCurrency(summary.cost) : '—' },
+              { label: 'Lợi nhuận', value: summary ? formatCurrency(summary.profit) : '—' },
+              { label: 'COD nộp thấp kỳ', value: summary ? formatCurrency(summary.codPending) : '—' },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-line bg-canvas px-4 py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-ink-faint">{item.label}</p>
+                <p className="mt-1 text-[20px] font-semibold tabular-nums text-ink">{item.value}</p>
+              </div>
+            ))}
           </div>
         </EditorialSection>
-      ) : null}
-
-      {summary && fleet ? (
-        <EditorialSection
-          title="Đội xe — hiệu suất"
-          eyebrow="Xu hướng xe chạy tháng qua"
-          action={
-            <span className="text-[11px] text-ink-faint">
-              {summary.fleetUtilization}% sử dụng
-            </span>
-          }
-        >
-          <div className="rounded-xl border border-line bg-canvas">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left" cellPadding={0} cellSpacing={0}>
-                <thead>
-                  <tr className="border-b border-line">
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
-                      Biển số
-                    </th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
-                      chuyến
-                    </th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
-                      km
-                    </th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
-                      xăng
-                    </th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
-                      bảo trì
-                    </th>
-                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
-                      hiệu suất
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <TableState
-                    loading={loading}
-                    empty={!loading && (fleet?.byVehicle.length === 0)}
-                    error={error ? new Error(error) : undefined}
-                    onRetry={load}
-                    colSpan={6}
-                    emptyTitle="Chưa có dữ liệu xe"
-                    emptyDescription="Không có xe chạy trong kỳ được chọn."
-                  >
-                    {fleet?.byVehicle.map((vehicle) => (
-                      <tr key={vehicle.id} className="border-b border-line last:border-b-0 transition-colors hover:bg-surface-alt">
-                        <td className="px-4 py-2">
-                          <div>
-                            <div className="text-[12px] font-medium text-ink">{vehicle.plate}</div>
-                            <div className="text-[10px] text-ink-faint">{vehicle.type}</div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <span className="tabular-nums text-[12px] text-ink">{formatNumber(vehicle.trips)}</span>
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <span className="tabular-nums text-[12px] text-ink">{formatNumber(vehicle.distanceKm)}</span>
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <span className="tabular-nums text-[12px] text-ink">{formatCurrency(vehicle.fuelCost)}</span>
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <span className="tabular-nums text-[12px] text-ink">{formatCurrency(vehicle.maintenanceCost)}</span>
-                        </td>
-                        <td className="px-4 py-2">
-                          <div className="flex justify-between gap-2 text-[11px]">
-                            <div className="h-2 w-24 rounded-full bg-line">
-                              <div
-                                className="h-2 rounded-full bg-accent"
-                                style={{ width: `${vehicle.rate}%` }}
-                              />
-                            </div>
-                            <span className={vehicle.rate >= 80 ? 'text-success' : 'text-warning'}>
-                              {vehicle.rate}%
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </TableState>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </EditorialSection>
-      ) : null}
-
-      <EditorialSection title="Tóm tắt hiệu suất tháng" eyebrow="Chỉ số chính">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            { label: 'Doanh thu', value: summary ? formatCurrency(summary.revenue) : '—' },
-            { label: 'Chi phí', value: summary ? formatCurrency(summary.cost) : '—' },
-            { label: 'Lợi nhuận', value: summary ? formatCurrency(summary.profit) : '—' },
-            { label: 'COD nộp thấp kỳ', value: summary ? formatCurrency(summary.codPending) : '—' },
-          ].map((item) => (
-            <div key={item.label} className="rounded-xl border border-line bg-canvas px-4 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-ink-faint">{item.label}</p>
-              <p className="mt-1 text-[20px] font-semibold tabular-nums text-ink">{item.value}</p>
-            </div>
-          ))}
-        </div>
-      </EditorialSection>
-    </div>
+      </div>
+    </RoleGuard>
   );
 }

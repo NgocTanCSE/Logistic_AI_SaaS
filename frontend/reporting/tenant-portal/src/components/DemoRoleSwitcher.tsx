@@ -6,19 +6,17 @@ import { useAuth } from '@/lib/auth-context';
 import { isMockDataSource } from '@/lib/data';
 import { DemoAccount, DEMO_ACCOUNTS, mockLogin } from '@/lib/mock-auth';
 import { StatusLabel, type StatusTone } from 'ui-kit';
+import { ROLE_REDIRECT } from '@/components/auth/roleRedirect';
 
 /**
  * Vai trò demo → route như trang đăng nhập, không qua server.
+ *
+ * Chỉ dùng được khi nguồn dữ liệu là mock: `mockLogin` tạo token trình duyệt,
+ * `setAuthToken` đồng bộ context ngay, sau đó chuyển đến trang mà vai trò vừa
+ * chọn được phép.
+ * Khi role chuyển, trang cũng được chuyển theo, đảm bảo dấu hiệu nhất quán
+ * (page không sở hữu quyền truy cập).
  */
-const ROLE_REDIRECT: Record<string, string> = {
-  TENANT_ADMIN: '/dashboard',
-  TENANT_USER: '/dashboard',
-  WAREHOUSE_MANAGER: '/dashboard',
-  WAREHOUSE_STAFF: '/dashboard',
-  LOGISTICS_MANAGER: '/logistics/dispatch',
-  DRIVER: '/drivers/my-trips',
-};
-
 const ROLE_TONE: Record<string, StatusTone> = {
   TENANT_ADMIN: 'neutral',
   WAREHOUSE_MANAGER: 'success',

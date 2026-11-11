@@ -12,6 +12,7 @@ import {
   invoiceStatusLabel,
   invoiceStatusTone,
 } from '@/lib/labels';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 
 export default function BillingPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -93,205 +94,207 @@ export default function BillingPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <EditorialPageHeader
-        eyebrow="Quản trị"
-        title="Hoá đơn"
-        description="Theo dõi cuối và ghi nhận thanh toán của khách hàng B2B."
-      />
+    <RoleGuard allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN']} fallbackHref="/dashboard">
+      <div className="space-y-6">
+        <EditorialPageHeader
+          eyebrow="Quản trị"
+          title="Hoá đơn"
+          description="Theo dõi cuối và ghi nhận thanh toán của khách hàng B2B."
+        />
 
-      {error ? (
-        <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas px-4 py-3">
-          <StatusLabel tone="danger">Lỗi dữ liệu</StatusLabel>
-          <span className="text-[12px] text-ink-soft">{error}</span>
-          <button type="button" onClick={load} className="ml-auto text-[11px] font-medium text-accent hover:underline">
-            Thử lại
-          </button>
-        </div>
-      ) : null}
-
-      <MetricBand
-        metrics={[
-          {
-            label: 'Hóa đơn mở',
-            value: String(openInvoices),
-            meta: 'Chưa thanh toán đủ',
-            tone: metricTone(openInvoices),
-          },
-          {
-            label: 'Quá hạn',
-            value: String(overdue.length),
-            meta: overdue.length > 0 ? 'Cần nhắc nợ ngay' : undefined,
-            tone: overdue.length > 0 ? 'danger' : 'success',
-          },
-          {
-            label: 'Phải thu',
-            value: formatCurrency(outstanding),
-            meta: 'Số tiền còn nợ từ hóa đơn',
-            tone: metricTone(outstanding),
-          },
-          {
-            label: 'Đã thu',
-            value: formatCurrency(invoices.reduce((sum, row) => sum + row.paidAmount, 0)),
-            meta: 'Đã ghi nhận thanh toán',
-          },
-        ]}
-      />
-
-      <EditorialSection title="Danh sách hoá đơn" eyebrow="Cuối tháng" action={
-        <div className="flex items-center gap-2">
-          <select
-            aria-label="Lọc trạng thái"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="h-8 border border-line bg-white px-2 text-[11px] text-ink-soft outline-none hover:border-line-strong"
-          >
-            <option value="">Tất cả</option>
-            <option value="SENT">Chờ thanh toán</option>
-            <option value="PAID">Đã thanh toán</option>
-            <option value="OVERDUE">Quá hạn</option>
-            <option value="VOID">Đã huỷ</option>
-            <option value="DRAFT">Bản nháp</option>
-          </select>
-          <input
-            type="search"
-            placeholder="Tìm mã khách..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 w-48 border border-line bg-white px-2 text-[11px] text-ink-soft outline-none hover:border-line-strong focus:border-accent"
-          />
-        </div>
-      }>
-        <div className="rounded-xl border border-line bg-canvas">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left" cellPadding={0} cellSpacing={0}>
-              <thead>
-                <tr className="border-b border-line">
-                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
-                    Mã
-                  </th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
-                    Khách
-                  </th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
-                    Kỳ
-                  </th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
-                    Tổng
-                  </th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
-                    Đã trả
-                  </th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
-                    Còn lại
-                  </th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
-                    Trạng thái
-                  </th>
-                  <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
-                    Hành động
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <TableState
-                  loading={loading}
-                  empty={!loading && visible.length === 0}
-                  error={error ? new Error(error) : undefined}
-                  onRetry={load}
-                  colSpan={8}
-                  emptyTitle="Chưa có hóa đơn nào"
-                  emptyDescription="Hóa đơn sẽ hiển thị nơi đây khi được tạo."
-                >
-                  {visible.map((row) => (
-                    <tr key={row.id} className="group border-b border-line last:border-b-0 transition-colors hover:bg-surface-alt">
-                      <td className="px-4 py-2">
-                        <span className="font-mono text-[11px] text-ink-faint">{row.code}</span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span className="text-[12px] font-medium text-ink">{row.clientName}</span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <span className="text-[11px] text-ink-soft">{row.period}</span>
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <span className="tabular-nums text-[12px] font-medium text-ink">{formatCurrency(row.amount)}</span>
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <span className="tabular-nums text-[12px] text-success">{formatCurrency(row.paidAmount)}</span>
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <span className="tabular-nums text-[12px] font-medium text-ink">{formatCurrency(row.amount - row.paidAmount)}</span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <StatusLabel tone={invoiceStatusTone(row.status)}>
-                          {invoiceStatusLabel(row.status)}
-                        </StatusLabel>
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {!['PAID', 'VOID'].includes(row.status) ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPayment(row)}
-                            className="text-[11px] font-medium text-accent hover:underline"
-                          >
-                            Ghi nhận thanh toán
-                          </button>
-                        ) : null}
-                      </td>
-                    </tr>
-                  ))}
-                </TableState>
-              </tbody>
-            </table>
+        {error ? (
+          <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas px-4 py-3">
+            <StatusLabel tone="danger">Lỗi dữ liệu</StatusLabel>
+            <span className="text-[12px] text-ink-soft">{error}</span>
+            <button type="button" onClick={load} className="ml-auto text-[11px] font-medium text-accent hover:underline">
+              Thử lại
+            </button>
           </div>
-        </div>
-      </EditorialSection>
+        ) : null}
 
-      <Modal
-        isOpen={paymentId !== null}
-        onClose={() => setPaymentId(null)}
-        title="Ghi nhận thanh toán"
-        size="sm"
-      >
-        {paymentId ? (
-          <form onSubmit={(e) => { e.preventDefault(); handlePayment(); }}>
-            <div className="mb-4">
-              <div className="flex items-end justify-between">
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Tổng thanh toán</div>
-                  <div className="text-[16px] font-semibold tabular-nums text-ink">
-                    {formatCurrency(invoices.find((row) => row.id === paymentId)?.amount ?? 0)}
+        <MetricBand
+          metrics={[
+            {
+              label: 'Hóa đơn mở',
+              value: String(openInvoices),
+              meta: 'Chưa thanh toán đủ',
+              tone: metricTone(openInvoices),
+            },
+            {
+              label: 'Quá hạn',
+              value: String(overdue.length),
+              meta: overdue.length > 0 ? 'Cần nhắc nợ ngay' : undefined,
+              tone: overdue.length > 0 ? 'danger' : 'success',
+            },
+            {
+              label: 'Phải thu',
+              value: formatCurrency(outstanding),
+              meta: 'Số tiền còn nợ từ hóa đơn',
+              tone: metricTone(outstanding),
+            },
+            {
+              label: 'Đã thu',
+              value: formatCurrency(invoices.reduce((sum, row) => sum + row.paidAmount, 0)),
+              meta: 'Đã ghi nhận thanh toán',
+            },
+          ]}
+        />
+
+        <EditorialSection title="Danh sách hoá đơn" eyebrow="Cuối tháng" action={
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Lọc trạng thái"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="h-8 border border-line bg-white px-2 text-[11px] text-ink-soft outline-none hover:border-line-strong"
+            >
+              <option value="">Tất cả</option>
+              <option value="SENT">Chờ thanh toán</option>
+              <option value="PAID">Đã thanh toán</option>
+              <option value="OVERDUE">Quá hạn</option>
+              <option value="VOID">Đã huỷ</option>
+              <option value="DRAFT">Bản nháp</option>
+            </select>
+            <input
+              type="search"
+              placeholder="Tìm mã khách..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-8 w-48 border border-line bg-white px-2 text-[11px] text-ink-soft outline-none hover:border-line-strong focus:border-accent"
+            />
+          </div>
+        }>
+          <div className="rounded-xl border border-line bg-canvas">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left" cellPadding={0} cellSpacing={0}>
+                <thead>
+                  <tr className="border-b border-line">
+                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                      Mã
+                    </th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                      Khách
+                    </th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                      Kỳ
+                    </th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                      Tổng
+                    </th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                      Đã trả
+                    </th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                      Còn lại
+                    </th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+                      Trạng thái
+                    </th>
+                    <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint text-right">
+                      Hành động
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <TableState
+                    loading={loading}
+                    empty={!loading && visible.length === 0}
+                    error={error ? new Error(error) : undefined}
+                    onRetry={load}
+                    colSpan={8}
+                    emptyTitle="Chưa có hóa đơn nào"
+                    emptyDescription="Hóa đơn sẽ hiển thị nơi đây khi được tạo."
+                  >
+                    {visible.map((row) => (
+                      <tr key={row.id} className="group border-b border-line last:border-b-0 transition-colors hover:bg-surface-alt">
+                        <td className="px-4 py-2">
+                          <span className="font-mono text-[11px] text-ink-faint">{row.code}</span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className="text-[12px] font-medium text-ink">{row.clientName}</span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className="text-[11px] text-ink-soft">{row.period}</span>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <span className="tabular-nums text-[12px] font-medium text-ink">{formatCurrency(row.amount)}</span>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <span className="tabular-nums text-[12px] text-success">{formatCurrency(row.paidAmount)}</span>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <span className="tabular-nums text-[12px] font-medium text-ink">{formatCurrency(row.amount - row.paidAmount)}</span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <StatusLabel tone={invoiceStatusTone(row.status)}>
+                            {invoiceStatusLabel(row.status)}
+                          </StatusLabel>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          {!['PAID', 'VOID'].includes(row.status) ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPayment(row)}
+                              className="text-[11px] font-medium text-accent hover:underline"
+                            >
+                              Ghi nhận thanh toán
+                            </button>
+                          ) : null}
+                        </td>
+                      </tr>
+                    ))}
+                  </TableState>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </EditorialSection>
+
+        <Modal
+          isOpen={paymentId !== null}
+          onClose={() => setPaymentId(null)}
+          title="Ghi nhận thanh toán"
+          size="sm"
+        >
+          {paymentId ? (
+            <form onSubmit={(e) => { e.preventDefault(); handlePayment(); }}>
+              <div className="mb-4">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Tổng thanh toán</div>
+                    <div className="text-[16px] font-semibold tabular-nums text-ink">
+                      {formatCurrency(invoices.find((row) => row.id === paymentId)?.amount ?? 0)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Số tiền cần trả</div>
+                    <Input
+                      required
+                      type="number"
+                      min={0}
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      className="w-32"
+                      placeholder="0"
+                    />
                   </div>
                 </div>
-                <div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint">Số tiền cần trả</div>
-                  <Input
-                    required
-                    type="number"
-                    min={0}
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    className="w-32"
-                    placeholder="0"
-                  />
-                </div>
               </div>
-            </div>
-            {actionError ? (
-              <p className="mb-4 text-[11px] font-medium text-danger">{actionError}</p>
-            ) : null}
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPaymentId(null)}>
-                Bỏ qua
-              </Button>
-              <Button type="submit" isLoading={saving} disabled={saving}>
-                Ghi nhận
-              </Button>
-            </div>
-          </form>
-        ) : null}
-      </Modal>
-    </div>
+              {actionError ? (
+                <p className="mb-4 text-[11px] font-medium text-danger">{actionError}</p>
+              ) : null}
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setPaymentId(null)}>
+                  Bỏ qua
+                </Button>
+                <Button type="submit" isLoading={saving} disabled={saving}>
+                  Ghi nhận
+                </Button>
+              </div>
+            </form>
+          ) : null}
+        </Modal>
+      </div>
+    </RoleGuard>
   );
 }

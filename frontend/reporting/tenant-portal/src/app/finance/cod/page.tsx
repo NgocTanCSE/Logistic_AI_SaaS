@@ -20,6 +20,7 @@ import {
   formatDateTimeVN,
   formatNumber,
 } from '@/lib/labels';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 
 const STATUS_FILTER: { label: string; value: CodRemittance['status'] | '' }[] = [
   { label: 'Tất cả', value: '' },
@@ -617,281 +618,283 @@ export default function CodRemittancePage() {
                 <tbody className="divide-y divide-line text-[12px]">
                   {unmatchedBank.map((txn) => {
                     const candidate = suggestionFor(txn);
-                    return (
-                      <tr key={txn.id} className="hover:bg-surface-alt">
-                        <td className="px-3 py-2 tabular-nums text-ink-soft">
-                          {formatDateVN(txn.txnDate)}
-                        </td>
-                        <td className="px-3 py-2 text-ink">{txn.description}</td>
-                        <td className="px-3 py-2 tabular-nums font-medium text-ink">
-                          {formatCurrency(txn.amount)}
-                        </td>
-                        <td className="px-3 py-2 font-mono text-[10px] text-ink-faint">
-                          {txn.bankRef}
-                        </td>
-                        <td className="px-3 py-2">
-                          {candidate ? (
-                            <span className="font-mono text-[11px] text-ink">
-                              {candidate.code}
-                              <span className="ml-1 text-ink-faint">
-                                {candidate.status === 'DISPUTED' ? '(lệch)' : ''}
+  return (
+    <RoleGuard allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN', 'LOGISTICS_MANAGER']} fallbackHref="/dashboard">
+                        <tr key={txn.id} className="hover:bg-surface-alt">
+                          <td className="px-3 py-2 tabular-nums text-ink-soft">
+                            {formatDateVN(txn.txnDate)}
+                          </td>
+                          <td className="px-3 py-2 text-ink">{txn.description}</td>
+                          <td className="px-3 py-2 tabular-nums font-medium text-ink">
+                            {formatCurrency(txn.amount)}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-[10px] text-ink-faint">
+                            {txn.bankRef}
+                          </td>
+                          <td className="px-3 py-2">
+                            {candidate ? (
+                              <span className="font-mono text-[11px] text-ink">
+                                {candidate.code}
+                                <span className="ml-1 text-ink-faint">
+                                  {candidate.status === 'DISPUTED' ? '(lệch)' : ''}
+                                </span>
                               </span>
-                            </span>
-                          ) : (
-                            <StatusLabel tone="warning">Không có phiếu</StatusLabel>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2">
-                          <button
-                            type="button"
-                            disabled={!candidate || saving}
-                            onClick={() => matchOne(txn)}
-                            className="text-[11px] font-semibold text-accent hover:underline disabled:text-ink-faint disabled:no-underline"
-                          >
-                            Khớp
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            ) : (
+                              <StatusLabel tone="warning">Không có phiếu</StatusLabel>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2">
+                            <button
+                              type="button"
+                              disabled={!candidate || saving}
+                              onClick={() => matchOne(txn)}
+                              className="text-[11px] font-semibold text-accent hover:underline disabled:text-ink-faint disabled:no-underline"
+                            >
+                              Khớp
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </DataState>
+          </EditorialSection>
+
+          <EditorialSection
+            title="Đối soát sao kê tự động"
+            eyebrow="Dán sao kê hoặc nạp mẫu"
+            action={
+              <button
+                type="button"
+                onClick={fillSampleStatement}
+                className="text-[11px] font-semibold text-accent hover:underline"
+              >
+                Nạp mẫu
+              </button>
+            }
+          >
+            <div className="space-y-3">
+              <p className="text-[12px] leading-6 text-ink-soft">
+                Mỗi dòng theo thứ tự{' '}
+                <span className="font-mono text-[11px] text-ink">
+                  số tiền | mã tham chiếu | mô tả
+                </span>
+                . Hệ thống khớp mã tham chiếu trước, rồi mới đối chiếu số tiền đã nộp của tài xế.
+              </p>
+              <textarea
+                value={statementText}
+                onChange={(event) => setStatementText(event.target.value)}
+                rows={6}
+                className="w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-[12px] text-ink focus:border-accent focus:outline-none"
+                placeholder={'4200000|VCB-20261110-0455|NOP TIEN COD TRP-4100'}
+              />
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] text-ink-faint">
+                  {parseStatement(statementText).length} dòng hợp lệ
+                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setStatementText('');
+                      setOutcomes([]);
+                    }}
+                  >
+                    Xoá
+                  </Button>
+                  <Button size="sm" onClick={runAutoMatch} isLoading={autoBusy}>
+                    Chạy đối soát
+                  </Button>
+                </div>
+              </div>
+
+              {outcomes.length === 0 ? (
+                <EmptyNote>
+                  Chưa chạy đối soát. Kết quả từng dòng hiện ở đây sau khi chạy.
+                </EmptyNote>
+              ) : (
+                <div className="divide-y divide-line border-y border-line">
+                  {outcomes.map((row) => (
+                    <div key={row.key} className="py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="tabular-nums text-[12px] font-medium text-ink">
+                          {formatCurrency(row.amount)}
+                        </span>
+                        <StatusLabel tone={OUTCOME_TONE[row.status]}>
+                          {OUTCOME_LABEL[row.status]}
+                        </StatusLabel>
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-ink-soft">{row.statement}</div>
+                      <div className="text-[11px] text-ink-faint">{row.detail}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          </DataState>
+          </EditorialSection>
+        </div>
+
+        <EditorialSection title="Quy tắc đối soát" eyebrow="Ch. 12 · Tài chính">
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="border border-line p-3 text-[12px] text-ink-soft">
+              <div className="font-semibold text-ink">1. Mã QR trên biên lai</div>
+              <p className="mt-1">
+                Biên lai COD in mã phiếu. Tài xế ghi mã vào nội dung chuyển khoản để ngân hàng trả
+                lại mã tham chiếu.
+              </p>
+            </div>
+            <div className="border border-line p-3 text-[12px] text-ink-soft">
+              <div className="font-semibold text-ink">2. Khớp hai lớp</div>
+              <p className="mt-1">
+                Khớp mã tham chiếu trước; nếu không có thì khớp số tiền đã nộp. Một giao dịch chỉ
+                được khớp một lần.
+              </p>
+            </div>
+            <div className="border border-line p-3 text-[12px] text-ink-soft">
+              <div className="font-semibold text-ink">3. Giữ lại chênh lệch</div>
+              <p className="mt-1">
+                Lệch tiền không bị ghi đè: phiếu chuyển Đang lệch kèm ghi chú để đối chiếu biên lai.
+              </p>
+            </div>
+          </div>
+          <EmptyNote>
+            Tổng chênh lệch hiện tại {formatCurrency(totalVariance)} trên{' '}
+            {formatNumber(remittances.length)} phiếu. Đối soát chỉ khoá sổ khi số tiền ngân hàng
+            khớp đúng số tiền tài xế đã nộp.
+          </EmptyNote>
         </EditorialSection>
 
-        <EditorialSection
-          title="Đối soát sao kê tự động"
-          eyebrow="Dán sao kê hoặc nạp mẫu"
-          action={
-            <button
-              type="button"
-              onClick={fillSampleStatement}
-              className="text-[11px] font-semibold text-accent hover:underline"
-            >
-              Nạp mẫu
-            </button>
+        <Modal
+          isOpen={submitTarget !== null}
+          onClose={() => setSubmitTarget(null)}
+          title="Nộp tiền quyết toán"
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setSubmitTarget(null)}>
+                Đóng
+              </Button>
+              <Button size="sm" onClick={submit} isLoading={saving}>
+                Nộp tiền
+              </Button>
+            </div>
           }
         >
-          <div className="space-y-3">
-            <p className="text-[12px] leading-6 text-ink-soft">
-              Mỗi dòng theo thứ tự{' '}
-              <span className="font-mono text-[11px] text-ink">
-                số tiền | mã tham chiếu | mô tả
-              </span>
-              . Hệ thống khớp mã tham chiếu trước, rồi mới đối chiếu số tiền đã nộp của tài xế.
-            </p>
-            <textarea
-              value={statementText}
-              onChange={(event) => setStatementText(event.target.value)}
-              rows={6}
-              className="w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-[12px] text-ink focus:border-accent focus:outline-none"
-              placeholder={'4200000|VCB-20261110-0455|NOP TIEN COD TRP-4100'}
-            />
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] text-ink-faint">
-                {parseStatement(statementText).length} dòng hợp lệ
-              </span>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setStatementText('');
-                    setOutcomes([]);
-                  }}
-                >
-                  Xoá
-                </Button>
-                <Button size="sm" onClick={runAutoMatch} isLoading={autoBusy}>
-                  Chạy đối soát
-                </Button>
+          {submitTarget ? (
+            <div className="space-y-3">
+              <div className="border border-line p-3 text-[12px] text-ink-soft">
+                <div className="flex justify-between">
+                  <span>Phiếu</span>
+                  <span className="font-mono text-ink">{submitTarget.code}</span>
+                </div>
+                <div className="mt-1 flex justify-between">
+                  <span>Tài xế</span>
+                  <span className="text-ink">{submitTarget.driverName}</span>
+                </div>
+                <div className="mt-1 flex justify-between">
+                  <span>Dự kiến phải thu</span>
+                  <span className="tabular-nums text-ink">
+                    {formatCurrency(submitTarget.expectedAmount)}
+                  </span>
+                </div>
               </div>
+              <Input
+                label="Số tiền thực nộp (₫)"
+                type="number"
+                min={0}
+                step="1000"
+                required
+                value={submitAmount}
+                onChange={(event) => setSubmitAmount(event.target.value)}
+              />
+              {Number(submitAmount) > 0 &&
+              Number(submitAmount) !== submitTarget.expectedAmount ? (
+                <p className="border-l-2 border-warning pl-2 text-[12px] text-warning">
+                  Chênh lệch{' '}
+                  {formatCurrency(Number(submitAmount) - submitTarget.expectedAmount)} so với dự
+                  kiến. Phiếu sẽ chuyển sang Đang lệch.
+                </p>
+              ) : (
+                <p className="text-[11px] text-ink-faint">
+                  Nộp đúng số dự kiến thì phiếu chuyển Đã nộp, chờ đối soát ngân hàng.
+                </p>
+              )}
+              {actionError ? (
+                <p className="border-l-2 border-danger pl-2 text-[12px] text-danger">
+                  {actionError}
+                </p>
+              ) : null}
             </div>
+          ) : null}
+        </Modal>
 
-            {outcomes.length === 0 ? (
-              <EmptyNote>
-                Chưa chạy đối soát. Kết quả từng dòng hiện ở đây sau khi chạy.
-              </EmptyNote>
-            ) : (
-              <div className="divide-y divide-line border-y border-line">
-                {outcomes.map((row) => (
-                  <div key={row.key} className="py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="tabular-nums text-[12px] font-medium text-ink">
-                        {formatCurrency(row.amount)}
-                      </span>
-                      <StatusLabel tone={OUTCOME_TONE[row.status]}>
-                        {OUTCOME_LABEL[row.status]}
-                      </StatusLabel>
-                    </div>
-                    <div className="mt-0.5 text-[11px] text-ink-soft">{row.statement}</div>
-                    <div className="text-[11px] text-ink-faint">{row.detail}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </EditorialSection>
-      </div>
-
-      <EditorialSection title="Quy tắc đối soát" eyebrow="Ch. 12 · Tài chính">
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="border border-line p-3 text-[12px] text-ink-soft">
-            <div className="font-semibold text-ink">1. Mã QR trên biên lai</div>
-            <p className="mt-1">
-              Biên lai COD in mã phiếu. Tài xế ghi mã vào nội dung chuyển khoản để ngân hàng trả
-              lại mã tham chiếu.
-            </p>
-          </div>
-          <div className="border border-line p-3 text-[12px] text-ink-soft">
-            <div className="font-semibold text-ink">2. Khớp hai lớp</div>
-            <p className="mt-1">
-              Khớp mã tham chiếu trước; nếu không có thì khớp số tiền đã nộp. Một giao dịch chỉ
-              được khớp một lần.
-            </p>
-          </div>
-          <div className="border border-line p-3 text-[12px] text-ink-soft">
-            <div className="font-semibold text-ink">3. Giữ lại chênh lệch</div>
-            <p className="mt-1">
-              Lệch tiền không bị ghi đè: phiếu chuyển Đang lệch kèm ghi chú để đối chiếu biên lai.
-            </p>
-          </div>
-        </div>
-        <EmptyNote>
-          Tổng chênh lệch hiện tại {formatCurrency(totalVariance)} trên{' '}
-          {formatNumber(remittances.length)} phiếu. Đối soát chỉ khoá sổ khi số tiền ngân hàng
-          khớp đúng số tiền tài xế đã nộp.
-        </EmptyNote>
-      </EditorialSection>
-
-      <Modal
-        isOpen={submitTarget !== null}
-        onClose={() => setSubmitTarget(null)}
-        title="Nộp tiền quyết toán"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setSubmitTarget(null)}>
-              Đóng
-            </Button>
-            <Button size="sm" onClick={submit} isLoading={saving}>
-              Nộp tiền
-            </Button>
-          </div>
-        }
-      >
-        {submitTarget ? (
-          <div className="space-y-3">
-            <div className="border border-line p-3 text-[12px] text-ink-soft">
-              <div className="flex justify-between">
-                <span>Phiếu</span>
-                <span className="font-mono text-ink">{submitTarget.code}</span>
-              </div>
-              <div className="mt-1 flex justify-between">
-                <span>Tài xế</span>
-                <span className="text-ink">{submitTarget.driverName}</span>
-              </div>
-              <div className="mt-1 flex justify-between">
-                <span>Dự kiến phải thu</span>
-                <span className="tabular-nums text-ink">
-                  {formatCurrency(submitTarget.expectedAmount)}
-                </span>
-              </div>
+        <Modal
+          isOpen={reconcileTarget !== null}
+          onClose={() => setReconcileTarget(null)}
+          title="Đối soát COD"
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setReconcileTarget(null)}>
+                Đóng
+              </Button>
+              <Button
+                size="sm"
+                onClick={reconcile}
+                isLoading={saving}
+                disabled={!bankId || saving}
+              >
+                Đối soát
+              </Button>
             </div>
-            <Input
-              label="Số tiền thực nộp (₫)"
-              type="number"
-              min={0}
-              step="1000"
-              required
-              value={submitAmount}
-              onChange={(event) => setSubmitAmount(event.target.value)}
-            />
-            {Number(submitAmount) > 0 &&
-            Number(submitAmount) !== submitTarget.expectedAmount ? (
-              <p className="border-l-2 border-warning pl-2 text-[12px] text-warning">
-                Chênh lệch{' '}
-                {formatCurrency(Number(submitAmount) - submitTarget.expectedAmount)} so với dự
-                kiến. Phiếu sẽ chuyển sang Đang lệch.
-              </p>
-            ) : (
+          }
+        >
+          {reconcileTarget ? (
+            <div className="space-y-3">
+              <div className="border border-line p-3 text-[12px] text-ink-soft">
+                <div className="flex justify-between">
+                  <span>Phiếu</span>
+                  <span className="font-mono text-ink">{reconcileTarget.code}</span>
+                </div>
+                <div className="mt-1 flex justify-between">
+                  <span>Đã nộp</span>
+                  <span className="tabular-nums text-ink">
+                    {formatCurrency(reconcileTarget.submittedAmount)}
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between">
+                  <span>Trạng thái</span>
+                  <StatusLabel tone={codStatusTone(reconcileTarget.status)}>
+                    {codStatusLabel(reconcileTarget.status)}
+                  </StatusLabel>
+                </div>
+              </div>
+              <Select
+                label="Giao dịch ngân hàng"
+                value={bankId}
+                onChange={(event) => setBankId(event.target.value)}
+                options={unmatchedBank.map((row) => ({
+                  value: row.id,
+                  label: `${formatCurrency(row.amount)} · ${formatDateVN(row.txnDate)} · ${
+                    row.bankRef
+                  }`,
+                }))}
+                placeholder="Chọn giao dịch chưa khớp"
+              />
               <p className="text-[11px] text-ink-faint">
-                Nộp đúng số dự kiến thì phiếu chuyển Đã nộp, chờ đối soát ngân hàng.
+                Giao dịch phải có số tiền đúng bằng số tài xế đã nộp; lệch sẽ bị đánh dấu Đang lệch
+                thay vì khoá sổ.
               </p>
-            )}
-            {actionError ? (
-              <p className="border-l-2 border-danger pl-2 text-[12px] text-danger">
-                {actionError}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-      </Modal>
-
-      <Modal
-        isOpen={reconcileTarget !== null}
-        onClose={() => setReconcileTarget(null)}
-        title="Đối soát COD"
-        footer={
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setReconcileTarget(null)}>
-              Đóng
-            </Button>
-            <Button
-              size="sm"
-              onClick={reconcile}
-              isLoading={saving}
-              disabled={!bankId || saving}
-            >
-              Đối soát
-            </Button>
-          </div>
-        }
-      >
-        {reconcileTarget ? (
-          <div className="space-y-3">
-            <div className="border border-line p-3 text-[12px] text-ink-soft">
-              <div className="flex justify-between">
-                <span>Phiếu</span>
-                <span className="font-mono text-ink">{reconcileTarget.code}</span>
-              </div>
-              <div className="mt-1 flex justify-between">
-                <span>Đã nộp</span>
-                <span className="tabular-nums text-ink">
-                  {formatCurrency(reconcileTarget.submittedAmount)}
-                </span>
-              </div>
-              <div className="mt-1 flex justify-between">
-                <span>Trạng thái</span>
-                <StatusLabel tone={codStatusTone(reconcileTarget.status)}>
-                  {codStatusLabel(reconcileTarget.status)}
-                </StatusLabel>
-              </div>
+              {actionError ? (
+                <p className="border-l-2 border-danger pl-2 text-[12px] text-danger">
+                  {actionError}
+                </p>
+              ) : null}
             </div>
-            <Select
-              label="Giao dịch ngân hàng"
-              value={bankId}
-              onChange={(event) => setBankId(event.target.value)}
-              options={unmatchedBank.map((row) => ({
-                value: row.id,
-                label: `${formatCurrency(row.amount)} · ${formatDateVN(row.txnDate)} · ${
-                  row.bankRef
-                }`,
-              }))}
-              placeholder="Chọn giao dịch chưa khớp"
-            />
-            <p className="text-[11px] text-ink-faint">
-              Giao dịch phải có số tiền đúng bằng số tài xế đã nộp; lệch sẽ bị đánh dấu Đang lệch
-              thay vì khoá sổ.
-            </p>
-            {actionError ? (
-              <p className="border-l-2 border-danger pl-2 text-[12px] text-danger">
-                {actionError}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-      </Modal>
-    </div>
+          ) : null}
+        </Modal>
+      </div>
+    </RoleGuard>
   );
 }

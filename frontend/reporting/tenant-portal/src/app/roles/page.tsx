@@ -22,6 +22,7 @@ import {
   canAccessRoute,
 } from '@/lib/permissions';
 import type { AppRole, PermissionAction } from '@/lib/permissions';
+import { RoleGuard } from '@/components/auth/RoleGuard';
 
 const ACTION_LABELS: Record<PermissionAction, string> = {
   'order:write': 'Đơn hàng',
@@ -177,7 +178,7 @@ export default function RolesPage() {
                       className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-[0.08em] text-ink-faint"
                       title={action}
                     >
-                      {ACTION_LABELS[action]}
+                      {ACTION_LABELS[action']} fallbackHref="/dashboard">
                     </th>
                   ))}
                   <th className="px-2 py-2 text-center text-[10px] font-bold uppercase tracking-[0.08em] text-ink-faint">
@@ -242,185 +243,187 @@ export default function RolesPage() {
         <div className="divide-y divide-line border-y border-line">
           {APP_ROLES.map((role) => {
             const routes = ROLE_ROUTE_ACCESS[role];
-            return (
-              <div key={role} className="grid gap-2 py-2.5 md:grid-cols-[220px_1fr]">
-                <div>
-                  <div className="text-[12px] font-semibold text-ink">{roleLabel(role)}</div>
-                  <div className="font-mono text-[10px] text-ink-faint">{role}</div>
-                </div>
-                {routes.includes('*') ? (
-                  <StatusLabel tone="success">Toàn bộ route trong tenant</StatusLabel>
-                ) : (
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
-                    {routes.map((route) => (
-                      <span key={route} className="font-mono text-ink-soft">
-                        {route}
-                      </span>
-                    ))}
+  return (
+    <RoleGuard allowedRoles={['SUPER_ADMIN', 'TENANT_ADMIN']} fallbackHref="/dashboard">
+                <div key={role} className="grid gap-2 py-2.5 md:grid-cols-[220px_1fr]">
+                  <div>
+                    <div className="text-[12px] font-semibold text-ink">{roleLabel(role)}</div>
+                    <div className="font-mono text-[10px] text-ink-faint">{role}</div>
                   </div>
-                )}
+                  {routes.includes('*') ? (
+                    <StatusLabel tone="success">Toàn bộ route trong tenant</StatusLabel>
+                  ) : (
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                      {routes.map((route) => (
+                        <span key={route} className="font-mono text-ink-soft">
+                          {route}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <EmptyNote>
+            Route không nằm trong danh sách sẽ bị chặn ở sidebar và chuyển hướng khi mở trực tiếp.
+          </EmptyNote>
+        </EditorialSection>
+
+        <EditorialSection title="Mô phỏng quyết định" eyebrow="Thử vai trò và hành động">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="border border-line p-3">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-faint">
+                Kiểm tra hành động ghi
               </div>
-            );
-          })}
-        </div>
-        <EmptyNote>
-          Route không nằm trong danh sách sẽ bị chặn ở sidebar và chuyển hướng khi mở trực tiếp.
-        </EmptyNote>
-      </EditorialSection>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <Select
+                  label="Vai trò"
+                  value={simRole}
+                  onChange={(event) => setSimRole(event.target.value as AppRole)}
+                  options={APP_ROLES.map((role) => ({
+                    value: role,
+                    label: `${roleLabel(role)} · ${role}`,
+                  }))}
+                />
+                <Select
+                  label="Hành động"
+                  value={simAction}
+                  onChange={(event) => setSimAction(event.target.value as PermissionAction)}
+                  options={ALL_WRITE_ACTIONS.map((action) => ({
+                    value: action,
+                    label: `${ACTION_LABELS[action]} (${action})`,
+                  }))}
+                />
+              </div>
+              <div className="mt-3 flex items-center gap-3 border-t border-line pt-3">
+                <StatusLabel tone={simAllowAction ? 'success' : 'danger'}>
+                  {simAllowAction ? 'Được phép' : 'Bị từ chối'}
+                </StatusLabel>
+                <span className="text-[12px] text-ink-soft">
+                  {roleLabel(simRole)} {simAllowAction ? 'có' : 'không có'} quyền{' '}
+                  <span className="font-mono text-[11px]">{simAction}</span>.
+                </span>
+              </div>
+              <p className="mt-2 text-[11px] text-ink-faint">
+                Khi bị từ chối, nút thao tác bị ẩn khỏi giao diện; gọi thẳng API vẫn nhận 403 từ
+                server.
+              </p>
+            </div>
 
-      <EditorialSection title="Mô phỏng quyết định" eyebrow="Thử vai trò và hành động">
-        <div className="grid gap-6 lg:grid-cols-2">
-          <div className="border border-line p-3">
-            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-faint">
-              Kiểm tra hành động ghi
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <Select
-                label="Vai trò"
-                value={simRole}
-                onChange={(event) => setSimRole(event.target.value as AppRole)}
-                options={APP_ROLES.map((role) => ({
-                  value: role,
-                  label: `${roleLabel(role)} · ${role}`,
-                }))}
-              />
-              <Select
-                label="Hành động"
-                value={simAction}
-                onChange={(event) => setSimAction(event.target.value as PermissionAction)}
-                options={ALL_WRITE_ACTIONS.map((action) => ({
-                  value: action,
-                  label: `${ACTION_LABELS[action]} (${action})`,
-                }))}
-              />
-            </div>
-            <div className="mt-3 flex items-center gap-3 border-t border-line pt-3">
-              <StatusLabel tone={simAllowAction ? 'success' : 'danger'}>
-                {simAllowAction ? 'Được phép' : 'Bị từ chối'}
-              </StatusLabel>
-              <span className="text-[12px] text-ink-soft">
-                {roleLabel(simRole)} {simAllowAction ? 'có' : 'không có'} quyền{' '}
-                <span className="font-mono text-[11px]">{simAction}</span>.
-              </span>
-            </div>
-            <p className="mt-2 text-[11px] text-ink-faint">
-              Khi bị từ chối, nút thao tác bị ẩn khỏi giao diện; gọi thẳng API vẫn nhận 403 từ
-              server.
-            </p>
-          </div>
-
-          <div className="border border-line p-3">
-            <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-faint">
-              Kiểm tra truy cập route
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr]">
-              <Select
-                label="Vai trò"
-                value={simRole}
-                onChange={(event) => setSimRole(event.target.value as AppRole)}
-                options={APP_ROLES.map((role) => ({
-                  value: role,
-                  label: roleLabel(role),
-                }))}
-              />
-              <Input
-                label="Đường dẫn"
-                value={simPath}
-                onChange={(event) => setSimPath(event.target.value)}
-                placeholder="/wms/waves"
-                list="rbac-routes"
-              />
-              <datalist id="rbac-routes">
-                {KNOWN_ROUTES.map((route) => (
-                  <option key={route} value={route} />
+            <div className="border border-line p-3">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-ink-faint">
+                Kiểm tra truy cập route
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr]">
+                <Select
+                  label="Vai trò"
+                  value={simRole}
+                  onChange={(event) => setSimRole(event.target.value as AppRole)}
+                  options={APP_ROLES.map((role) => ({
+                    value: role,
+                    label: roleLabel(role),
+                  }))}
+                />
+                <Input
+                  label="Đường dẫn"
+                  value={simPath}
+                  onChange={(event) => setSimPath(event.target.value)}
+                  placeholder="/wms/waves"
+                  list="rbac-routes"
+                />
+                <datalist id="rbac-routes">
+                  {KNOWN_ROUTES.map((route) => (
+                    <option key={route} value={route} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+                <StatusLabel tone={simAllowRoute ? 'success' : 'danger'}>
+                  {simAllowRoute ? 'Được vào' : 'Bị chặn'}
+                </StatusLabel>
+                <span className="font-mono text-[11px] text-ink-soft">{simPath || '/'}</span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {KNOWN_ROUTES.filter((route) => canAccessRoute(simRole, route)).map((route) => (
+                  <button
+                    key={route}
+                    type="button"
+                    onClick={() => setSimPath(route)}
+                    className="border border-line px-2 py-0.5 font-mono text-[10px] text-ink-soft transition-colors hover:border-accent hover:text-accent"
+                  >
+                    {route}
+                  </button>
                 ))}
-              </datalist>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-              <StatusLabel tone={simAllowRoute ? 'success' : 'danger'}>
-                {simAllowRoute ? 'Được vào' : 'Bị chặn'}
-              </StatusLabel>
-              <span className="font-mono text-[11px] text-ink-soft">{simPath || '/'}</span>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {KNOWN_ROUTES.filter((route) => canAccessRoute(simRole, route)).map((route) => (
-                <button
-                  key={route}
-                  type="button"
-                  onClick={() => setSimPath(route)}
-                  className="border border-line px-2 py-0.5 font-mono text-[10px] text-ink-soft transition-colors hover:border-accent hover:text-accent"
-                >
-                  {route}
-                </button>
-              ))}
+              </div>
             </div>
           </div>
-        </div>
-      </EditorialSection>
+        </EditorialSection>
 
-      <EditorialSection title="Vai trò trong dữ liệu tenant" eyebrow="Danh mục">
-        <DataState
-          loading={loading}
-          empty={!loading && roles.length === 0}
-          error={error}
-          onRetry={load}
-          emptyTitle="Chưa có vai trò trong tenant"
-          emptyDescription="Vai trò hệ thống sẽ hiển thị nơi đây."
-        >
-          <div className="overflow-x-auto border border-line">
-            <table className="min-w-full divide-y divide-line">
-              <thead className="bg-surface-alt">
-                <tr>
-                  {['Vai trò', 'Mô tả', 'Thành viên', 'Quyền khai báo', 'Loại'].map((label) => (
-                    <th
-                      key={label}
-                      className="whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint"
-                    >
-                      {label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line text-[12px]">
-                <TableState
-                  loading={loading}
-                  empty={!loading && roles.length === 0}
-                  error={error ? new Error(error) : undefined}
-                  onRetry={load}
-                  colSpan={5}
-                  emptyTitle="Chưa có vai trò"
-                  emptyDescription="Vai trò hệ thống sẽ hiển thị nơi đây."
-                >
-                  {roles.map((row) => (
-                    <tr key={row.id} className="hover:bg-surface-alt">
-                      <td className="px-3 py-2">
-                        <div className="font-medium text-ink">{row.name}</div>
-                        <div className="font-mono text-[10px] text-ink-faint">{row.key}</div>
-                      </td>
-                      <td className="px-3 py-2 text-ink-soft">{row.description}</td>
-                      <td className="px-3 py-2 tabular-nums text-ink">
-                        {formatNumber(row.memberCount)}
-                      </td>
-                      <td className="px-3 py-2 font-mono text-[10px] text-ink-faint">
-                        {row.permissions.join(' · ')}
-                      </td>
-                      <td className="px-3 py-2">
-                        <StatusLabel tone={row.builtin ? 'success' : 'neutral'}>
-                          {row.builtin ? 'Hệ thống' : 'Tuỳ chỉnh'}
-                        </StatusLabel>
-                      </td>
-                    </tr>
-                  ))}
-                </TableState>
-              </tbody>
-            </table>
-          </div>
-        </DataState>
-        <EmptyNote>
-          Danh mục này là bản ghi của tenant. Ma trận phía trên lấy từ cấu hình runtime nên luôn là
-          nguồn đúng khi kiểm tra quyền.
-        </EmptyNote>
-      </EditorialSection>
-    </div>
+        <EditorialSection title="Vai trò trong dữ liệu tenant" eyebrow="Danh mục">
+          <DataState
+            loading={loading}
+            empty={!loading && roles.length === 0}
+            error={error}
+            onRetry={load}
+            emptyTitle="Chưa có vai trò trong tenant"
+            emptyDescription="Vai trò hệ thống sẽ hiển thị nơi đây."
+          >
+            <div className="overflow-x-auto border border-line">
+              <table className="min-w-full divide-y divide-line">
+                <thead className="bg-surface-alt">
+                  <tr>
+                    {['Vai trò', 'Mô tả', 'Thành viên', 'Quyền khai báo', 'Loại'].map((label) => (
+                      <th
+                        key={label}
+                        className="whitespace-nowrap px-3 py-2 text-left text-[10px] font-bold uppercase tracking-[0.14em] text-ink-faint"
+                      >
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line text-[12px]">
+                  <TableState
+                    loading={loading}
+                    empty={!loading && roles.length === 0}
+                    error={error ? new Error(error) : undefined}
+                    onRetry={load}
+                    colSpan={5}
+                    emptyTitle="Chưa có vai trò"
+                    emptyDescription="Vai trò hệ thống sẽ hiển thị nơi đây."
+                  >
+                    {roles.map((row) => (
+                      <tr key={row.id} className="hover:bg-surface-alt">
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-ink">{row.name}</div>
+                          <div className="font-mono text-[10px] text-ink-faint">{row.key}</div>
+                        </td>
+                        <td className="px-3 py-2 text-ink-soft">{row.description}</td>
+                        <td className="px-3 py-2 tabular-nums text-ink">
+                          {formatNumber(row.memberCount)}
+                        </td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-ink-faint">
+                          {row.permissions.join(' · ')}
+                        </td>
+                        <td className="px-3 py-2">
+                          <StatusLabel tone={row.builtin ? 'success' : 'neutral'}>
+                            {row.builtin ? 'Hệ thống' : 'Tuỳ chỉnh'}
+                          </StatusLabel>
+                        </td>
+                      </tr>
+                    ))}
+                  </TableState>
+                </tbody>
+              </table>
+            </div>
+          </DataState>
+          <EmptyNote>
+            Danh mục này là bản ghi của tenant. Ma trận phía trên lấy từ cấu hình runtime nên luôn là
+            nguồn đúng khi kiểm tra quyền.
+          </EmptyNote>
+        </EditorialSection>
+      </div>
+    </RoleGuard>
   );
 }

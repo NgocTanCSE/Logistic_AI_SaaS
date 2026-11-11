@@ -5,20 +5,12 @@ import { GoogleLogin } from '@react-oauth/google';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { setSession } from '@/lib/auth';
+import { ROLE_REDIRECT } from '@/components/auth/roleRedirect';
 
 interface GoogleLoginButtonProps {
   tenantSlug?: string;
   onError?: (message: string) => void;
 }
-
-const ROLE_REDIRECT: Record<string, string> = {
-  TENANT_ADMIN: '/dashboard',
-  TENANT_USER: '/dashboard',
-  WAREHOUSE_MANAGER: '/dashboard',
-  WAREHOUSE_STAFF: '/dashboard',
-  LOGISTICS_MANAGER: '/logistics/dispatch',
-  DRIVER: '/drivers/my-trips',
-};
 
 export function GoogleLoginButton({ tenantSlug, onError }: GoogleLoginButtonProps) {
   const [loading, setLoading] = useState(false);

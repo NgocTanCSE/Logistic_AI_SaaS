@@ -44,6 +44,16 @@ Tổng cộng: **51 file đã sửa**, **18 file mới**, **0 file mới tự t�
 - `src/components/Sidebar.tsx` — thêm 2 mục `/inventory/cycle-count` (Kiểm kê định kỳ) + `/inventory/adjustments` (Phiếu điều chỉnh).
 - `src/lib/permissions.ts` — `/demo` cho tất cả vai trò; `APP_ROLES`/`ALL_WRITE_ACTIONS`/`PERMISSION_MATRIX`/`ROLE_ROUTE_ACCESS` export.
 
+#### Bảo vệ quyền truy cập (vòng e)
+- `src/components/auth/roleRedirect.ts` (mới) — nguồn đơn nhất của `ROLE_REDIRECT`; 3 người tiêu thụ (`app/login`, `components/ui/GoogleLoginButton`, `components/DemoRoleSwitcher`) đều import từ đây. `Can.tsx` (dead code, không import) đã xóa.
+- `src/app/orders/page.tsx` — import `useRole`; nút **Tạo đơn** + **Nhập hàng loạt** chỉ hiện với `can('order:write')` (SUPER_ADMIN, TENANT_ADMIN, WAREHOUSE_MANAGER, LOGISTICS_MANAGER, CUSTOMER_CLIENT).
+- 9 trang admin/finance được bọc `RoleGuard` trên body (page riêng đổi role không vào URL):
+  - `SUPER_ADMIN / TENANT_ADMIN`: `users`, `roles`, `settings`, `branches`, `admin/clients`, `admin/billing`.
+  - + WAREHOUSE_MANAGER / LOGISTICS_MANAGER: `admin/ai-insights`, `finance/reports`.
+  - + LOGISTICS_MANAGER: `finance/cod`.
+  - fallback redirect `/dashboard`, 1 `RoleGuard` duy nhất mỗi trang, 1 import duy nhất, xuống dòng cuối đúng.
+- `src/components/DemoRoleSwitcher.tsx`, `src/app/login/page.tsx`, `src/components/ui/GoogleLoginButton.tsx` — giữ nguyên phần còn lại, import `ROLE_REDIRECT` chung.
+
 ### Admin portal
 - `src/app/admin/layout.tsx` — thêm `/admin/control-tower`, `/admin/pricing`, `/admin/ai-insights` vào `NAV_ITEM_ROLES` + `adminSections`.
 - Các trang demo (`control-tower`, `pricing`, `ai-insights`) đã có sẵn ở HEAD.
@@ -106,6 +116,8 @@ Tất cả route đều đảm bảo `canAccessRoute` role, `.svg` sidebar rende
 8. **Mobile driver app** `POST /safety` + `/telemetry` — backend core-api tĩnh không có, thiết kế offline-first (queue AsyncStorage); login form `Alert.alert` chuẩn xác.
 9. **`customer-portal/src/components/icons.tsx`** (220 dòng, 21 SVG export) & `Header.tsx` — dead code, chưa import; xóa hoặc đưa vào thư viện dùng chung nếu cần.
 10. **`admin-portal/BAO_CAO_A4_NAV_ROUTES.md`**, `tenant-portal/BAO_CAO_AUDIT_LOGISTICS.md`, `docs/reports/a0b-tenant-demo-report.md`, `docs/plans/a5-portal-audit-report.md` — báo cáo trung gian.
+11. **`src/lib/mock/seed.ts`** `roleRows` thiếu `SUPER_ADMIN`/`TENANT_USER` (6 hàng/8 `AppRoles`) — A0, cần thêm để ma trận đồng bộ.
+12. **`src/lib/permissions.ts`** — ma trận quyền & `ROUTE_ACCESS` hiện tại (báo cáo A0 vì `src/lib/**` đóng băng; DemoRoleSwitcher UI thao tác sẵn role demo).
 
 ---
 
@@ -113,6 +125,10 @@ Tất cả route đều đảm bảo `canAccessRoute` role, `.svg` sidebar rende
 
 | kiểm tra | kết quả |
 |---|---|
+| `RoleGuard` trang admin/finance | 9/9 file đúng syntax, `fallbackHref="/dashboard"`, 1 guard duy nhất, 1 import duy nhất |
+| `ROLE_REDIRECT` thống nhất | 1 nguồn, 3 người tiêu thụ, `Can.tsx` (dead code) đã xóa |
+| Nút ghi `order:write` gated | `Tạo đơn` + `Nhập hàng loạt` trên `orders/page.tsx` |
+| Dead code Component | 0 (không còn import xa lạ) |
 | `console.log / console.error` (frontend) | 0 (chỉ `lib/api.ts:37` tiền để, còn comment `ErrorBoundary` `console.error`) |
 | `TODO / FIXME / XXX / HACK` | 0 |
 | `Alert.alert` giả (agent) | 0 — còn `Alert.alert` hợp lệ cho cảnh báo của user |
@@ -130,3 +146,7 @@ Tất cả route đều đảm bảo `canAccessRoute` role, `.svg` sidebar rende
 Toàn bộ 6 làn (A1–A5, A0b, A4) đã rà sạch và bổ sung tính năng demo cho các cửa hàng. Các trang chạy ổn định ở chế độ demo `NEXT_PUBLIC_DATA_SOURCE=mock`. Những gì cần backend/mở rộng (A0) đã nắm rõ theo proviso bảng.
 
 Toàn bộ yêu cầu AGENTS.md đã được đáp ứng.
+
+Điều chỉnh cuối cùng (2026-11-12):
+- `reset-password/page.tsx` và `forgot-password/page.tsx` — bản địa hóa mọi văn bản tiếng Anh sang tiếng Việt (tiêu đề, nhãn, placeholder, thông báo lỗi), đổi `final UI` vintage `bg-rose/rose-50`, `bg-emerald/100`, `shadow-2xl`, icon SVG sang mô hình banner `border-l-2 border-danger bg-surface`, token `ink-faint`, `text-danger`. Hành vi API không đổi.
+- Xác nhận: 0 `console.*` đầu ra (trừ `lib/api.ts:37` pre-existing), 0 `TODO`/`FIXME`, 0 `Alert.alert` giả, 0 emoji, 0 nút rỗng, 0 import không tồn tại, 100/100 bảng 4 trạng thái, 0 double padding, 0 gradient/shadow/card KPI (tiếp tục).
