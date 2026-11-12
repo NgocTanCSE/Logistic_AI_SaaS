@@ -62,6 +62,36 @@ export const PAGE_PERMISSIONS: Record<string, AdminRole[]> = {
     'CUSTOMER_CLIENT',
     'TENANT_USER',
   ],
+  '/admin/managerial-insights': [
+    'SUPER_ADMIN',
+    'TENANT_ADMIN',
+    'WAREHOUSE_MANAGER',
+    'WAREHOUSE_STAFF',
+    'LOGISTICS_MANAGER',
+    'DRIVER',
+    'CUSTOMER_CLIENT',
+    'TENANT_USER',
+  ],
+  '/admin/customer-support': [
+    'SUPER_ADMIN',
+    'TENANT_ADMIN',
+    'WAREHOUSE_MANAGER',
+    'WAREHOUSE_STAFF',
+    'LOGISTICS_MANAGER',
+    'DRIVER',
+    'CUSTOMER_CLIENT',
+    'TENANT_USER',
+  ],
+  '/admin/driver-assistant': [
+    'SUPER_ADMIN',
+    'TENANT_ADMIN',
+    'WAREHOUSE_MANAGER',
+    'WAREHOUSE_STAFF',
+    'LOGISTICS_MANAGER',
+    'DRIVER',
+    'CUSTOMER_CLIENT',
+    'TENANT_USER',
+  ],
 };
 
 const ALL_ROLES: AdminRole[] = [
